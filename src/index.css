@@ -30,14 +30,19 @@ button.danger { background: transparent; color: var(--danger); padding: 4px 8px;
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .table-scroll { overflow-x: auto; }
-table.deck td:nth-child(10) { min-width: 260px; }
-table.deck td:nth-child(2) { min-width: 160px; }
+table.deck td:nth-child(11) { min-width: 260px; }
+table.deck td:nth-child(3) { min-width: 160px; }
 tr.dirty { background: var(--dirty); }
 .summary { display: flex; gap: 20px; flex-wrap: wrap; font-weight: 500; }
 .actions, .save { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
 .actions input { width: 160px; }
 .muted { color: var(--muted); } .ok { color: var(--ok); } .warn { color: var(--warn); } .error { color: var(--danger); }
 code { font-size: 13px; }
+.filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.filters input { width: 220px; } .filters select { width: auto; } .spacer { flex: 1; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 220px; }
+button.tag { padding: 2px 8px; font-size: 12px; background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; }
+button.tag.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* Battle */
 .narrow-wide { max-width: 520px; margin: 32px auto; }

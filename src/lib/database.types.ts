@@ -4,6 +4,8 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 
 export type AppRole = 'super_admin' | 'player'
 export type CardType = 'P' | 'K' | 'S'
+export const CARD_TAGS = ['Attack', 'Defend', 'Speed', 'Technique', 'Spell', 'Hold', 'Control'] as const
+export type CardTag = (typeof CARD_TAGS)[number]
 
 type Timestamps = { updated_at: string }
 
@@ -32,12 +34,14 @@ export type CardRow = {
   name: string
   source: string
   line: string
+  tags: CardTag[]
   type: CardType
   dmg: number
   dmg_tct: number | null
   dmg_tentative: boolean
   effect: string
   copies: number
+  in_deck: boolean
   sort_order: number
 } & Timestamps
 
@@ -71,7 +75,7 @@ export type Database = {
     }
     Views: { [_ in never]: never }
     Functions: { is_super_admin: { Args: Record<string, never>; Returns: boolean } }
-    Enums: { app_role: AppRole; card_type: CardType }
+    Enums: { app_role: AppRole; card_type: CardType; card_tag: CardTag }
     CompositeTypes: { [_ in never]: never }
   }
 }
