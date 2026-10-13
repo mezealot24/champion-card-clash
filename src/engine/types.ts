@@ -37,7 +37,7 @@ export type RulesConfig = {
 
 export const DEFAULT_RULES: RulesConfig = {
   handMax: 5,
-  startHand: 5,
+  startHand: 0, // Q 2026-10-13: start with an empty hand, cards come only from Charge
   blockStopsHits: 2,
   blockStreakDiscard: 3,
   chargeDraw: 1,
