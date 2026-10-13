@@ -38,3 +38,15 @@ tr.dirty { background: var(--dirty); }
 .actions input { width: 160px; }
 .muted { color: var(--muted); } .ok { color: var(--ok); } .warn { color: var(--warn); } .error { color: var(--danger); }
 code { font-size: 13px; }
+
+/* Battle */
+.narrow-wide { max-width: 520px; margin: 32px auto; }
+.battle .panel { margin-bottom: 12px; }
+.hp-bar { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; margin: 8px 0 12px; }
+.hp-bar > div { height: 100%; background: var(--ok); transition: width .3s; }
+.hp-bar > div.low { background: var(--danger); }
+.hand { display: flex; gap: 10px; flex-wrap: wrap; min-height: 40px; }
+.card-tile { width: 150px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); font-size: 13px; }
+.card-tile .dmg { font-size: 26px; font-weight: 700; margin: 4px 0; }
+.card-tile .effect { line-height: 1.35; }
+.turn-log { margin: 10px 0 0; padding-left: 18px; font-size: 14px; }
