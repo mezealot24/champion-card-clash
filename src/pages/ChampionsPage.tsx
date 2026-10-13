@@ -6,7 +6,7 @@ export function ChampionsPage() {
   const { data, error } = useAsync(async () => {
     const [champions, cards] = await Promise.all([
       supabase.from('champions').select('*').order('sort_order'),
-      supabase.from('cards').select('champion_id, dmg, copies'),
+      supabase.from('cards').select('champion_id, dmg, copies').eq('in_deck', true),
     ])
     return { champions: must(champions), cards: must(cards) }
   }, [])
@@ -20,7 +20,7 @@ export function ChampionsPage() {
       <table>
         <thead>
           <tr>
-            <th>ID</th><th>Name</th><th>HP start / max</th><th>Cards</th><th>Total dmg</th><th />
+            <th>ID</th><th>Name</th><th>HP start / max</th><th>In deck</th><th>Total dmg</th><th />
           </tr>
         </thead>
         <tbody>

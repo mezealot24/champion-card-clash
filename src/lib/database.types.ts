@@ -38,6 +38,7 @@ export type CardRow = {
   dmg_tentative: boolean
   effect: string
   copies: number
+  in_deck: boolean
   sort_order: number
 } & Timestamps
 
