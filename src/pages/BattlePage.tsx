@@ -45,7 +45,7 @@ export function BattlePage() {
 
   const deckOf = (id: string) => buildDeck(data.cards.filter((c) => c.champion_id === id))
   const missingOf = (id: string) =>
-    data.cards.filter((c) => c.champion_id === id && c.in_deck !== false && isEffectMissing(c.id, c.effect)).length
+    data.cards.filter((c) => c.champion_id === id && c.in_deck !== false && isEffectMissing(c.id, c.effect, c.effect_json)).length
 
   function start() {
     const setup = (id: string) => {
@@ -163,8 +163,8 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
 }
 
 function CardTile({ card, slot }: { card: CardInst; slot: number }) {
-  const { id, type, dmg, effectText } = card.def
-  const missing = isEffectMissing(id, effectText)
+  const { id, type, dmg, effectText, effectSpec } = card.def
+  const missing = isEffectMissing(id, effectText, effectSpec)
   return (
     <div className="card-tile">
       <div className="muted">

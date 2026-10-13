@@ -69,7 +69,7 @@ export function drawCards(state: GameState, side: Side, n: number): number {
     const card = p.deck.shift()!
     p.hand.push(card)
     drawn++
-    getEffect(card.def.id)?.onDraw?.({ state, self: side, enemy: side === 'p1' ? 'p2' : 'p1', card, pending: null })
+    getEffect(card.def)?.onDraw?.({ state, self: side, enemy: side === 'p1' ? 'p2' : 'p1', card, pending: null })
   }
   return drawn
 }

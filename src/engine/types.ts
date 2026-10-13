@@ -1,4 +1,5 @@
 // Pure game types: no React, no Supabase. The engine only reads these.
+import type { EffectSpec } from './effects/spec'
 
 export type CardType = 'P' | 'K' | 'S'
 export type Action = 'strike' | 'block' | 'charge'
@@ -9,7 +10,8 @@ export type CardDef = {
   id: string // CLASS-NNN, e.g. BR-001
   type: CardType
   dmg: number
-  effectText: string // display only; behaviour lives in effects/registry.ts
+  effectText: string // display only
+  effectSpec?: EffectSpec | null // cards.effect_json; wins over code in effects/registry.ts
 }
 
 /** One physical card in a game. uid is unique even for copies. */

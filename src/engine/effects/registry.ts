@@ -4,6 +4,8 @@
 //
 // วิธีแก้ effect: เปลี่ยนบรรทัดของการ์ดนั้น ใช้ตัวต่อจาก primitives.ts
 //   hook: modify (ปรับ dmg ก่อนตี) | onResolve (ตอนตี โดน Block ก็ทำงาน) | onClean | onBlocked | onDraw
+import type { CardDef } from '../types'
+import { compileSpec, type EffectSpec } from './spec'
 import type { CardEffect } from './types'
 import {
   addDmg,
@@ -46,8 +48,19 @@ export const EFFECTS: Record<string, CardEffect> = {
   // BR-003, BR-012..015: ไม่มี effect
 }
 
-export const getEffect = (cardId: string): CardEffect | undefined => EFFECTS[cardId]
+const compiled = new Map<string, CardEffect>()
 
-/** มีข้อความ effect แต่ยังไม่มีโค้ด → ให้ UI ขึ้น ⚠ */
-export const isEffectMissing = (cardId: string, effectText: string) =>
-  effectText.trim() !== '' && !(cardId in EFFECTS)
+/** effect_json จาก DB มาก่อน ถ้าไม่มีค่อยใช้โค้ดในไฟล์นี้ */
+export function getEffect(def: Pick<CardDef, 'id' | 'effectSpec'>): CardEffect | undefined {
+  if (def.effectSpec?.length) {
+    const key = JSON.stringify(def.effectSpec)
+    let fx = compiled.get(key)
+    if (!fx) compiled.set(key, (fx = compileSpec(def.effectSpec)))
+    return fx
+  }
+  return EFFECTS[def.id]
+}
+
+/** มีข้อความ effect แต่ยังไม่มีทั้ง JSON และโค้ด → ให้ UI ขึ้น ⚠ */
+export const isEffectMissing = (cardId: string, effectText: string, effectSpec?: EffectSpec | null) =>
+  effectText.trim() !== '' && !effectSpec?.length && !(cardId in EFFECTS)

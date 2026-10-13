@@ -1,5 +1,6 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { getEffect } from './effects/registry'
+import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, log, loseHp, toDeckBottom } from './state'
 import type { Action, CardDef, CardInst, CardType, GameState, Side } from './types'
@@ -107,7 +108,7 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
 
   // 1) modify: chain auras adjust dmg before anything hits
   for (const side of strikers) {
-    chains[side]!.forEach((card, i) => getEffect(card.def.id)?.modify?.(ctxFor(side, i, false)))
+    chains[side]!.forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false)))
   }
 
   // 2) hits, slot by slot (both chains interleave when Strike meets Strike)
@@ -121,7 +122,7 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
       const dmg = Math.max(0, card.def.dmg + bonus[side]![i])
       if (!blocked) loseHp(state, enemy, dmg)
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
-      const fx = getEffect(card.def.id)
+      const fx = getEffect(card.def)
       const ctx = ctxFor(side, i, blocked)
       fx?.onResolve?.(ctx)
       if (blocked) fx?.onBlocked?.(ctx)
@@ -143,11 +144,18 @@ export type CardRowLike = {
   effect: string
   copies: number
   in_deck?: boolean
+  effect_json?: EffectSpec | null
 }
 
 /** DB rows → deck list, expanded by copies. Rows with in_deck = false are left out. */
 export function buildDeck(rows: CardRowLike[]): CardDef[] {
   return rows
     .filter((r) => r.in_deck !== false)
-    .flatMap((r) => Array.from({ length: r.copies }, () => ({ id: r.id, type: r.type, dmg: r.dmg, effectText: r.effect })))
+    .flatMap((r) => Array.from({ length: r.copies }, () => ({
+      id: r.id,
+      type: r.type,
+      dmg: r.dmg,
+      effectText: r.effect,
+      effectSpec: r.effect_json ?? null,
+    })))
 }
