@@ -40,3 +40,6 @@ tr.dirty { background: var(--dirty); }
 code { font-size: 13px; }
 .filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
 .filters input { width: 220px; } .filters select { width: auto; } .spacer { flex: 1; }
+.tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 220px; }
+button.tag { padding: 2px 8px; font-size: 12px; background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; }
+button.tag.on { background: var(--accent); color: #fff; border-color: var(--accent); }

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { must, useAsync } from '../lib/useAsync'
-import type { CardRow, CardType } from '../lib/database.types'
+import { CARD_TAGS, type CardRow, type CardTag, type CardType } from '../lib/database.types'
 import { SaveButton } from './SaveButton'
 import { downloadCsv, downloadJson } from '../lib/download'
 
@@ -40,13 +40,15 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
   const [dirty, setDirty] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
   const [typeFilter, setTypeFilter] = useState<CardType | ''>('')
+  const [tagFilter, setTagFilter] = useState<CardTag | ''>('')
   const [deckFilter, setDeckFilter] = useState<'all' | 'in' | 'out'>('all')
 
   const deckCount = cards.filter((c) => c.in_deck).reduce((n, c) => n + c.copies, 0)
   const q = query.trim().toLowerCase()
   const visible = cards.filter((c) =>
-    (!q || [c.id, c.name, c.source, c.line, c.effect].some((v) => v.toLowerCase().includes(q))) &&
+    (!q || [c.id, c.name, c.source, c.effect].some((v) => v.toLowerCase().includes(q))) &&
     (!typeFilter || c.type === typeFilter) &&
+    (!tagFilter || c.tags.includes(tagFilter)) &&
     (deckFilter === 'all' || c.in_deck === (deckFilter === 'in')),
   )
   // Max deck_size cards (counting copies) can be picked for battle
@@ -61,7 +63,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
     const id = nextCardId(championId, cards)
     const sort_order = Math.max(0, ...cards.map((c) => c.sort_order)) + 1
     setCards([...cards, {
-      id, champion_id: championId, name: 'New card', source: '', line: '', type: 'P',
+      id, champion_id: championId, name: 'New card', source: '', line: '', tags: [], type: 'P',
       dmg: 0, dmg_tct: null, dmg_tentative: true, effect: '', copies: 1, in_deck: false, sort_order,
     }])
     setDirty(new Set(dirty).add(id))
@@ -105,6 +107,10 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
           <option value="">All types</option>
           {TYPES.map((t) => <option key={t}>{t}</option>)}
         </select>
+        <select value={tagFilter} onChange={(e) => setTagFilter(e.target.value as CardTag | '')}>
+          <option value="">All tags</option>
+          {CARD_TAGS.map((t) => <option key={t}>{t}</option>)}
+        </select>
         <select value={deckFilter} onChange={(e) => setDeckFilter(e.target.value as 'all' | 'in' | 'out')}>
           <option value="all">All cards</option>
           <option value="in">In deck</option>
@@ -119,7 +125,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
         <table className="deck">
           <thead>
             <tr>
-              <th title="เอาไปสู้">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>สาย</th><th>Type</th><th>dmg</th><th>?</th>
+              <th title="เอาไปสู้">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th>
               <th>TCT</th><th>Copies</th><th>Effect</th><th />
             </tr>
           </thead>
@@ -132,7 +138,20 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
                 <td><code>{c.id}</code></td>
                 <td><input value={c.name} onChange={(e) => edit(c.id, { name: e.target.value })} /></td>
                 <td><input className="short" value={c.source} onChange={(e) => edit(c.id, { source: e.target.value })} /></td>
-                <td><input className="short" value={c.line} onChange={(e) => edit(c.id, { line: e.target.value })} /></td>
+                <td>
+                  <div className="tags">
+                    {CARD_TAGS.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        className={c.tags.includes(t) ? 'tag on' : 'tag'}
+                        onClick={() => edit(c.id, { tags: c.tags.includes(t) ? c.tags.filter((x) => x !== t) : [...c.tags, t] })}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </td>
                 <td>
                   <select value={c.type} onChange={(e) => edit(c.id, { type: e.target.value as CardType })}>
                     {TYPES.map((t) => <option key={t}>{t}</option>)}
