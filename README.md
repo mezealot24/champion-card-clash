@@ -29,3 +29,13 @@ Design docs stay in the Obsidian vault; Supabase is the source of truth for numb
 ## Re-seeding from the vault
 
 `python3 scripts/seed_from_vault.py "<vault>/04 Cards"` regenerates the card insert (checks each deck has 15 cards).
+
+## Battle engine (`src/engine`)
+
+Pure TypeScript, no React or Supabase imports, so it runs in tests and later in the battle screen.
+
+- `createGame(p1, p2, { seed })` → shuffles each deck once and deals the starting hand.
+- `resolveTurn(state, { p1, p2 })` → returns a new state (input is never mutated); `state.log` has a readable play-by-play.
+- `legalActions`, `pickAiAction` (v0 weighted-random AI), `buildDeck(rows)` (DB rows → deck, honours `copies` / `in_deck`).
+- **Card effects** live in `src/engine/effects/registry.ts` (card ID → code built from `effects/primitives.ts`). `cards.effect` in Supabase stays display text. Cards with text but no code play as plain dmg; `isEffectMissing()` lets the UI flag them.
+- `npm test` runs the engine tests.

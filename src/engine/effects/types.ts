@@ -1,0 +1,46 @@
+import type { Action, CardInst, GameState, Side } from '../types'
+
+/** What every effect can see. pending != null means draws wait until the chain ends. */
+export type BaseCtx = {
+  state: GameState
+  self: Side
+  enemy: Side
+  card: CardInst
+  pending: Record<Side, number> | null
+}
+
+/** Context while a card is inside a Strike chain. */
+export type ChainCtx = BaseCtx & {
+  slot: number // 0-based position in the chain (slot 1 = 0)
+  chain: CardInst[]
+  enemyChain: CardInst[] | null // set only when the enemy also Strikes
+  selfAction: Action
+  enemyAction: Action
+  /** Both hands as they were when actions were revealed. */
+  handAtStart: Record<Side, CardInst[]>
+  /** Dmg bonus per slot of my chain; modify hooks write here. */
+  bonus: number[]
+  /** Same for the enemy chain (only when the enemy Strikes). */
+  enemyBonus: number[] | null
+  /** Hit phase only: was this hit stopped by Block? */
+  blocked: boolean
+}
+
+export type Act<C extends BaseCtx = ChainCtx> = (ctx: C) => void
+export type Cond = (ctx: ChainCtx) => boolean
+
+/**
+ * Hooks a card can have. All optional.
+ * - modify: before any hit, adjust dmg of this / later cards (chain auras)
+ * - onResolve: when this card hits, blocked or not (Q: blocked cards still fire effects, just 0 dmg)
+ * - onClean: when this card hits clean (not blocked, dmg > 0)
+ * - onBlocked: when this card is stopped by Block
+ * - onDraw: when this card is drawn into the hand
+ */
+export type CardEffect = {
+  modify?: Act
+  onResolve?: Act
+  onClean?: Act
+  onBlocked?: Act
+  onDraw?: Act<BaseCtx>
+}
