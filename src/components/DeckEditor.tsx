@@ -4,6 +4,7 @@ import { must, useAsync } from '../lib/useAsync'
 import { CARD_TAGS, type CardRow, type CardTag, type CardType } from '../lib/database.types'
 import { SaveButton } from './SaveButton'
 import { downloadCsv, downloadJson } from '../lib/download'
+import { EffectBuilder } from './EffectBuilder'
 
 const TYPES: CardType[] = ['P', 'K', 'S']
 type EditableCard = Omit<CardRow, 'updated_at'>
@@ -64,7 +65,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
     const sort_order = Math.max(0, ...cards.map((c) => c.sort_order)) + 1
     setCards([...cards, {
       id, champion_id: championId, name: 'New card', source: '', line: '', tags: [], type: 'P',
-      dmg: 0, dmg_tct: null, dmg_tentative: true, effect: '', copies: 1, in_deck: false, sort_order,
+      dmg: 0, dmg_tct: null, dmg_tentative: true, effect: '', effect_json: null, copies: 1, in_deck: false, sort_order,
     }])
     setDirty(new Set(dirty).add(id))
   }
@@ -163,7 +164,14 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
                 </td>
                 <td className="muted">{c.dmg_tct ?? '–'}</td>
                 <td><input className="num" type="number" min={1} max={4} value={c.copies} onChange={(e) => edit(c.id, { copies: Number(e.target.value) })} /></td>
-                <td><textarea rows={1} value={c.effect} onChange={(e) => edit(c.id, { effect: e.target.value })} /></td>
+                <td>
+                  <textarea rows={1} value={c.effect} onChange={(e) => edit(c.id, { effect: e.target.value })} />
+                  <EffectBuilder
+                    value={c.effect_json}
+                    onChange={(effect_json) => edit(c.id, { effect_json })}
+                    onUseText={(effect) => edit(c.id, { effect })}
+                  />
+                </td>
                 <td><button className="danger" onClick={() => removeCard(c.id)} title="Delete">✕</button></td>
               </tr>
             ))}

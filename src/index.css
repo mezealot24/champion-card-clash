@@ -30,7 +30,7 @@ button.danger { background: transparent; color: var(--danger); padding: 4px 8px;
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .table-scroll { overflow-x: auto; }
-table.deck td:nth-child(11) { min-width: 260px; }
+table.deck td:nth-child(11) { min-width: 380px; }
 table.deck td:nth-child(3) { min-width: 160px; }
 tr.dirty { background: var(--dirty); }
 .summary { display: flex; gap: 20px; flex-wrap: wrap; font-weight: 500; }
@@ -55,3 +55,11 @@ button.tag.on { background: var(--accent); color: #fff; border-color: var(--acce
 .card-tile .dmg { font-size: 26px; font-weight: 700; margin: 4px 0; }
 .card-tile .effect { line-height: 1.35; }
 .turn-log { margin: 10px 0 0; padding-left: 18px; font-size: 14px; }
+
+/* Effect builder (Deck page) */
+.effect-builder { margin-top: 4px; font-size: 13px; }
+.effect-builder summary { cursor: pointer; color: var(--accent); }
+.effect-builder .rule { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
+.effect-builder .rule-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 4px 0; }
+.effect-builder select { width: auto; }
+.effect-builder .hint { margin: 0; font-size: 12px; }
