@@ -36,12 +36,24 @@ describe('Tank cards', () => {
     expect(t([plain(), plain(), tk('TK-003')])).toBe(70)
   })
 
-  it('TK-004/005/011 fire only on a clean hit', () => {
-    expect(resolveTurn(game([tk('TK-004')], []), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(58)
-    expect(resolveTurn(game([tk('TK-004')], []), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(50)
-    expect(resolveTurn(game([tk('TK-005')], []), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(55)
-    expect(resolveTurn(game([tk('TK-011')], []), { p1: 'strike', p2: 'charge' }).players.p1.hand).toHaveLength(1)
-    expect(resolveTurn(game([tk('TK-011')], []), { p1: 'strike', p2: 'block' }).players.p1.hand).toHaveLength(0)
+  it('TK-004 heals 8 on a charge break (we Charge, opponent Strikes)', () => {
+    expect(resolveTurn(game([tk('TK-004')], [plain(3)]), { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(50 - 3 + 8)
+    expect(resolveTurn(game([tk('TK-004')], [plain(3)]), { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(50)
+    expect(resolveTurn(game([tk('TK-004')], []), { p1: 'charge', p2: 'block' }).players.p1.hp).toBe(50)
+    // still fires when the charge break throws it away (hand > 1, oldest card is lost)
+    expect(resolveTurn(game([tk('TK-004'), plain()], [plain(3)]), { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(55)
+  })
+
+  it("TK-005 held while we Charge: opponent's Kicks deal half (rounded down)", () => {
+    const foe = () => [plain(10, 'K'), plain(7, 'K'), plain(6, 'P')]
+    expect(resolveTurn(game([tk('TK-005')], foe()), { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(50 - 5 - 3 - 6)
+    expect(resolveTurn(game([tk('TK-005')], foe()), { p1: 'strike', p2: 'strike' }).players.p1.hp).toBe(50 - 23)
+  })
+
+  it('TK-011 heals 10 when we Strike and take hit dmg this turn', () => {
+    expect(resolveTurn(game([tk('TK-011')], [plain(3), plain(3)]), { p1: 'strike', p2: 'strike' }).players.p1.hp).toBe(50 - 6 + 10)
+    expect(resolveTurn(game([tk('TK-011')], [plain(0)]), { p1: 'strike', p2: 'strike' }).players.p1.hp).toBe(50)
+    expect(resolveTurn(game([tk('TK-011')], []), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(50)
   })
 
   it('TK-006 needs the opponent at 5 cards; TK-007 needs opponent Strike; TK-008 always', () => {
@@ -113,5 +125,7 @@ describe('Tank cards', () => {
     expect(describeSpec(specs['TK-009'])).toBe('Every turn (Hold), if you play Block and opponent plays Strike: Gain 3 HP per hit you blocked this turn')
     expect(describeSpec(specs['TK-014'])).toBe('After attack, if your HP ≤ 29: Gain 20 HP (once per game)')
     expect(describeSpec(specs['TK-016'])).toBe('Comes into play: Your Block stops +1 hit next turn')
+    expect(describeSpec(specs['TK-005'])).toBe("Before attack, if you play Charge: All opponent's Kick cards lose 50% dmg")
+    expect(describeSpec(specs['TK-011'])).toBe('After attack, if you play Strike and you take dmg from a hit this turn: Gain 10 HP')
   })
 })

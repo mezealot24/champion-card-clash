@@ -102,22 +102,32 @@ export type DmgTarget =
   | 'following' // ทุกใบที่ตามหลัง
   | { slot: number } // ช่องที่ n (นับ 1)
   | 'facing' // ใบประจันหน้าของศัตรู (มีผลเมื่อศัตรู Strike)
+  | 'enemyAll' // ทุกใบในสายศัตรู (มีผลเมื่อศัตรู Strike)
+
+/** Apply fn to every slot the target points at: (array of that chain, slot). */
+function eachTarget(ctx: ChainCtx, target: DmgTarget, onlyType: CardType | undefined, mine: number[], theirs: number[] | null, fn: (arr: number[], i: number) => void) {
+  const ok = (c?: { def: { type: CardType } }) => !!c && (!onlyType || c.def.type === onlyType)
+  if (target === 'facing' || target === 'enemyAll') {
+    if (!theirs || !ctx.enemyChain) return
+    const slots = target === 'facing' ? [ctx.slot] : ctx.enemyChain.map((_, i) => i)
+    for (const i of slots) if (ok(ctx.enemyChain[i])) fn(theirs, i)
+    return
+  }
+  for (const i of targetSlots(ctx, target)) if (ok(ctx.chain[i])) fn(mine, i)
+}
 
 export const addDmg =
   (target: DmgTarget, n: number, onlyType?: CardType): Act =>
-  (ctx) => {
-    if (target === 'facing') {
-      const f = ctx.enemyChain?.[ctx.slot]
-      if (ctx.enemyBonus && f && (!onlyType || f.def.type === onlyType)) ctx.enemyBonus[ctx.slot] += n
-      return
-    }
-    for (const i of targetSlots(ctx, target)) {
-      const c = ctx.chain[i]
-      if (c && (!onlyType || c.def.type === onlyType)) ctx.bonus[i] += n
-    }
-  }
+  (ctx) =>
+    eachTarget(ctx, target, onlyType, ctx.bonus, ctx.enemyBonus, (arr, i) => (arr[i] += n))
 
-function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing'>): number[] {
+/** ใช้ใน hook `modify`: คูณ dmg เป็น pct% (50 = ครึ่งเดียว, 200 = x2) ปัดลง */
+export const mulDmg =
+  (target: DmgTarget, pct: number, onlyType?: CardType): Act =>
+  (ctx) =>
+    eachTarget(ctx, target, onlyType, ctx.mult, ctx.enemyMult, (arr, i) => (arr[i] *= pct / 100))
+
+function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing' | 'enemyAll'>): number[] {
   if (target === 'this') return [ctx.slot]
   if (target === 'next') return [ctx.slot + 1]
   if (target === 'following') return ctx.chain.map((_, i) => i).filter((i) => i > ctx.slot)
@@ -179,6 +189,9 @@ export const slotIs = (n: number): Cond => (ctx) => ctx.slot === n - 1
 /** มีใบประจันหน้า = มือศัตรูมีการ์ดลำดับเดียวกับใบนี้ (ไม่สน action ศัตรู) */
 export const hasFacing: Cond = (ctx) => handOf(ctx, 'enemy').length > ctx.slot
 export const facingSameType: Cond = (ctx) => handOf(ctx, 'enemy')[ctx.slot]?.def.type === ctx.card.def.type
+
+/** เราโดน hit รวม ≥ n dmg ในเทิร์นนี้ (Block ที่กันได้ไม่นับ) */
+export const tookDmg = (n: number): Cond => (ctx) => ctx.hitDmgTaken[ctx.self] >= n
 
 export const hpAtMost = (n: number): Cond => (ctx) => ctx.state.players[ctx.self].hp <= n
 export const hpNotAbove: Cond = (ctx) => ctx.state.players[ctx.self].hp <= ctx.state.players[ctx.enemy].hp

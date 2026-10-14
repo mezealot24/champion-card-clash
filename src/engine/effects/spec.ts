@@ -17,7 +17,8 @@ export type CondSpec =
   | { c: 'enemyHandEmpty' }
   | { c: 'handCompare'; op: '<' | '=' | '>' }
   | { c: 'enemyAction'; a: 'strike' | 'block' | 'charge' }
-  | { c: 'selfAction'; a: 'block' | 'charge' }
+  | { c: 'selfAction'; a: 'strike' | 'block' | 'charge' }
+  | { c: 'tookDmg'; n: number }
   | { c: 'hitResult'; r: 'clean' | 'blocked' }
   | { c: 'enemyChainAtLeast'; n: number }
   | { c: 'chainAll'; type: CardType }
@@ -34,6 +35,7 @@ export type ActSpec =
   | { a: 'status'; who: P.Who; kind: StatusKind; turns: number; n?: number }
   | { a: 'grow'; n: number; dur: 'next' | 'game'; stack?: boolean }
   | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType }
+  | { a: 'mulDmg'; target: P.DmgTarget; pct: number; onlyType?: CardType }
 
 /**
  * One rule = when [hook], if all [if], do all [do]. A card can have several rules.
@@ -56,6 +58,7 @@ function cond(s: CondSpec): Cond {
     case 'slotIs': return P.slotIs(s.n)
     case 'hasFacing': return P.hasFacing
     case 'facingSameType': return P.facingSameType
+    case 'tookDmg': return P.tookDmg(s.n)
     case 'hpAtMost': return P.hpAtMost(s.n)
     case 'hpNotAbove': return P.hpNotAbove
   }
@@ -70,6 +73,7 @@ function act(s: ActSpec): Act {
     case 'status': return P.status(s.who, s.kind, s.turns, s.kind === 'blockPlus' ? (s.n ?? 1) : undefined)
     case 'grow': return P.grow(s.n, s.dur ?? 'game', s.stack)
     case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType)
+    case 'mulDmg': return P.mulDmg(s.target, s.pct, s.onlyType)
   }
 }
 

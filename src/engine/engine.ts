@@ -40,8 +40,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
 
   const hitsBlocked: Record<Side, number> = { p1: 0, p2: 0 }
-  if (actions.p1 === 'strike' || actions.p2 === 'strike') resolveStrikes(state, actions, handAtStart, blockStops, hitsBlocked)
-  resolveHeld(state, actions, handAtStart, hitsBlocked)
+  const hitDmgTaken: Record<Side, number> = { p1: 0, p2: 0 }
+  if (actions.p1 === 'strike' || actions.p2 === 'strike') resolveStrikes(state, actions, handAtStart, blockStops, hitsBlocked, hitDmgTaken)
+  resolveHeld(state, actions, handAtStart, hitsBlocked, hitDmgTaken)
 
   for (const side of SIDES) {
     if (actions[side] !== 'charge') continue
@@ -92,42 +93,63 @@ function resolveStrikes(
   handAtStart: Record<Side, CardInst[]>,
   blockStops: Record<Side, number>,
   hitsBlocked: Record<Side, number>,
+  hitDmgTaken: Record<Side, number>,
 ) {
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
   const pending: Record<Side, number> = { p1: 0, p2: 0 }
   const chains: Partial<Record<Side, CardInst[]>> = {}
   const bonus: Partial<Record<Side, number[]>> = {}
+  const mult: Partial<Record<Side, number[]>> = {}
   for (const side of strikers) {
     chains[side] = state.players[side].hand
     state.players[side].hand = [] // Strike uses the whole hand
     bonus[side] = chains[side].map(() => 0)
+    mult[side] = chains[side].map(() => 1)
   }
 
-  const ctxFor = (side: Side, slot: number, blocked: boolean, clean = false): ChainCtx => {
+  // held = a card in the hand of a side that didn't Strike (it has no chain of its own)
+  const ctxFor = (side: Side, slot: number, blocked: boolean, clean = false, held = false): ChainCtx => {
     const enemy = other(side)
     return {
       state,
       self: side,
       enemy,
-      card: chains[side]![slot],
+      card: held ? handAtStart[side][slot] : chains[side]![slot],
       pending,
       slot,
-      chain: chains[side]!,
+      chain: held ? [] : chains[side]!,
       enemyChain: chains[enemy] ?? null,
       selfAction: actions[side],
       enemyAction: actions[enemy],
       handAtStart,
       hitsBlocked,
-      bonus: bonus[side]!,
+      hitDmgTaken,
+      bonus: held ? [] : bonus[side]!,
       enemyBonus: bonus[enemy] ?? null,
+      mult: held ? [] : mult[side]!,
+      enemyMult: mult[enemy] ?? null,
       blocked,
       clean,
     }
   }
 
-  // 1) modify: chain auras adjust dmg before anything hits
+  // 1) Before attack: chain auras, plus held cards of a side that didn't Strike (e.g. "if you played Charge")
+  for (const side of SIDES) {
+    if (actions[side] === 'strike') chains[side]!.forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false)))
+    else handAtStart[side].forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false, false, true)))
+  }
+
+  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < blockStops[other(side)]
+  const dmgOf = (side: Side, i: number) => {
+    const card = chains[side]![i]
+    const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + bonus[side]![i]
+    return Math.max(0, Math.floor(raw * mult[side]![i]))
+  }
+  // dmg each side will take from hits this turn is known now (later effects can't change it)
   for (const side of strikers) {
-    chains[side]!.forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false)))
+    chains[side]!.forEach((_, i) => {
+      if (!isBlocked(side, i)) hitDmgTaken[other(side)] += dmgOf(side, i)
+    })
   }
 
   // 2) hits, slot by slot (both chains interleave when Strike meets Strike)
@@ -137,10 +159,10 @@ function resolveStrikes(
       const card = chains[side]![i]
       if (!card) continue
       const enemy = other(side)
-      const blocked = actions[enemy] === 'block' && i < blockStops[enemy]
+      const blocked = isBlocked(side, i)
       if (blocked) hitsBlocked[enemy]++
       const usedNext = card.growNext ?? 0
-      const dmg = Math.max(0, card.def.dmg + (card.grow ?? 0) + usedNext + bonus[side]![i])
+      const dmg = dmgOf(side, i)
       if (!blocked) loseHp(state, enemy, dmg)
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
       const fx = getEffect(card.def)
@@ -163,6 +185,7 @@ function resolveHeld(
   actions: Record<Side, Action>,
   handAtStart: Record<Side, CardInst[]>,
   hitsBlocked: Record<Side, number>,
+  hitDmgTaken: Record<Side, number>,
 ) {
   for (const side of SIDES) {
     if (actions[side] === 'strike') continue
@@ -180,8 +203,11 @@ function resolveHeld(
         enemyAction: actions[other(side)],
         handAtStart,
         hitsBlocked,
+        hitDmgTaken,
         bonus: [],
         enemyBonus: null,
+        mult: [],
+        enemyMult: null,
         blocked: false,
         clean: false,
       })

@@ -39,6 +39,7 @@ export function describeCond(c: CondSpec): string {
     case 'slotIs': return `this card is in slot ${c.n}`
     case 'hasFacing': return 'there is a facing card'
     case 'facingSameType': return 'facing card is the same type'
+    case 'tookDmg': return c.n <= 1 ? 'you take dmg from a hit this turn' : `you take ${c.n}+ dmg from hits this turn`
     case 'hpAtMost': return `your HP ≤ ${c.n}`
     case 'hpNotAbove': return "your HP ≤ opponent's HP"
   }
@@ -46,7 +47,7 @@ export function describeCond(c: CondSpec): string {
 
 function describeTarget(t: DmgTarget): string {
   if (typeof t === 'object') return `card in slot ${t.slot}`
-  return { this: 'this card', next: 'next card', following: 'all following cards', facing: 'facing card' }[t]
+  return { this: 'this card', next: 'next card', following: 'all following cards', facing: 'facing card', enemyAll: "all opponent's cards" }[t]
 }
 
 export function describeAct(a: ActSpec): string {
@@ -62,6 +63,11 @@ export function describeAct(a: ActSpec): string {
     }
     case 'grow': return `this card gains ${signed(a.n)} dmg ${a.dur === 'next' ? 'on its next attack' : 'for the rest of the game'}${a.stack ? ' (stacks)' : ''}`
     case 'addDmg': return `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''} ${signed(a.n)} dmg`
+    case 'mulDmg': {
+      const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`
+      if (a.pct < 100) return `${what} lose ${100 - a.pct}% dmg`
+      return a.pct % 100 === 0 ? `${what} dmg x${a.pct / 100}` : `${what} dmg ${a.pct}%`
+    }
   }
 }
 
