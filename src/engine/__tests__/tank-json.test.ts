@@ -121,6 +121,20 @@ describe('Tank cards', () => {
     expect(s.players.p1.hp).toBe(35) // back to 2 stopped
   })
 
+  it('TK-017 on Field while opponent has 3+ cards: our Block stops 1 hit next turn', () => {
+    const spec: EffectSpec = JSON.parse(readFileSync(new URL('../../../supabase/migrations/20261014000002_tk017.sql', import.meta.url), 'utf8').match(/'(\[\{"hook".*\])'\)/)![1])
+    const card: CardInst = { uid: 'tk17', def: { id: 'TK-017', type: 'S', dmg: 20, effectText: '', effectSpec: spec } }
+    const chain = () => [plain(5), plain(5), plain(5)]
+    let s = resolveTurn(game([card], chain()), { p1: 'charge', p2: 'block' })
+    s.players.p2.hand = chain()
+    s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(50 - 10) // only 1 hit stopped
+    const calm = resolveTurn(game([card], [plain()]), { p1: 'charge', p2: 'block' })
+    calm.players.p2.hand = chain()
+    expect(resolveTurn(calm, { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(50 - 5)
+    expect(describeSpec(spec)).toBe('Every turn (Hold), if opponent has 3+ cards: Your Block stops −1 hit next turn')
+  })
+
   it('describes the new pieces in English', () => {
     expect(describeSpec(specs['TK-009'])).toBe('Every turn (Hold), if you play Block and opponent plays Strike: Gain 3 HP per hit you blocked this turn')
     expect(describeSpec(specs['TK-014'])).toBe('After attack, if your HP ≤ 29: Gain 20 HP (once per game)')

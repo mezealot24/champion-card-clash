@@ -81,10 +81,10 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   return state
 }
 
-/** How many hits this side's Block stops: base rule + every active "Block +N hit" status. */
+/** How many hits this side's Block stops: base rule + every active "Block ±N hit" status (never below 0). */
 function blockStopsFor(state: GameState, side: Side): number {
   const extra = state.players[side].statuses.filter((s) => s.kind === 'blockPlus').reduce((t, s) => t + (s.n ?? 1), 0)
-  return state.rules.blockStopsHits + extra
+  return Math.max(0, state.rules.blockStopsHits + extra)
 }
 
 function resolveStrikes(

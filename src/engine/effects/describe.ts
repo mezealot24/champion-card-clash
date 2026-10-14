@@ -14,7 +14,7 @@ export const HOOK_LABEL: Record<Hook, string> = {
 const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops more hits' }
+const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits' }
 export const PER_LABEL: Record<Per, string> = {
   hitBlocked: 'hit you blocked this turn',
   chainCard: 'card in your chain',
@@ -58,7 +58,10 @@ export function describeAct(a: ActSpec): string {
     case 'maxHp': return `${a.who === 'self' ? '' : `${WHO[a.who]} `}Max HP ${signed(a.n)}`
     case 'status': {
       const turns = a.turns === 1 ? 'next turn' : `for ${a.turns} turns`
-      if (a.kind === 'blockPlus') return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops +${a.n ?? 1} hit${(a.n ?? 1) === 1 ? '' : 's'} ${turns}`
+      if (a.kind === 'blockPlus') {
+        const n = a.n ?? 1
+        return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops ${signed(n)} hit${Math.abs(n) === 1 ? '' : 's'} ${turns}`
+      }
       return `${WHO[a.who]} ${STATUS[a.kind]} ${turns}`
     }
     case 'grow': return `this card gains ${signed(a.n)} dmg ${a.dur === 'next' ? 'on its next attack' : 'for the rest of the game'}${a.stack ? ' (stacks)' : ''}`

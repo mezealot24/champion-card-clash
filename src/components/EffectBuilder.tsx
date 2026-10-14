@@ -176,9 +176,9 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
             }}
           >
             <option value="noStrike">can't Strike</option><option value="noBlock">can't Block</option><option value="noCharge">can't Charge</option>
-            <option value="blockPlus">Block stops +N hits</option>
+            <option value="blockPlus">Block stops ±N hits</option>
           </select>
-          {value.kind === 'blockPlus' && <>+<Num value={value.n ?? 1} min={1} onChange={(n) => onChange({ ...value, n })} /> hit(s),</>}
+          {value.kind === 'blockPlus' && <><Num value={value.n ?? 1} onChange={(n) => onChange({ ...value, n })} /> hit(s) (negative = fewer),</>}
           <Num value={value.turns} min={1} onChange={(turns) => onChange({ ...value, turns })} /> turn(s)
         </>
       )}
