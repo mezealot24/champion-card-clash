@@ -126,6 +126,7 @@ export const handCompare =
   }
 
 export const enemyAction = (a: ChainCtx['enemyAction']): Cond => (ctx) => ctx.enemyAction === a
+export const selfAction = (a: ChainCtx['selfAction']): Cond => (ctx) => ctx.selfAction === a
 export const enemyChainAtLeast = (n: number): Cond => (ctx) => (ctx.enemyChain?.length ?? 0) >= n
 
 /** สายของเราเป็นประเภทเดียวล้วน เช่น Kick ล้วน */

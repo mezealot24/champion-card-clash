@@ -4,13 +4,14 @@ import type { CardType, StatusKind } from '../types'
 import * as P from './primitives'
 import type { Act, CardEffect, ChainCtx, Cond } from './types'
 
-export type Hook = 'modify' | 'onResolve' | 'onClean' | 'onBlocked' | 'onDraw'
+export type Hook = 'modify' | 'onResolve' | 'onClean' | 'onBlocked' | 'onDraw' | 'onHeld'
 
 export type CondSpec =
   | { c: 'enemyHandAtLeast'; n: number }
   | { c: 'enemyHandEmpty' }
   | { c: 'handCompare'; op: '<' | '=' | '>' }
   | { c: 'enemyAction'; a: 'strike' | 'block' | 'charge' }
+  | { c: 'selfAction'; a: 'block' | 'charge' }
   | { c: 'enemyChainAtLeast'; n: number }
   | { c: 'chainAll'; type: CardType }
   | { c: 'chainLength'; op: '=' | '>='; n: number }
@@ -35,6 +36,7 @@ function cond(s: CondSpec): Cond {
     case 'enemyHandEmpty': return P.enemyHandEmpty
     case 'handCompare': return P.handCompare(s.op)
     case 'enemyAction': return P.enemyAction(s.a)
+    case 'selfAction': return P.selfAction(s.a)
     case 'enemyChainAtLeast': return P.enemyChainAtLeast(s.n)
     case 'chainAll': return P.chainAll(s.type)
     case 'chainLength': return P.chainLength(s.op, s.n)

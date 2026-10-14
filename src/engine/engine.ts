@@ -37,6 +37,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
 
   if (actions.p1 === 'strike' || actions.p2 === 'strike') resolveStrikes(state, actions, handAtStart)
+  resolveHeld(state, actions, handAtStart)
 
   for (const side of SIDES) {
     if (actions[side] !== 'charge') continue
@@ -133,6 +134,31 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
   // 3) used cards go under the deck, then draws from effects enter the hand
   for (const side of strikers) toDeckBottom(state, side, chains[side]!)
   for (const side of SIDES) if (pending[side]) drawCards(state, side, pending[side])
+}
+
+// onHeld: cards that stayed in hand this turn (we didn't Strike), after hits land, before Charge draws
+function resolveHeld(state: GameState, actions: Record<Side, Action>, handAtStart: Record<Side, CardInst[]>) {
+  for (const side of SIDES) {
+    if (actions[side] === 'strike') continue
+    handAtStart[side].forEach((card, slot) => {
+      getEffect(card.def)?.onHeld?.({
+        state,
+        self: side,
+        enemy: other(side),
+        card,
+        pending: null,
+        slot,
+        chain: [],
+        enemyChain: null,
+        selfAction: actions[side],
+        enemyAction: actions[other(side)],
+        handAtStart,
+        bonus: [],
+        enemyBonus: null,
+        blocked: false,
+      })
+    })
+  }
 }
 
 // ---------- data loading ----------

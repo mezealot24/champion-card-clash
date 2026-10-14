@@ -39,4 +39,13 @@ describe('effect_json', () => {
     const override = inst({ id: 'BR-001', type: 'K', dmg: 16, effectText: '', effectSpec: [{ hook: 'onResolve', do: [] }] })
     expect(resolveTurn(game([override], []), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(50) // no self-damage
   })
+
+  it('onHeld fires for each held copy, only when we Block', () => {
+    const spec: EffectSpec = [{ hook: 'onHeld', if: [{ c: 'selfAction', a: 'block' }], do: [{ a: 'heal', who: 'self', n: 5 }] }]
+    const card = () => inst({ id: 'ZZ-004', type: 'P', dmg: 4, effectText: 'ถ้าเรา Block: ฮีล 5', effectSpec: spec })
+    expect(resolveTurn(game([card(), card()], []), { p1: 'block', p2: 'charge' }).players.p1.hp).toBe(60)
+    expect(resolveTurn(game([card()], []), { p1: 'charge', p2: 'charge' }).players.p1.hp).toBe(50)
+    // Strike takes the card out of the hand, so it does not count as held
+    expect(resolveTurn(game([card()], []), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(50)
+  })
 })

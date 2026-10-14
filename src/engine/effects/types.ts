@@ -36,6 +36,7 @@ export type Cond = (ctx: ChainCtx) => boolean
  * - onClean: when this card hits clean (not blocked, dmg > 0)
  * - onBlocked: when this card is stopped by Block
  * - onDraw: when this card is drawn into the hand
+ * - onHeld: each turn this card sits in the hand and we don't Strike (slot = hand position, chain is empty)
  */
 export type CardEffect = {
   modify?: Act
@@ -43,4 +44,5 @@ export type CardEffect = {
   onClean?: Act
   onBlocked?: Act
   onDraw?: Act<BaseCtx>
+  onHeld?: Act
 }

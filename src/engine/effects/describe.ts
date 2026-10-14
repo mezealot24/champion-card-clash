@@ -8,6 +8,7 @@ export const HOOK_TH: Record<Hook, string> = {
   onClean: 'ถ้า clean',
   onBlocked: 'ถ้าโดน Block',
   onDraw: 'เมื่อจั่วได้',
+  onHeld: 'ตอนอยู่ในมือ',
 }
 const WHO_TH: Record<Who, string> = { self: 'เรา', enemy: 'ศัตรู', both: 'ทั้งคู่' }
 const ACTION_TH = { strike: 'Strike', block: 'Block', charge: 'Charge' }
@@ -22,6 +23,7 @@ export function describeCond(c: CondSpec): string {
     case 'enemyHandEmpty': return 'ศัตรูมือว่าง'
     case 'handCompare': return { '<': 'เรามีการ์ดน้อยกว่าศัตรู', '=': 'มีการ์ดเท่าศัตรู', '>': 'เรามีการ์ดมากกว่าศัตรู' }[c.op]
     case 'enemyAction': return `ศัตรู ${ACTION_TH[c.a]}`
+    case 'selfAction': return `เรา ${ACTION_TH[c.a]}`
     case 'enemyChainAtLeast': return `ศัตรู Strike สาย ≥${c.n} ใบ`
     case 'chainAll': return `สายเป็น ${TYPE_TH[c.type]} ล้วน`
     case 'chainLength': return c.op === '=' ? `สายมี ${c.n} ใบ` : `สาย ≥${c.n} ใบ`

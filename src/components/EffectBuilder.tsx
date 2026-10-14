@@ -12,6 +12,7 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   enemyHandEmpty: { c: 'enemyHandEmpty' },
   handCompare: { c: 'handCompare', op: '<' },
   enemyAction: { c: 'enemyAction', a: 'strike' },
+  selfAction: { c: 'selfAction', a: 'block' },
   enemyChainAtLeast: { c: 'enemyChainAtLeast', n: 3 },
   chainAll: { c: 'chainAll', type: 'K' },
   chainLength: { c: 'chainLength', op: '=', n: 1 },
@@ -54,6 +55,7 @@ export function EffectBuilder({ value, onChange, onUseText }: Props) {
             <button type="button" className="danger" onClick={() => set(removeAt(rules, ri))} title="ลบกฎนี้">✕</button>
           </div>
           {rule.hook === 'modify' && <p className="muted hint">ก่อนตี = ใช้กับ "ปรับ dmg" ของใบในสาย</p>}
+          {rule.hook === 'onHeld' && <p className="muted hint">ทำงานทุกเทิร์นที่การ์ดอยู่ในมือและเราไม่ได้ Strike (ทุกใบที่ถืออยู่ทำงานแยกกัน) · ใส่เงื่อนไข "เรา Block" ถ้าอยากให้ทำงานเฉพาะตอน Block</p>}
 
           {(rule.if ?? []).map((cond, ci) => (
             <div className="rule-row" key={`c${ci}`}>
@@ -113,6 +115,11 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
       {value.c === 'enemyAction' && (
         <select value={value.a} onChange={(e) => onChange({ ...value, a: e.target.value as 'strike' | 'block' | 'charge' })}>
           <option value="strike">Strike</option><option value="block">Block</option><option value="charge">Charge</option>
+        </select>
+      )}
+      {value.c === 'selfAction' && (
+        <select value={value.a} onChange={(e) => onChange({ ...value, a: e.target.value as 'block' | 'charge' })}>
+          <option value="block">Block</option><option value="charge">Charge</option>
         </select>
       )}
       {value.c === 'chainAll' && <TypeSelect value={value.type} onChange={(type) => onChange({ ...value, type: type! })} />}
