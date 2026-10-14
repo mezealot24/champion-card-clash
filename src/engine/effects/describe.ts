@@ -1,7 +1,7 @@
 // effect_json → short English text (used by the Admin form, and as the card's effect text)
 import type { ActSpec, CondSpec, EffectSpec, Hook } from './spec'
 import { normalizeSpec } from './spec'
-import type { DmgTarget, Who } from './primitives'
+import type { DmgTarget, Per, Who } from './primitives'
 
 export const HOOK_LABEL: Record<Hook, string> = {
   modify: 'Before attack',
@@ -14,7 +14,13 @@ export const HOOK_LABEL: Record<Hook, string> = {
 const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge" }
+const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops more hits' }
+export const PER_LABEL: Record<Per, string> = {
+  hitBlocked: 'hit you blocked this turn',
+  chainCard: 'card in your chain',
+  selfCard: 'card in your hand',
+  enemyCard: "card in opponent's hand",
+}
 
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
 const cards = (n: number) => `${n} card${n === 1 ? '' : 's'}`
@@ -45,15 +51,21 @@ function describeTarget(t: DmgTarget): string {
 
 export function describeAct(a: ActSpec): string {
   switch (a.a) {
-    case 'draw': return a.who === 'self' ? `draw ${a.n}` : `${WHO[a.who]} draw ${a.n}`
-    case 'heal': return a.who === 'self' ? `gain ${a.n} HP` : `${WHO[a.who]} gain ${a.n} HP`
-    case 'loseHp': return a.who === 'self' ? `lose ${a.n} HP` : `${WHO[a.who]} lose ${a.n} HP`
+    case 'draw': return (a.who === 'self' ? `draw ${a.n}` : `${WHO[a.who]} draw ${a.n}`) + per(a.per)
+    case 'heal': return (a.who === 'self' ? `gain ${a.n} HP` : `${WHO[a.who]} gain ${a.n} HP`) + per(a.per)
+    case 'loseHp': return (a.who === 'self' ? `lose ${a.n} HP` : `${WHO[a.who]} lose ${a.n} HP`) + per(a.per)
     case 'maxHp': return `${a.who === 'self' ? '' : `${WHO[a.who]} `}Max HP ${signed(a.n)}`
-    case 'status': return `${WHO[a.who]} ${STATUS[a.kind]} for ${a.turns} turn${a.turns === 1 ? '' : 's'}`
+    case 'status': {
+      const turns = a.turns === 1 ? 'next turn' : `for ${a.turns} turns`
+      if (a.kind === 'blockPlus') return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops +${a.n ?? 1} hit${(a.n ?? 1) === 1 ? '' : 's'} ${turns}`
+      return `${WHO[a.who]} ${STATUS[a.kind]} ${turns}`
+    }
     case 'grow': return `this card gains ${signed(a.n)} dmg ${a.dur === 'next' ? 'on its next attack' : 'for the rest of the game'}${a.stack ? ' (stacks)' : ''}`
     case 'addDmg': return `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''} ${signed(a.n)} dmg`
   }
 }
+
+const per = (p?: Per) => (p ? ` per ${PER_LABEL[p]}` : '')
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -62,7 +74,7 @@ export function describeSpec(spec: EffectSpec | null | undefined): string {
     .map((r) => {
       const conds = (r.if ?? []).map(describeCond)
       const head = [HOOK_LABEL[r.hook], conds.length ? `if ${conds.join(' and ')}` : ''].filter(Boolean).join(', ')
-      return `${head}: ${cap(r.do.map(describeAct).join(', '))}`
+      return `${head}: ${cap(r.do.map(describeAct).join(', '))}${r.once ? ' (once per game)' : ''}`
     })
     .join(' / ')
 }

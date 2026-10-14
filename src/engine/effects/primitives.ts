@@ -11,12 +11,29 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
   return [who === 'self' ? ctx.self : ctx.enemy]
 }
 
+/** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard'
+
+export function perCount(ctx: BaseCtx, per?: Per): number {
+  if (!per) return 1
+  const c = ctx as Partial<ChainCtx> & BaseCtx
+  const hand = (s: Side) => c.handAtStart?.[s] ?? ctx.state.players[s].hand
+  switch (per) {
+    case 'hitBlocked': return c.hitsBlocked?.[ctx.self] ?? 0
+    case 'chainCard': return c.chain?.length ?? 0
+    case 'selfCard': return hand(ctx.self).length
+    case 'enemyCard': return hand(ctx.enemy).length
+  }
+}
+
 // ---------- Actions ----------
 
 /** จั่ว n ใบ. ระหว่างสาย Strike การ์ดจะเข้ามือหลังจบสาย */
 export const draw =
-  (who: Who, n: number): Act<BaseCtx> =>
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
+    const n = base * perCount(ctx, per)
+    if (n <= 0) return
     for (const s of sides(ctx, who)) {
       if (ctx.pending) ctx.pending[s] += n
       else drawCards(ctx.state, s, n)
@@ -26,16 +43,20 @@ export const draw =
 
 /** ฮีล n (ไม่เกิน Max HP) */
 export const heal =
-  (who: Who, n: number): Act<BaseCtx> =>
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
+    const n = base * perCount(ctx, per)
+    if (n <= 0) return
     for (const s of sides(ctx, who)) healHp(ctx.state, s, n)
     log(ctx.state, `${ctx.card.def.id}: ${who} ฮีล ${n}`)
   }
 
 /** เสีย HP n ตรงๆ (ไม่ใช่ hit, ทะลุ Block) */
 export const loseHp =
-  (who: Who, n: number): Act<BaseCtx> =>
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
+    const n = base * perCount(ctx, per)
+    if (n <= 0) return
     for (const s of sides(ctx, who)) loseHpRaw(ctx.state, s, n)
     log(ctx.state, `${ctx.card.def.id}: ${who} เสีย ${n} HP`)
   }
@@ -52,12 +73,12 @@ export const maxHp =
     log(ctx.state, `${ctx.card.def.id}: ${who} Max HP ${n >= 0 ? '+' : ''}${n}`)
   }
 
-/** ติดสถานะ เช่น ห้าม Strike n เทิร์น (นับเทิร์นถัดไป) */
+/** ติดสถานะ เช่น ห้าม Strike n เทิร์น (นับเทิร์นถัดไป). blockPlus: Block กันเพิ่ม n hit */
 export const status =
-  (who: Who, kind: StatusKind, turns = 1): Act<BaseCtx> =>
+  (who: Who, kind: StatusKind, turns = 1, n?: number): Act<BaseCtx> =>
   (ctx) => {
-    for (const s of sides(ctx, who)) ctx.state.players[s].statuses.push({ kind, turns })
-    log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind} ${turns} เทิร์น`)
+    for (const s of sides(ctx, who)) ctx.state.players[s].statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
+    log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind}${n === undefined ? '' : ` ${n}`} ${turns} เทิร์น`)
   }
 
 /**

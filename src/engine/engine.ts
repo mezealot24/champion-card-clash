@@ -28,6 +28,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const state = structuredClone(prev)
   log(state, `p1 ${actions.p1} / p2 ${actions.p2}`)
 
+  // Block size comes from statuses active this turn, read before they tick
+  const blockStops = { p1: blockStopsFor(state, 'p1'), p2: blockStopsFor(state, 'p2') }
+
   // statuses were checked above; they tick down now (new ones from this turn last into the next)
   for (const side of SIDES) {
     const p = state.players[side]
@@ -36,8 +39,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
 
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
 
-  if (actions.p1 === 'strike' || actions.p2 === 'strike') resolveStrikes(state, actions, handAtStart)
-  resolveHeld(state, actions, handAtStart)
+  const hitsBlocked: Record<Side, number> = { p1: 0, p2: 0 }
+  if (actions.p1 === 'strike' || actions.p2 === 'strike') resolveStrikes(state, actions, handAtStart, blockStops, hitsBlocked)
+  resolveHeld(state, actions, handAtStart, hitsBlocked)
 
   for (const side of SIDES) {
     if (actions[side] !== 'charge') continue
@@ -76,7 +80,19 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   return state
 }
 
-function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtStart: Record<Side, CardInst[]>) {
+/** How many hits this side's Block stops: base rule + every active "Block +N hit" status. */
+function blockStopsFor(state: GameState, side: Side): number {
+  const extra = state.players[side].statuses.filter((s) => s.kind === 'blockPlus').reduce((t, s) => t + (s.n ?? 1), 0)
+  return state.rules.blockStopsHits + extra
+}
+
+function resolveStrikes(
+  state: GameState,
+  actions: Record<Side, Action>,
+  handAtStart: Record<Side, CardInst[]>,
+  blockStops: Record<Side, number>,
+  hitsBlocked: Record<Side, number>,
+) {
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
   const pending: Record<Side, number> = { p1: 0, p2: 0 }
   const chains: Partial<Record<Side, CardInst[]>> = {}
@@ -101,6 +117,7 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
       selfAction: actions[side],
       enemyAction: actions[enemy],
       handAtStart,
+      hitsBlocked,
       bonus: bonus[side]!,
       enemyBonus: bonus[enemy] ?? null,
       blocked,
@@ -120,7 +137,8 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
       const card = chains[side]![i]
       if (!card) continue
       const enemy = other(side)
-      const blocked = actions[enemy] === 'block' && i < state.rules.blockStopsHits
+      const blocked = actions[enemy] === 'block' && i < blockStops[enemy]
+      if (blocked) hitsBlocked[enemy]++
       const usedNext = card.growNext ?? 0
       const dmg = Math.max(0, card.def.dmg + (card.grow ?? 0) + usedNext + bonus[side]![i])
       if (!blocked) loseHp(state, enemy, dmg)
@@ -140,7 +158,12 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
 }
 
 // onHeld: cards that stayed in hand this turn (we didn't Strike), after hits land, before Charge draws
-function resolveHeld(state: GameState, actions: Record<Side, Action>, handAtStart: Record<Side, CardInst[]>) {
+function resolveHeld(
+  state: GameState,
+  actions: Record<Side, Action>,
+  handAtStart: Record<Side, CardInst[]>,
+  hitsBlocked: Record<Side, number>,
+) {
   for (const side of SIDES) {
     if (actions[side] === 'strike') continue
     handAtStart[side].forEach((card, slot) => {
@@ -156,6 +179,7 @@ function resolveHeld(state: GameState, actions: Record<Side, Action>, handAtStar
         selfAction: actions[side],
         enemyAction: actions[other(side)],
         handAtStart,
+        hitsBlocked,
         bonus: [],
         enemyBonus: null,
         blocked: false,

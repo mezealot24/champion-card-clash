@@ -1,6 +1,6 @@
 // Form for cards.effect_json: rules of "when [hook], if [conditions], do [actions]".
 import type { ActSpec, CondSpec, EffectRule, EffectSpec, Hook } from '../engine'
-import { HOOK_LABEL, describeAct, describeSpec } from '../engine/effects/describe'
+import { HOOK_LABEL, PER_LABEL, describeAct, describeSpec } from '../engine/effects/describe'
 import { HOOKS, normalizeSpec } from '../engine/effects/spec'
 
 type Props = { value: EffectSpec | null; onChange: (v: EffectSpec | null) => void; onUseText: (text: string) => void }
@@ -69,6 +69,9 @@ export function EffectBuilder({ value, onChange, onUseText }: Props) {
             <select value={rule.hook} onChange={(e) => set(replaceAt(rules, ri, { ...rule, hook: e.target.value as Hook }))}>
               {HOOKS.map((h) => <option key={h} value={h}>{HOOK_LABEL[h]}</option>)}
             </select>
+            <label className="inline" title="Fires at most once per game for each copy of this card">
+              <input type="checkbox" checked={!!rule.once} onChange={(e) => set(replaceAt(rules, ri, { ...rule, once: e.target.checked || undefined }))} /> once per game
+            </label>
             <button type="button" className="danger" onClick={() => set(removeAt(rules, ri))} title="Delete rule">✕</button>
           </div>
           {rule.hook === 'modify' && <p className="muted hint">Before the first hit of the chain. Use with "Change dmg".</p>}
@@ -162,9 +165,17 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
       )}
       {value.a === 'status' && (
         <>
-          <select value={value.kind} onChange={(e) => onChange({ ...value, kind: e.target.value as typeof value.kind })}>
+          <select
+            value={value.kind}
+            onChange={(e) => {
+              const kind = e.target.value as typeof value.kind
+              onChange(kind === 'blockPlus' ? { ...value, kind, n: value.n ?? 1 } : { a: 'status', who: value.who, kind, turns: value.turns })
+            }}
+          >
             <option value="noStrike">can't Strike</option><option value="noBlock">can't Block</option><option value="noCharge">can't Charge</option>
+            <option value="blockPlus">Block stops +N hits</option>
           </select>
+          {value.kind === 'blockPlus' && <>+<Num value={value.n ?? 1} min={1} onChange={(n) => onChange({ ...value, n })} /> hit(s),</>}
           <Num value={value.turns} min={1} onChange={(turns) => onChange({ ...value, turns })} /> turn(s)
         </>
       )}
@@ -191,7 +202,13 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
           <input type="checkbox" checked={!!value.stack} onChange={(e) => onChange({ ...value, stack: e.target.checked || undefined })} /> stacks
         </label>
       )}
-      {'n' in value && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
+      {value.a !== 'status' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
+      {(value.a === 'draw' || value.a === 'heal' || value.a === 'loseHp') && (
+        <select value={value.per ?? ''} onChange={(e) => onChange({ ...value, per: (e.target.value || undefined) as typeof value.per })} title="Multiply by a count">
+          <option value="">(flat)</option>
+          {Object.entries(PER_LABEL).map(([k, label]) => <option key={k} value={k}>per {label}</option>)}
+        </select>
+      )}
       <span className="muted">→ {describeAct(value)}</span>
     </>
   )

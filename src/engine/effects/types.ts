@@ -18,6 +18,8 @@ export type ChainCtx = BaseCtx & {
   enemyAction: Action
   /** Both hands as they were when actions were revealed. */
   handAtStart: Record<Side, CardInst[]>
+  /** Hits each side's Block stopped this turn (filled while the chain resolves; final by Hold time). */
+  hitsBlocked: Record<Side, number>
   /** Dmg bonus per slot of my chain; modify hooks write here. */
   bonus: number[]
   /** Same for the enemy chain (only when the enemy Strikes). */

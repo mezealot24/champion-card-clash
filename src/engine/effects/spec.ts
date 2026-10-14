@@ -2,7 +2,7 @@
 // Same vocabulary as primitives.ts, so every rule here is one primitive call.
 import type { CardType, StatusKind } from '../types'
 import * as P from './primitives'
-import type { Act, CardEffect, ChainCtx, Cond } from './types'
+import type { Act, BaseCtx, CardEffect, ChainCtx, Cond } from './types'
 
 /**
  * Timings, Tekken Card Tournament style: modify = Before attack, onResolve = After attack,
@@ -29,13 +29,17 @@ export type CondSpec =
   | { c: 'hpNotAbove' }
 
 export type ActSpec =
-  | { a: 'draw' | 'heal' | 'loseHp' | 'maxHp'; who: P.Who; n: number }
-  | { a: 'status'; who: P.Who; kind: StatusKind; turns: number }
+  | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
+  | { a: 'maxHp'; who: P.Who; n: number }
+  | { a: 'status'; who: P.Who; kind: StatusKind; turns: number; n?: number }
   | { a: 'grow'; n: number; dur: 'next' | 'game'; stack?: boolean }
   | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType }
 
-/** One rule = when [hook], if all [if], do all [do]. A card can have several rules. */
-export type EffectRule = { hook: Hook; if?: CondSpec[]; do: ActSpec[] }
+/**
+ * One rule = when [hook], if all [if], do all [do]. A card can have several rules.
+ * once = fires at most once per game for each copy of the card.
+ */
+export type EffectRule = { hook: Hook; if?: CondSpec[]; do: ActSpec[]; once?: boolean }
 export type EffectSpec = EffectRule[]
 
 function cond(s: CondSpec): Cond {
@@ -59,11 +63,11 @@ function cond(s: CondSpec): Cond {
 
 function act(s: ActSpec): Act {
   switch (s.a) {
-    case 'draw': return P.draw(s.who, s.n)
-    case 'heal': return P.heal(s.who, s.n)
-    case 'loseHp': return P.loseHp(s.who, s.n)
+    case 'draw': return P.draw(s.who, s.n, s.per)
+    case 'heal': return P.heal(s.who, s.n, s.per)
+    case 'loseHp': return P.loseHp(s.who, s.n, s.per)
     case 'maxHp': return P.maxHp(s.who, s.n)
-    case 'status': return P.status(s.who, s.kind, s.turns)
+    case 'status': return P.status(s.who, s.kind, s.turns, s.kind === 'blockPlus' ? (s.n ?? 1) : undefined)
     case 'grow': return P.grow(s.n, s.dur ?? 'game', s.stack)
     case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType)
   }
@@ -80,23 +84,29 @@ export function normalizeSpec(spec: EffectSpec): EffectSpec {
 
 export function compileSpec(spec: EffectSpec): CardEffect {
   const out: CardEffect = {}
-  for (const rule of normalizeSpec(spec)) {
+  normalizeSpec(spec).forEach((rule, ri) => {
     const conds = (rule.if ?? []).map(cond)
     const acts = rule.do.map(act)
+    // once per game: remember on the card copy that this rule already fired
+    const spent = (ctx: BaseCtx) => !!rule.once && !!ctx.card.usedOnce?.includes(ri)
+    const fire = (ctx: BaseCtx) => {
+      if (rule.once) ctx.card.usedOnce = [...(ctx.card.usedOnce ?? []), ri]
+      for (const a of acts) (a as unknown as Act<BaseCtx>)(ctx)
+    }
     const run: Act = (ctx: ChainCtx) => {
-      if (conds.every((c) => c(ctx))) for (const a of acts) a(ctx)
+      if (!spent(ctx) && conds.every((c) => c(ctx))) fire(ctx)
     }
     if (rule.hook === 'onDraw') {
       // onDraw has no chain: only actions without conditions make sense there
       const prev = out.onDraw
       out.onDraw = (ctx) => {
         prev?.(ctx)
-        for (const a of acts) (a as unknown as NonNullable<CardEffect['onDraw']>)(ctx)
+        if (!spent(ctx)) fire(ctx)
       }
     } else {
       const prev = out[rule.hook]
       out[rule.hook] = prev ? (ctx) => (prev(ctx), run(ctx)) : run
     }
-  }
+  })
   return out
 }

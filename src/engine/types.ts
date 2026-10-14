@@ -18,11 +18,13 @@ export type CardDef = {
 /**
  * grow = dmg this copy has gained for the rest of the game; growNext = dmg it adds to its next attack only.
  * Both stay on the copy when it goes back to the deck.
+ * usedOnce = indexes of this card's "once per game" rules that already fired.
  */
-export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number }
+export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[] }
 
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge'
-export type Status = { kind: StatusKind; turns: number }
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus'
+/** n = size, used by blockPlus (Block stops n more hits) */
+export type Status = { kind: StatusKind; turns: number; n?: number }
 
 export type PlayerState = {
   championId: string
