@@ -40,8 +40,10 @@ export type ActSpec =
 /**
  * One rule = when [hook], if all [if], do all [do]. A card can have several rules.
  * once = fires at most once per game for each copy of the card.
+ * at = only for onHeld (Every turn): 'before' fires before the attack, so its statuses count this turn.
+ *      Default is after the attack (statuses with 1 turn then count next turn).
  */
-export type EffectRule = { hook: Hook; if?: CondSpec[]; do: ActSpec[]; once?: boolean }
+export type EffectRule = { hook: Hook; if?: CondSpec[]; do: ActSpec[]; once?: boolean; at?: 'before' }
 export type EffectSpec = EffectRule[]
 
 function cond(s: CondSpec): Cond {
@@ -108,8 +110,9 @@ export function compileSpec(spec: EffectSpec): CardEffect {
         if (!spent(ctx)) fire(ctx)
       }
     } else {
-      const prev = out[rule.hook]
-      out[rule.hook] = prev ? (ctx) => (prev(ctx), run(ctx)) : run
+      const key = rule.hook === 'onHeld' && rule.at === 'before' ? 'onHeldBefore' : rule.hook
+      const prev = out[key]
+      out[key] = prev ? (ctx) => (prev(ctx), run(ctx)) : run
     }
   })
   return out

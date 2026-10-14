@@ -72,13 +72,23 @@ export function EffectBuilder({ value, onChange, onUseText }: Props) {
             <select value={rule.hook} onChange={(e) => set(replaceAt(rules, ri, { ...rule, hook: e.target.value as Hook }))}>
               {HOOKS.map((h) => <option key={h} value={h}>{HOOK_LABEL[h]}</option>)}
             </select>
+            {rule.hook === 'onHeld' && (
+              <select
+                value={rule.at ?? 'after'}
+                onChange={(e) => set(replaceAt(rules, ri, { ...rule, at: e.target.value === 'before' ? 'before' : undefined }))}
+                title="When in the turn it fires"
+              >
+                <option value="after">after attack (effects land next turn)</option>
+                <option value="before">before attack (effects land this turn)</option>
+              </select>
+            )}
             <label className="inline" title="Fires at most once per game for each copy of this card">
               <input type="checkbox" checked={!!rule.once} onChange={(e) => set(replaceAt(rules, ri, { ...rule, once: e.target.checked || undefined }))} /> once per game
             </label>
             <button type="button" className="danger" onClick={() => set(removeAt(rules, ri))} title="Delete rule">✕</button>
           </div>
           {rule.hook === 'modify' && <p className="muted hint">Before the first hit. Fires in your Strike chain, and also while held when you didn't Strike (add "You play Charge/Block"). Use with "Change dmg" or "Dmg × %".</p>}
-          {rule.hook === 'onHeld' && <p className="muted hint">After the attack, every turn this card stays in your hand (you didn't Strike). Each copy fires on its own. Add "you play Block" to fire only on Block.</p>}
+          {rule.hook === 'onHeld' && <p className="muted hint">Every turn this card stays on your Field (you didn't Strike). After attack by default; pick "before attack" for effects that should count this turn. Each copy fires on its own. Add "you play Block" to fire only on Block.</p>}
 
           {(rule.if ?? []).map((cond, ci) => (
             <div className="rule-row" key={`c${ci}`}>
@@ -176,9 +186,9 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
             }}
           >
             <option value="noStrike">can't Strike</option><option value="noBlock">can't Block</option><option value="noCharge">can't Charge</option>
-            <option value="blockPlus">Block stops +N hits</option>
+            <option value="blockPlus">Block stops ±N hits</option>
           </select>
-          {value.kind === 'blockPlus' && <>+<Num value={value.n ?? 1} min={1} onChange={(n) => onChange({ ...value, n })} /> hit(s),</>}
+          {value.kind === 'blockPlus' && <><Num value={value.n ?? 1} onChange={(n) => onChange({ ...value, n })} /> hit(s) (negative = fewer),</>}
           <Num value={value.turns} min={1} onChange={(turns) => onChange({ ...value, turns })} /> turn(s)
         </>
       )}

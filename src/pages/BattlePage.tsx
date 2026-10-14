@@ -145,7 +145,7 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
         <span className="muted">มือ {p.hand.length} · กอง {p.deck.length}</span>
         {p.statuses.map((s, i) => (
           <span key={i} className="warn">
-            {s.kind === 'blockPlus' ? `Block +${s.n ?? 1}` : s.kind} ({s.turns})
+            {s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind} ({s.turns})
           </span>
         ))}
       </div>

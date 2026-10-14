@@ -23,7 +23,7 @@ export type CardDef = {
 export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[] }
 
 export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus'
-/** n = size, used by blockPlus (Block stops n more hits) */
+/** n = size, used by blockPlus (Block stops n more hits; negative = fewer) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
 
 export type PlayerState = {
