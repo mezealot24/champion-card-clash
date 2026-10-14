@@ -135,6 +135,15 @@ describe('Tank cards', () => {
     expect(describeSpec(spec)).toBe('Every turn (Hold), if opponent has 3+ cards: Your Block stops −1 hit next turn')
   })
 
+  it('Every turn before attack: Block −1 counts this turn', () => {
+    const spec: EffectSpec = [{ hook: 'onHeld', at: 'before', if: [{ c: 'enemyHandAtLeast', n: 3 }], do: [{ a: 'status', who: 'self', kind: 'blockPlus', n: -1, turns: 1 }] }]
+    const card: CardInst = { uid: 'tk17b', def: { id: 'TK-017', type: 'S', dmg: 20, effectText: '', effectSpec: spec } }
+    const s = resolveTurn(game([card], [plain(5), plain(5), plain(5)]), { p1: 'block', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(50 - 10) // only 1 of 3 hits stopped, right away
+    expect(s.players.p1.statuses).toEqual([]) // gone after this turn
+    expect(describeSpec(spec)).toBe('Every turn (Hold), before attack, if opponent has 3+ cards: Your Block stops −1 hit this turn')
+  })
+
   it('describes the new pieces in English', () => {
     expect(describeSpec(specs['TK-009'])).toBe('Every turn (Hold), if you play Block and opponent plays Strike: Gain 3 HP per hit you blocked this turn')
     expect(describeSpec(specs['TK-014'])).toBe('After attack, if your HP ≤ 29: Gain 20 HP (once per game)')

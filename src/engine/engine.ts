@@ -28,6 +28,13 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const state = structuredClone(prev)
   log(state, `p1 ${actions.p1} / p2 ${actions.p2}`)
 
+  const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
+  const hitsBlocked: Record<Side, number> = { p1: 0, p2: 0 }
+  const hitDmgTaken: Record<Side, number> = { p1: 0, p2: 0 }
+
+  // Every turn (before attack): right after actions are revealed, so its statuses count this turn
+  resolveHeld(state, actions, handAtStart, hitsBlocked, hitDmgTaken, 'onHeldBefore')
+
   // Block size comes from statuses active this turn, read before they tick
   const blockStops = { p1: blockStopsFor(state, 'p1'), p2: blockStopsFor(state, 'p2') }
 
@@ -37,12 +44,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     p.statuses = p.statuses.map((s) => ({ ...s, turns: s.turns - 1 })).filter((s) => s.turns > 0)
   }
 
-  const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
-
-  const hitsBlocked: Record<Side, number> = { p1: 0, p2: 0 }
-  const hitDmgTaken: Record<Side, number> = { p1: 0, p2: 0 }
   if (actions.p1 === 'strike' || actions.p2 === 'strike') resolveStrikes(state, actions, handAtStart, blockStops, hitsBlocked, hitDmgTaken)
-  resolveHeld(state, actions, handAtStart, hitsBlocked, hitDmgTaken)
+  resolveHeld(state, actions, handAtStart, hitsBlocked, hitDmgTaken, 'onHeld')
 
   for (const side of SIDES) {
     if (actions[side] !== 'charge') continue
@@ -179,18 +182,20 @@ function resolveStrikes(
   for (const side of SIDES) if (pending[side]) drawCards(state, side, pending[side])
 }
 
-// onHeld: cards that stayed in hand this turn (we didn't Strike), after hits land, before Charge draws
+// Every turn: cards on the Field of a side that didn't Strike.
+// onHeldBefore = before any hit; onHeld = after hits land, before Charge draws.
 function resolveHeld(
   state: GameState,
   actions: Record<Side, Action>,
   handAtStart: Record<Side, CardInst[]>,
   hitsBlocked: Record<Side, number>,
   hitDmgTaken: Record<Side, number>,
+  hook: 'onHeld' | 'onHeldBefore',
 ) {
   for (const side of SIDES) {
     if (actions[side] === 'strike') continue
     handAtStart[side].forEach((card, slot) => {
-      getEffect(card.def)?.onHeld?.({
+      getEffect(card.def)?.[hook]?.({
         state,
         self: side,
         enemy: other(side),

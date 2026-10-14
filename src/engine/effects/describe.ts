@@ -50,14 +50,15 @@ function describeTarget(t: DmgTarget): string {
   return { this: 'this card', next: 'next card', following: 'all following cards', facing: 'facing card', enemyAll: "all opponent's cards" }[t]
 }
 
-export function describeAct(a: ActSpec): string {
+/** now = the rule fires before the attack, so 1-turn statuses land this turn */
+export function describeAct(a: ActSpec, now = false): string {
   switch (a.a) {
     case 'draw': return (a.who === 'self' ? `draw ${a.n}` : `${WHO[a.who]} draw ${a.n}`) + per(a.per)
     case 'heal': return (a.who === 'self' ? `gain ${a.n} HP` : `${WHO[a.who]} gain ${a.n} HP`) + per(a.per)
     case 'loseHp': return (a.who === 'self' ? `lose ${a.n} HP` : `${WHO[a.who]} lose ${a.n} HP`) + per(a.per)
     case 'maxHp': return `${a.who === 'self' ? '' : `${WHO[a.who]} `}Max HP ${signed(a.n)}`
     case 'status': {
-      const turns = a.turns === 1 ? 'next turn' : `for ${a.turns} turns`
+      const turns = a.turns === 1 ? (now ? 'this turn' : 'next turn') : `for ${a.turns} turns`
       if (a.kind === 'blockPlus') {
         const n = a.n ?? 1
         return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops ${signed(n)} hit${Math.abs(n) === 1 ? '' : 's'} ${turns}`
@@ -82,8 +83,9 @@ export function describeSpec(spec: EffectSpec | null | undefined): string {
   return normalizeSpec(spec ?? [])
     .map((r) => {
       const conds = (r.if ?? []).map(describeCond)
-      const head = [HOOK_LABEL[r.hook], conds.length ? `if ${conds.join(' and ')}` : ''].filter(Boolean).join(', ')
-      return `${head}: ${cap(r.do.map(describeAct).join(', '))}${r.once ? ' (once per game)' : ''}`
+      const when = r.hook === 'onHeld' && r.at === 'before' ? `${HOOK_LABEL[r.hook]}, before attack` : HOOK_LABEL[r.hook]
+      const head = [when, conds.length ? `if ${conds.join(' and ')}` : ''].filter(Boolean).join(', ')
+      return `${head}: ${cap(r.do.map((a) => describeAct(a, r.at === 'before')).join(', '))}${r.once ? ' (once per game)' : ''}`
     })
     .join(' / ')
 }
