@@ -15,8 +15,11 @@ export type CardDef = {
 }
 
 /** One physical card in a game. uid is unique even for copies. */
-/** grow = permanent dmg bonus this copy has gained during the game (stays when it goes back to the deck) */
-export type CardInst = { uid: string; def: CardDef; grow?: number }
+/**
+ * grow = dmg this copy has gained for the rest of the game; growNext = dmg it adds to its next attack only.
+ * Both stay on the copy when it goes back to the deck.
+ */
+export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number }
 
 export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge'
 export type Status = { kind: StatusKind; turns: number }

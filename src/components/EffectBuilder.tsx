@@ -45,10 +45,10 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
   maxHp: { a: 'maxHp', who: 'self', n: 5 },
   status: { a: 'status', who: 'enemy', kind: 'noBlock', turns: 1 },
   addDmg: { a: 'addDmg', target: 'this', n: 2 },
-  grow: { a: 'grow', n: 5 },
+  grow: { a: 'grow', n: 5, dur: 'next' },
 }
 const ACT_LABEL: Record<string, string> = {
-  draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', grow: 'Gain dmg (permanent)',
+  draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', grow: 'Gain dmg (later attacks)',
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -180,6 +180,11 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
           {typeof value.target === 'object' && <Num value={value.target.slot} min={1} onChange={(slot) => onChange({ ...value, target: { slot } })} />}
           <TypeSelect value={value.onlyType} allowAny onChange={(onlyType) => onChange({ ...value, onlyType })} />
         </>
+      )}
+      {value.a === 'grow' && (
+        <select value={value.dur} onChange={(e) => onChange({ ...value, dur: e.target.value as 'next' | 'game' })} title="Duration">
+          <option value="next">next attack only</option><option value="game">rest of game</option>
+        </select>
       )}
       {'n' in value && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
       <span className="muted">→ {describeAct(value)}</span>

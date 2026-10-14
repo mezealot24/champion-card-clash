@@ -60,12 +60,14 @@ export const status =
     log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind} ${turns} เทิร์น`)
   }
 
-/** This card gains +n dmg for the rest of the game (stacks; stays on this copy when it goes back to the deck) */
+/** This card gains +n dmg on its next attack only, or for the rest of the game (stacks). Stays on this copy in the deck. */
 export const grow =
-  (n: number): Act<BaseCtx> =>
+  (n: number, dur: 'next' | 'game'): Act<BaseCtx> =>
   (ctx) => {
-    ctx.card.grow = (ctx.card.grow ?? 0) + n
-    log(ctx.state, `${ctx.card.def.id}: dmg ${n >= 0 ? '+' : ''}${n} ถาวร (รวม ${ctx.card.def.dmg + ctx.card.grow})`)
+    const c = ctx.card
+    if (dur === 'game') c.grow = (c.grow ?? 0) + n
+    else c.growNext = (c.growNext ?? 0) + n
+    log(ctx.state, `${c.def.id}: dmg ${n >= 0 ? '+' : ''}${n} ${dur === 'game' ? 'ถาวร' : 'ครั้งถัดไป'}`)
   }
 
 /** ใช้ใน hook `modify` เท่านั้น: ปรับ dmg ของการ์ดในสาย */

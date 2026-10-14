@@ -50,7 +50,7 @@ export function describeAct(a: ActSpec): string {
     case 'loseHp': return a.who === 'self' ? `lose ${a.n} HP` : `${WHO[a.who]} lose ${a.n} HP`
     case 'maxHp': return `${a.who === 'self' ? '' : `${WHO[a.who]} `}Max HP ${signed(a.n)}`
     case 'status': return `${WHO[a.who]} ${STATUS[a.kind]} for ${a.turns} turn${a.turns === 1 ? '' : 's'}`
-    case 'grow': return `this card gains ${signed(a.n)} dmg for the rest of the game`
+    case 'grow': return `this card gains ${signed(a.n)} dmg ${a.dur === 'next' ? 'on its next attack' : 'for the rest of the game'}`
     case 'addDmg': return `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''} ${signed(a.n)} dmg`
   }
 }

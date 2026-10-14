@@ -171,8 +171,8 @@ function CardTile({ card, slot }: { card: CardInst; slot: number }) {
         ช่อง {slot} · <code>{id} · {type}</code>
       </div>
       <div className="dmg">
-        {dmg + (card.grow ?? 0)}
-        {card.grow ? <span className="muted"> ({dmg}{card.grow > 0 ? '+' : ''}{card.grow})</span> : null}
+        {dmg + (card.grow ?? 0) + (card.growNext ?? 0)}
+        {card.grow || card.growNext ? <span className="muted"> ({dmg}{card.grow ? ` ${card.grow > 0 ? '+' : ''}${card.grow}` : ''}{card.growNext ? ` ${card.growNext > 0 ? '+' : ''}${card.growNext} next` : ''})</span> : null}
       </div>
       {effectText && (
         <div className="effect">

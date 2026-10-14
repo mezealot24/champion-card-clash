@@ -62,7 +62,7 @@ describe('effect_json', () => {
   })
 
   it('grow: After attack, if opponent played Block, this card gains +30 dmg for good', () => {
-    const spec: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'enemyAction', a: 'block' }], do: [{ a: 'grow', n: 30 }] }]
+    const spec: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'enemyAction', a: 'block' }], do: [{ a: 'grow', n: 30, dur: 'game' }] }]
     const card = inst({ id: 'ZZ-006', type: 'K', dmg: 10, effectText: 'x', effectSpec: spec })
     const s1 = resolveTurn(game([card], []), { p1: 'strike', p2: 'block' })
     expect(s1.players.p2.hp).toBe(100) // blocked, but it grew
@@ -70,5 +70,18 @@ describe('effect_json', () => {
     expect(grown.grow).toBe(30)
     const s2 = resolveTurn({ ...s1, players: { ...s1.players, p1: { ...s1.players.p1, hand: [grown] } } }, { p1: 'strike', p2: 'charge' })
     expect(s2.players.p2.hp).toBe(60)
+  })
+
+  it('grow for next attack only wears off after one attack', () => {
+    const spec: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'enemyAction', a: 'block' }], do: [{ a: 'grow', n: 30, dur: 'next' }] }]
+    const card = inst({ id: 'ZZ-007', type: 'K', dmg: 10, effectText: 'x', effectSpec: spec })
+    const withHand = (st: ReturnType<typeof game>, c: CardInst) => ({ ...st, players: { ...st.players, p1: { ...st.players.p1, hand: [c] } } })
+    const s1 = resolveTurn(game([card], []), { p1: 'strike', p2: 'block' })
+    const c1 = s1.players.p1.deck.find((c) => c.uid === card.uid)!
+    expect(c1.growNext).toBe(30)
+    const s2 = resolveTurn(withHand(s1, c1), { p1: 'strike', p2: 'charge' })
+    expect(s2.players.p2.hp).toBe(60)
+    const c2 = s2.players.p1.deck.filter((c) => c.uid === card.uid).at(-1)!
+    expect(c2.growNext).toBeUndefined()
   })
 })

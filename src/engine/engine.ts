@@ -121,7 +121,8 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
       if (!card) continue
       const enemy = other(side)
       const blocked = actions[enemy] === 'block' && i < state.rules.blockStopsHits
-      const dmg = Math.max(0, card.def.dmg + (card.grow ?? 0) + bonus[side]![i])
+      const usedNext = card.growNext ?? 0
+      const dmg = Math.max(0, card.def.dmg + (card.grow ?? 0) + usedNext + bonus[side]![i])
       if (!blocked) loseHp(state, enemy, dmg)
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
       const fx = getEffect(card.def)
@@ -129,6 +130,7 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
       fx?.onResolve?.(ctx)
       if (blocked) fx?.onBlocked?.(ctx)
       else if (dmg > 0) fx?.onClean?.(ctx)
+      if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
   }
 
