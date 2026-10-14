@@ -24,6 +24,8 @@ export type ChainCtx = BaseCtx & {
   enemyBonus: number[] | null
   /** Hit phase only: was this hit stopped by Block? */
   blocked: boolean
+  /** Hit phase only: did this hit land clean (not blocked, dmg > 0)? */
+  clean: boolean
 }
 
 export type Act<C extends BaseCtx = ChainCtx> = (ctx: C) => void

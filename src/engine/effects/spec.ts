@@ -4,7 +4,13 @@ import type { CardType, StatusKind } from '../types'
 import * as P from './primitives'
 import type { Act, CardEffect, ChainCtx, Cond } from './types'
 
-export type Hook = 'modify' | 'onResolve' | 'onClean' | 'onBlocked' | 'onDraw' | 'onHeld'
+/**
+ * Timings, Tekken Card Tournament style: modify = Before attack, onResolve = After attack,
+ * onHeld = Every turn (Hold), onDraw = Comes into play.
+ * onClean / onBlocked are legacy: normalizeSpec turns them into onResolve + a hitResult condition.
+ */
+export type Hook = 'modify' | 'onResolve' | 'onHeld' | 'onDraw' | 'onClean' | 'onBlocked'
+export const HOOKS: Hook[] = ['modify', 'onResolve', 'onHeld', 'onDraw']
 
 export type CondSpec =
   | { c: 'enemyHandAtLeast'; n: number }
@@ -12,6 +18,7 @@ export type CondSpec =
   | { c: 'handCompare'; op: '<' | '=' | '>' }
   | { c: 'enemyAction'; a: 'strike' | 'block' | 'charge' }
   | { c: 'selfAction'; a: 'block' | 'charge' }
+  | { c: 'hitResult'; r: 'clean' | 'blocked' }
   | { c: 'enemyChainAtLeast'; n: number }
   | { c: 'chainAll'; type: CardType }
   | { c: 'chainLength'; op: '=' | '>='; n: number }
@@ -37,6 +44,7 @@ function cond(s: CondSpec): Cond {
     case 'handCompare': return P.handCompare(s.op)
     case 'enemyAction': return P.enemyAction(s.a)
     case 'selfAction': return P.selfAction(s.a)
+    case 'hitResult': return P.hitResult(s.r)
     case 'enemyChainAtLeast': return P.enemyChainAtLeast(s.n)
     case 'chainAll': return P.chainAll(s.type)
     case 'chainLength': return P.chainLength(s.op, s.n)
@@ -59,9 +67,18 @@ function act(s: ActSpec): Act {
   }
 }
 
+/** Legacy onClean / onBlocked rules → After attack + hitResult condition (same behavior). */
+export function normalizeSpec(spec: EffectSpec): EffectSpec {
+  return spec.map((rule) =>
+    rule.hook === 'onClean' || rule.hook === 'onBlocked'
+      ? { ...rule, hook: 'onResolve', if: [{ c: 'hitResult', r: rule.hook === 'onClean' ? 'clean' : 'blocked' }, ...(rule.if ?? [])] }
+      : rule,
+  )
+}
+
 export function compileSpec(spec: EffectSpec): CardEffect {
   const out: CardEffect = {}
-  for (const rule of spec) {
+  for (const rule of normalizeSpec(spec)) {
     const conds = (rule.if ?? []).map(cond)
     const acts = rule.do.map(act)
     const run: Act = (ctx: ChainCtx) => {

@@ -87,7 +87,7 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
     bonus[side] = chains[side].map(() => 0)
   }
 
-  const ctxFor = (side: Side, slot: number, blocked: boolean): ChainCtx => {
+  const ctxFor = (side: Side, slot: number, blocked: boolean, clean = false): ChainCtx => {
     const enemy = other(side)
     return {
       state,
@@ -104,6 +104,7 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
       bonus: bonus[side]!,
       enemyBonus: bonus[enemy] ?? null,
       blocked,
+      clean,
     }
   }
 
@@ -124,7 +125,7 @@ function resolveStrikes(state: GameState, actions: Record<Side, Action>, handAtS
       if (!blocked) loseHp(state, enemy, dmg)
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
       const fx = getEffect(card.def)
-      const ctx = ctxFor(side, i, blocked)
+      const ctx = ctxFor(side, i, blocked, !blocked && dmg > 0)
       fx?.onResolve?.(ctx)
       if (blocked) fx?.onBlocked?.(ctx)
       else if (dmg > 0) fx?.onClean?.(ctx)
@@ -156,6 +157,7 @@ function resolveHeld(state: GameState, actions: Record<Side, Action>, handAtStar
         bonus: [],
         enemyBonus: null,
         blocked: false,
+        clean: false,
       })
     })
   }

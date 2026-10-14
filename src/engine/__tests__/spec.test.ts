@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createGame, isEffectMissing, resolveTurn } from '../index'
+import { describeSpec } from '../effects/describe'
 import type { CardDef, CardInst, EffectSpec } from '../index'
 
 let uid = 0
@@ -47,5 +48,16 @@ describe('effect_json', () => {
     expect(resolveTurn(game([card()], []), { p1: 'charge', p2: 'charge' }).players.p1.hp).toBe(50)
     // Strike takes the card out of the hand, so it does not count as held
     expect(resolveTurn(game([card()], []), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(50)
+  })
+
+  it('After attack + hit result works like the legacy onClean / onBlocked hooks', () => {
+    const legacy: EffectSpec = [{ hook: 'onClean', do: [{ a: 'heal', who: 'self', n: 5 }] }]
+    const modern: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'hitResult', r: 'clean' }], do: [{ a: 'heal', who: 'self', n: 5 }] }]
+    for (const spec of [legacy, modern]) {
+      const card = () => inst({ id: 'ZZ-005', type: 'P', dmg: 4, effectText: 'x', effectSpec: spec })
+      expect(resolveTurn(game([card()], []), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(55)
+      expect(resolveTurn(game([card()], []), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(50)
+    }
+    expect(describeSpec(legacy)).toBe('After attack, if this card hits clean: Gain 5 HP')
   })
 })
