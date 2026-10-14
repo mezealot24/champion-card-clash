@@ -18,6 +18,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px; }
 .narrow { max-width: 360px; margin: 48px auto; }
 h2 { margin-top: 0; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+label.inline { flex-direction: row; align-items: center; margin-bottom: 0; } label.inline input { width: auto; }
 input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; width: 100%; }
 textarea { resize: vertical; }
 input.num { width: 64px; } input.short { width: 110px; } input.invalid { border-color: var(--danger); }
@@ -30,7 +31,7 @@ button.danger { background: transparent; color: var(--danger); padding: 4px 8px;
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .table-scroll { overflow-x: auto; }
-table.deck td:nth-child(11) { min-width: 260px; }
+table.deck td:nth-child(11) { min-width: 380px; }
 table.deck td:nth-child(3) { min-width: 160px; }
 tr.dirty { background: var(--dirty); }
 .summary { display: flex; gap: 20px; flex-wrap: wrap; font-weight: 500; }
@@ -43,3 +44,23 @@ code { font-size: 13px; }
 .tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 220px; }
 button.tag { padding: 2px 8px; font-size: 12px; background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; }
 button.tag.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Battle */
+.narrow-wide { max-width: 520px; margin: 32px auto; }
+.battle .panel { margin-bottom: 12px; }
+.hp-bar { height: 10px; background: var(--border); border-radius: 5px; overflow: hidden; margin: 8px 0 12px; }
+.hp-bar > div { height: 100%; background: var(--ok); transition: width .3s; }
+.hp-bar > div.low { background: var(--danger); }
+.hand { display: flex; gap: 10px; flex-wrap: wrap; min-height: 40px; }
+.card-tile { width: 150px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); font-size: 13px; }
+.card-tile .dmg { font-size: 26px; font-weight: 700; margin: 4px 0; }
+.card-tile .effect { line-height: 1.35; }
+.turn-log { margin: 10px 0 0; padding-left: 18px; font-size: 14px; }
+
+/* Effect builder (Deck page) */
+.effect-builder { margin-top: 4px; font-size: 13px; }
+.effect-builder summary { cursor: pointer; color: var(--accent); }
+.effect-builder .rule { border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
+.effect-builder .rule-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 4px 0; }
+.effect-builder select { width: auto; }
+.effect-builder .hint { margin: 0; font-size: 12px; }

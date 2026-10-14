@@ -1,5 +1,7 @@
 // Mirrors supabase/migrations. Regenerate with:
 //   npx supabase gen types typescript --project-id <ref> > src/lib/database.types.ts
+import type { EffectSpec } from '../engine/effects/spec'
+
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type AppRole = 'super_admin' | 'player'
@@ -40,6 +42,7 @@ export type CardRow = {
   dmg_tct: number | null
   dmg_tentative: boolean
   effect: string
+  effect_json: EffectSpec | null // see src/engine/effects/spec.ts
   copies: number
   in_deck: boolean
   sort_order: number
