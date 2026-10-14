@@ -84,4 +84,17 @@ describe('effect_json', () => {
     const c2 = s2.players.p1.deck.filter((c) => c.uid === card.uid).at(-1)!
     expect(c2.growNext).toBeUndefined()
   })
+
+  it('BR-002 mind game: buff builds in hand while the opponent Blocks, cashed in on Strike', () => {
+    const spec: EffectSpec = [{ hook: 'onHeld', if: [{ c: 'enemyAction', a: 'block' }], do: [{ a: 'grow', n: 30, dur: 'next' }] }]
+    const br2 = inst({ id: 'BR-002', type: 'K', dmg: 10, effectText: 'x', effectSpec: spec })
+    let s = game([br2], [])
+    s = resolveTurn(s, { p1: 'charge', p2: 'block' }) // +30, and p1 draws
+    s = resolveTurn(s, { p1: 'charge', p2: 'block' }) // +30 again
+    expect(s.players.p1.hand.find((c) => c.uid === br2.uid)!.growNext).toBe(60)
+    const hp = s.players.p2.hp
+    s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(hp - s.players.p2.hp).toBe(70 + 1 + 1) // BR-002 70 + the two 1-dmg filler draws
+    expect(s.players.p1.deck.find((c) => c.uid === br2.uid)!.growNext).toBeUndefined()
+  })
 })
