@@ -11,12 +11,29 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
   return [who === 'self' ? ctx.self : ctx.enemy]
 }
 
+/** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard'
+
+export function perCount(ctx: BaseCtx, per?: Per): number {
+  if (!per) return 1
+  const c = ctx as Partial<ChainCtx> & BaseCtx
+  const hand = (s: Side) => c.handAtStart?.[s] ?? ctx.state.players[s].hand
+  switch (per) {
+    case 'hitBlocked': return c.hitsBlocked?.[ctx.self] ?? 0
+    case 'chainCard': return c.chain?.length ?? 0
+    case 'selfCard': return hand(ctx.self).length
+    case 'enemyCard': return hand(ctx.enemy).length
+  }
+}
+
 // ---------- Actions ----------
 
 /** จั่ว n ใบ. ระหว่างสาย Strike การ์ดจะเข้ามือหลังจบสาย */
 export const draw =
-  (who: Who, n: number): Act<BaseCtx> =>
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
+    const n = base * perCount(ctx, per)
+    if (n <= 0) return
     for (const s of sides(ctx, who)) {
       if (ctx.pending) ctx.pending[s] += n
       else drawCards(ctx.state, s, n)
@@ -26,16 +43,20 @@ export const draw =
 
 /** ฮีล n (ไม่เกิน Max HP) */
 export const heal =
-  (who: Who, n: number): Act<BaseCtx> =>
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
+    const n = base * perCount(ctx, per)
+    if (n <= 0) return
     for (const s of sides(ctx, who)) healHp(ctx.state, s, n)
     log(ctx.state, `${ctx.card.def.id}: ${who} ฮีล ${n}`)
   }
 
 /** เสีย HP n ตรงๆ (ไม่ใช่ hit, ทะลุ Block) */
 export const loseHp =
-  (who: Who, n: number): Act<BaseCtx> =>
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
+    const n = base * perCount(ctx, per)
+    if (n <= 0) return
     for (const s of sides(ctx, who)) loseHpRaw(ctx.state, s, n)
     log(ctx.state, `${ctx.card.def.id}: ${who} เสีย ${n} HP`)
   }
@@ -52,12 +73,12 @@ export const maxHp =
     log(ctx.state, `${ctx.card.def.id}: ${who} Max HP ${n >= 0 ? '+' : ''}${n}`)
   }
 
-/** ติดสถานะ เช่น ห้าม Strike n เทิร์น (นับเทิร์นถัดไป) */
+/** ติดสถานะ เช่น ห้าม Strike n เทิร์น (นับเทิร์นถัดไป). blockPlus: Block กันเพิ่ม n hit */
 export const status =
-  (who: Who, kind: StatusKind, turns = 1): Act<BaseCtx> =>
+  (who: Who, kind: StatusKind, turns = 1, n?: number): Act<BaseCtx> =>
   (ctx) => {
-    for (const s of sides(ctx, who)) ctx.state.players[s].statuses.push({ kind, turns })
-    log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind} ${turns} เทิร์น`)
+    for (const s of sides(ctx, who)) ctx.state.players[s].statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
+    log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind}${n === undefined ? '' : ` ${n}`} ${turns} เทิร์น`)
   }
 
 /**
@@ -81,22 +102,32 @@ export type DmgTarget =
   | 'following' // ทุกใบที่ตามหลัง
   | { slot: number } // ช่องที่ n (นับ 1)
   | 'facing' // ใบประจันหน้าของศัตรู (มีผลเมื่อศัตรู Strike)
+  | 'enemyAll' // ทุกใบในสายศัตรู (มีผลเมื่อศัตรู Strike)
+
+/** Apply fn to every slot the target points at: (array of that chain, slot). */
+function eachTarget(ctx: ChainCtx, target: DmgTarget, onlyType: CardType | undefined, mine: number[], theirs: number[] | null, fn: (arr: number[], i: number) => void) {
+  const ok = (c?: { def: { type: CardType } }) => !!c && (!onlyType || c.def.type === onlyType)
+  if (target === 'facing' || target === 'enemyAll') {
+    if (!theirs || !ctx.enemyChain) return
+    const slots = target === 'facing' ? [ctx.slot] : ctx.enemyChain.map((_, i) => i)
+    for (const i of slots) if (ok(ctx.enemyChain[i])) fn(theirs, i)
+    return
+  }
+  for (const i of targetSlots(ctx, target)) if (ok(ctx.chain[i])) fn(mine, i)
+}
 
 export const addDmg =
   (target: DmgTarget, n: number, onlyType?: CardType): Act =>
-  (ctx) => {
-    if (target === 'facing') {
-      const f = ctx.enemyChain?.[ctx.slot]
-      if (ctx.enemyBonus && f && (!onlyType || f.def.type === onlyType)) ctx.enemyBonus[ctx.slot] += n
-      return
-    }
-    for (const i of targetSlots(ctx, target)) {
-      const c = ctx.chain[i]
-      if (c && (!onlyType || c.def.type === onlyType)) ctx.bonus[i] += n
-    }
-  }
+  (ctx) =>
+    eachTarget(ctx, target, onlyType, ctx.bonus, ctx.enemyBonus, (arr, i) => (arr[i] += n))
 
-function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing'>): number[] {
+/** ใช้ใน hook `modify`: คูณ dmg เป็น pct% (50 = ครึ่งเดียว, 200 = x2) ปัดลง */
+export const mulDmg =
+  (target: DmgTarget, pct: number, onlyType?: CardType): Act =>
+  (ctx) =>
+    eachTarget(ctx, target, onlyType, ctx.mult, ctx.enemyMult, (arr, i) => (arr[i] *= pct / 100))
+
+function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing' | 'enemyAll'>): number[] {
   if (target === 'this') return [ctx.slot]
   if (target === 'next') return [ctx.slot + 1]
   if (target === 'following') return ctx.chain.map((_, i) => i).filter((i) => i > ctx.slot)
@@ -158,6 +189,9 @@ export const slotIs = (n: number): Cond => (ctx) => ctx.slot === n - 1
 /** มีใบประจันหน้า = มือศัตรูมีการ์ดลำดับเดียวกับใบนี้ (ไม่สน action ศัตรู) */
 export const hasFacing: Cond = (ctx) => handOf(ctx, 'enemy').length > ctx.slot
 export const facingSameType: Cond = (ctx) => handOf(ctx, 'enemy')[ctx.slot]?.def.type === ctx.card.def.type
+
+/** เราโดน hit รวม ≥ n dmg ในเทิร์นนี้ (Block ที่กันได้ไม่นับ) */
+export const tookDmg = (n: number): Cond => (ctx) => ctx.hitDmgTaken[ctx.self] >= n
 
 export const hpAtMost = (n: number): Cond => (ctx) => ctx.state.players[ctx.self].hp <= n
 export const hpNotAbove: Cond = (ctx) => ctx.state.players[ctx.self].hp <= ctx.state.players[ctx.enemy].hp

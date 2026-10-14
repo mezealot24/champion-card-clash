@@ -9,7 +9,10 @@ export type BaseCtx = {
   pending: Record<Side, number> | null
 }
 
-/** Context while a card is inside a Strike chain. */
+/**
+ * Context while a card is inside a Strike chain. Held cards (Before attack / Hold of a side that
+ * didn't Strike) get the same shape with an empty chain; slot = their hand position.
+ */
 export type ChainCtx = BaseCtx & {
   slot: number // 0-based position in the chain (slot 1 = 0)
   chain: CardInst[]
@@ -18,10 +21,17 @@ export type ChainCtx = BaseCtx & {
   enemyAction: Action
   /** Both hands as they were when actions were revealed. */
   handAtStart: Record<Side, CardInst[]>
+  /** Hits each side's Block stopped this turn (filled while the chain resolves; final by Hold time). */
+  hitsBlocked: Record<Side, number>
+  /** Dmg each side takes from hits this turn (known once Before attack is done). */
+  hitDmgTaken: Record<Side, number>
   /** Dmg bonus per slot of my chain; modify hooks write here. */
   bonus: number[]
   /** Same for the enemy chain (only when the enemy Strikes). */
   enemyBonus: number[] | null
+  /** Dmg multiplier per slot (1 = normal, 0.5 = half), applied after bonus, rounded down. */
+  mult: number[]
+  enemyMult: number[] | null
   /** Hit phase only: was this hit stopped by Block? */
   blocked: boolean
   /** Hit phase only: did this hit land clean (not blocked, dmg > 0)? */
