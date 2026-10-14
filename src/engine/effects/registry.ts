@@ -23,7 +23,11 @@ import {
   when,
 } from './primitives'
 
-export const EFFECTS: Record<string, CardEffect> = {
+// Built on first use, not at module load: primitives → state → registry is a circular import,
+// so the primitives may not be initialized yet when this file is first evaluated.
+let effects: Record<string, CardEffect> | null = null
+export function codeEffects(): Record<string, CardEffect> {
+  return (effects ??= {
   // ---------- Bruiser ----------
   // เราเสีย 3 HP
   'BR-001': { onResolve: loseHp('self', 3) },
@@ -46,6 +50,7 @@ export const EFFECTS: Record<string, CardEffect> = {
   // ถ้าสายเป็น Punch ล้วน: ใบที่ 3 +8
   'BR-011': { modify: when(chainAll('P'), addDmg({ slot: 3 }, 8)) },
   // BR-003, BR-012..015: ไม่มี effect
+  })
 }
 
 const compiled = new Map<string, CardEffect>()
@@ -58,9 +63,9 @@ export function getEffect(def: Pick<CardDef, 'id' | 'effectSpec'>): CardEffect |
     if (!fx) compiled.set(key, (fx = compileSpec(def.effectSpec)))
     return fx
   }
-  return EFFECTS[def.id]
+  return codeEffects()[def.id]
 }
 
 /** มีข้อความ effect แต่ยังไม่มีทั้ง JSON และโค้ด → ให้ UI ขึ้น ⚠ */
 export const isEffectMissing = (cardId: string, effectText: string, effectSpec?: EffectSpec | null) =>
-  effectText.trim() !== '' && !effectSpec?.length && !(cardId in EFFECTS)
+  effectText.trim() !== '' && !effectSpec?.length && !(cardId in codeEffects())
