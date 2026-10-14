@@ -25,3 +25,6 @@ dist-ssr
 
 .env
 .env.local
+
+# standalone Battle build (src/play.tsx)
+dist-play
