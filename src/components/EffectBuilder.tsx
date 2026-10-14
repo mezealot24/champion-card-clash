@@ -186,6 +186,11 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
           <option value="next">next attack only</option><option value="game">rest of game</option>
         </select>
       )}
+      {value.a === 'grow' && (
+        <label className="inline">
+          <input type="checkbox" checked={!!value.stack} onChange={(e) => onChange({ ...value, stack: e.target.checked || undefined })} /> stacks
+        </label>
+      )}
       {'n' in value && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
       <span className="muted">→ {describeAct(value)}</span>
     </>

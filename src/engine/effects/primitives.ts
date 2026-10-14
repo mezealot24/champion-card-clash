@@ -60,13 +60,17 @@ export const status =
     log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind} ${turns} เทิร์น`)
   }
 
-/** This card gains +n dmg on its next attack only, or for the rest of the game (stacks). Stays on this copy in the deck. */
+/**
+ * This card gains +n dmg on its next attack only, or for the rest of the game. Stays on this copy in the deck.
+ * Doesn't stack unless `stack` (Q: a buff triggering again keeps it at +n).
+ */
 export const grow =
-  (n: number, dur: 'next' | 'game'): Act<BaseCtx> =>
+  (n: number, dur: 'next' | 'game', stack = false): Act<BaseCtx> =>
   (ctx) => {
     const c = ctx.card
-    if (dur === 'game') c.grow = (c.grow ?? 0) + n
-    else c.growNext = (c.growNext ?? 0) + n
+    const key = dur === 'game' ? 'grow' : 'growNext'
+    const cur = c[key] ?? 0
+    c[key] = stack ? cur + n : n >= 0 ? Math.max(cur, n) : Math.min(cur, n)
     log(ctx.state, `${c.def.id}: dmg ${n >= 0 ? '+' : ''}${n} ${dur === 'game' ? 'ถาวร' : 'ครั้งถัดไป'}`)
   }
 

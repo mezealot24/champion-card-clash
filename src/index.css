@@ -18,6 +18,7 @@ main { max-width: 1280px; margin: 0 auto; padding: 16px; }
 .narrow { max-width: 360px; margin: 48px auto; }
 h2 { margin-top: 0; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+label.inline { flex-direction: row; align-items: center; margin-bottom: 0; } label.inline input { width: auto; }
 input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; width: 100%; }
 textarea { resize: vertical; }
 input.num { width: 64px; } input.short { width: 110px; } input.invalid { border-color: var(--danger); }

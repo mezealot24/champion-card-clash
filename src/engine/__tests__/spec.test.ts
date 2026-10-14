@@ -90,11 +90,11 @@ describe('effect_json', () => {
     const br2 = inst({ id: 'BR-002', type: 'K', dmg: 10, effectText: 'x', effectSpec: spec })
     let s = game([br2], [])
     s = resolveTurn(s, { p1: 'charge', p2: 'block' }) // +30, and p1 draws
-    s = resolveTurn(s, { p1: 'charge', p2: 'block' }) // +30 again
-    expect(s.players.p1.hand.find((c) => c.uid === br2.uid)!.growNext).toBe(60)
+    s = resolveTurn(s, { p1: 'charge', p2: 'block' }) // triggers again, but no stacking
+    expect(s.players.p1.hand.find((c) => c.uid === br2.uid)!.growNext).toBe(30)
     const hp = s.players.p2.hp
     s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-    expect(hp - s.players.p2.hp).toBe(70 + 1 + 1) // BR-002 70 + the two 1-dmg filler draws
+    expect(hp - s.players.p2.hp).toBe(40 + 1 + 1) // BR-002 40 + the two 1-dmg filler draws
     expect(s.players.p1.deck.find((c) => c.uid === br2.uid)!.growNext).toBeUndefined()
   })
 })
