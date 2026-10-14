@@ -60,4 +60,15 @@ describe('effect_json', () => {
     }
     expect(describeSpec(legacy)).toBe('After attack, if this card hits clean: Gain 5 HP')
   })
+
+  it('grow: After attack, if opponent played Block, this card gains +30 dmg for good', () => {
+    const spec: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'enemyAction', a: 'block' }], do: [{ a: 'grow', n: 30 }] }]
+    const card = inst({ id: 'ZZ-006', type: 'K', dmg: 10, effectText: 'x', effectSpec: spec })
+    const s1 = resolveTurn(game([card], []), { p1: 'strike', p2: 'block' })
+    expect(s1.players.p2.hp).toBe(100) // blocked, but it grew
+    const grown = s1.players.p1.deck.find((c) => c.uid === card.uid)!
+    expect(grown.grow).toBe(30)
+    const s2 = resolveTurn({ ...s1, players: { ...s1.players, p1: { ...s1.players.p1, hand: [grown] } } }, { p1: 'strike', p2: 'charge' })
+    expect(s2.players.p2.hp).toBe(60)
+  })
 })

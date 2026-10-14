@@ -31,6 +31,7 @@ export type CondSpec =
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp' | 'maxHp'; who: P.Who; n: number }
   | { a: 'status'; who: P.Who; kind: StatusKind; turns: number }
+  | { a: 'grow'; n: number }
   | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType }
 
 /** One rule = when [hook], if all [if], do all [do]. A card can have several rules. */
@@ -63,6 +64,7 @@ function act(s: ActSpec): Act {
     case 'loseHp': return P.loseHp(s.who, s.n)
     case 'maxHp': return P.maxHp(s.who, s.n)
     case 'status': return P.status(s.who, s.kind, s.turns)
+    case 'grow': return P.grow(s.n)
     case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType)
   }
 }

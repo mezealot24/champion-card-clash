@@ -170,7 +170,10 @@ function CardTile({ card, slot }: { card: CardInst; slot: number }) {
       <div className="muted">
         ช่อง {slot} · <code>{id} · {type}</code>
       </div>
-      <div className="dmg">{dmg}</div>
+      <div className="dmg">
+        {dmg + (card.grow ?? 0)}
+        {card.grow ? <span className="muted"> ({dmg}{card.grow > 0 ? '+' : ''}{card.grow})</span> : null}
+      </div>
       {effectText && (
         <div className="effect">
           {missing && <span className="warn" title="effect นี้ยังไม่มีโค้ด เล่นเป็น dmg เปล่า">⚠ </span>}

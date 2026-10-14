@@ -45,9 +45,10 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
   maxHp: { a: 'maxHp', who: 'self', n: 5 },
   status: { a: 'status', who: 'enemy', kind: 'noBlock', turns: 1 },
   addDmg: { a: 'addDmg', target: 'this', n: 2 },
+  grow: { a: 'grow', n: 5 },
 }
 const ACT_LABEL: Record<string, string> = {
-  draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg',
+  draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', grow: 'Gain dmg (permanent)',
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -180,7 +181,7 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
           <TypeSelect value={value.onlyType} allowAny onChange={(onlyType) => onChange({ ...value, onlyType })} />
         </>
       )}
-      {'n' in value && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
+      {'n' in value && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
       <span className="muted">→ {describeAct(value)}</span>
     </>
   )
