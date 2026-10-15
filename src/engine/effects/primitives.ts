@@ -224,4 +224,4 @@ export const hasStatus = (who: 'self' | 'enemy', kind: StatusKind): Cond => (ctx
   ctx.state.players[who === 'self' ? ctx.self : ctx.enemy].statuses.some((s) => s.kind === kind && (s.n ?? 1) > 0)
 
 /** Status kinds that carry a size n */
-export const SIZED: StatusKind[] = ['blockPlus', 'shield', 'parry']
+export const SIZED: StatusKind[] = ['blockPlus', 'shield', 'parry', 'vulnerable']
