@@ -126,7 +126,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
         <table className="deck">
           <thead>
             <tr>
-              <th title="เอาไปสู้">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 2 Rage, Assassin 1 Energy, Tank 10 HP)">Cost</th>
+              <th title="เอาไปสู้">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 20 Rage, Assassin 1 Energy, Tank 10 HP)">Cost</th>
               <th>TCT</th><th>Copies</th><th>Effect</th><th />
             </tr>
           </thead>

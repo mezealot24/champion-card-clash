@@ -1,7 +1,7 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { getStyle } from './styles'
-import { gainRes, payChain } from './resources'
+import { gainRes, holdUnpaid, payChain } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, effectOf, heal, log, loseHp, toDeckBottom } from './state'
@@ -165,11 +165,13 @@ function resolveStrikes(
   for (const side of strikers) {
     chains[side] = state.players[side].hand
     state.players[side].hand = [] // Strike uses the whole hand
+    // resource costs, in chain order: an unpaid card still hits but only its drawbacks fire this turn
+    // (Bruiser: an unpaid S card can't be used at all and stays on the Field)
+    payChain(state, side, chains[side])
+    chains[side] = holdUnpaid(state, side, chains[side])
     bonus[side] = chains[side].map(() => 0)
     mult[side] = chains[side].map(() => 1)
     pierce[side] = chains[side].map(() => 0)
-    // resource costs, in chain order: an unpaid card still hits but its effects are off this turn
-    payChain(state, side, chains[side])
   }
 
   // held = a card in the hand of a side that didn't Strike (it has no chain of its own)
@@ -327,10 +329,13 @@ function resolveStrikes(
   for (const side of SIDES) {
     const struck = actions[side] === 'strike'
     handAtStart[side].forEach((card, i) => {
+      // a card held back from the chain (unpaid Bruiser S) took no part in the Strike: no After action
+      const slot = struck ? chains[side]!.indexOf(card) : i
+      if (slot < 0) return
       const fx = effectOf(state, side, card)
       if (!fx?.onResolve && !fx?.onClean && !fx?.onBlocked) return
       const r = hitResults.get(card.uid) ?? { blocked: false, clean: false }
-      const ctx = { ...ctxFor(side, i, r.blocked, r.clean, !struck), pending: null }
+      const ctx = { ...ctxFor(side, slot, r.blocked, r.clean, !struck), pending: null }
       fx.onResolve?.(ctx)
       if (r.blocked) fx.onBlocked?.(ctx)
       else if (r.clean) fx.onClean?.(ctx)

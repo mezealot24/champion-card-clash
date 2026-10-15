@@ -169,7 +169,7 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
         </span>
         {res && !res.payWithHp && (
           <span className="res" title={`${res.name}: S cards cost ${res.name}`}>
-            {res.name} {'◆'.repeat(p.res ?? 0)}{'◇'.repeat(Math.max(0, res.cap - (p.res ?? 0)))} {p.res ?? 0}/{res.cap}
+            {res.name} {res.cap <= 5 ? `${'◆'.repeat(p.res ?? 0)}${'◇'.repeat(Math.max(0, res.cap - (p.res ?? 0)))} ` : ''}{p.res ?? 0}/{res.cap}
           </span>
         )}
         {res?.payWithHp && <span className="muted">S cards cost HP</span>}

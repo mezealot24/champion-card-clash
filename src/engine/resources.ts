@@ -22,6 +22,8 @@ export type ResourceDef = {
   defaultCost: number
   /** Tank: costs are paid in HP (never down to 0) instead of a bar. */
   payWithHp?: boolean
+  /** Unpaid S cards can't be used at all: they stay on the Field and skip the chain (Bruiser, Q 17:59Z). */
+  unpaidStays?: boolean
   /** Change to the bar at the end of the turn. */
   gain?: (t: TurnSummary) => number
 }
@@ -32,9 +34,10 @@ export const RESOURCES: Record<string, ResourceDef> = {
   // Rage: +1 per hit you take, +1 per clean hit you land; −1 on a quiet turn (nobody Strikes you and you don't Strike).
   BR: {
     name: 'Rage',
-    cap: 5,
+    cap: 20, // Q 17:59Z: nerf, cap 5 → 20
     start: 0,
-    defaultCost: 2,
+    defaultCost: 20, // Q 17:59Z: an S card needs a full 20 Rage, below that it can't be used
+    unpaidStays: true,
     gain: (t) => (t.action !== 'strike' && t.enemyAction !== 'strike' ? -1 : t.hitsTaken + t.cleanHits),
   },
   // Energy: starts full, +1 every turn, small cap.
@@ -79,9 +82,21 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
       log(state, `${side} จ่าย ${cost} ${def.name} ให้ ${card.def.id}`)
     } else {
       p.unpaid.push(card.uid)
-      log(state, `${side} ${def.name} ไม่พอสำหรับ ${card.def.id} (ต้องการ ${cost}): ตีได้ แต่เหลือแค่ผลเสีย`)
+      log(state, `${side} ${def.name} ไม่พอสำหรับ ${card.def.id} (ต้องการ ${cost}): ${def.unpaidStays ? 'ใช้ไม่ได้ ค้างบน Field' : 'ตีได้ แต่เหลือแค่ผลเสีย'}`)
     }
   }
+}
+
+/**
+ * Bruiser-style classes: cards that couldn't be paid leave the chain and go back onto the Field, in order.
+ * Returns the chain that actually strikes.
+ */
+export function holdUnpaid(state: GameState, side: Side, chain: CardInst[]): CardInst[] {
+  const p = state.players[side]
+  if (!p.unpaid?.length || !resourceOf(p.championId)?.unpaidStays) return chain
+  p.hand = chain.filter((c) => p.unpaid!.includes(c.uid))
+  p.unpaid = []
+  return chain.filter((c) => !p.hand.includes(c))
 }
 
 /** End of turn: each class fills (or drains) its bar. */

@@ -39,6 +39,17 @@ describe('resources', () => {
     expect(resolveTurn(game('BR', [], [], 3), { p1: 'block', p2: 'charge' }).players.p1.res).toBe(2)
   })
 
+  it('Bruiser: Rage cap 20, an S card needs the full 20 (Q 17:59Z)', () => {
+    expect(resolveTurn(game('BR', [c('P')], [c('P')], 20), { p1: 'strike', p2: 'strike' }).players.p1.res).toBe(20)
+    // under 20: the S card can't be used, it stays on the Field; the P still strikes
+    const s = c('S', 10, heal5)
+    const short = resolveTurn(game('BR', [c('P', 5), s], [], 19), { p1: 'strike', p2: 'charge' })
+    expect([short.players.p1.hp, short.players.p2.hp, short.players.p1.res]).toEqual([50, 95, 20])
+    expect(short.players.p1.hand.map((x) => x.uid)).toEqual([s.uid])
+    const full = resolveTurn(game('BR', [c('S', 10, heal5)], [], 20), { p1: 'strike', p2: 'charge' })
+    expect([full.players.p1.hp, full.players.p1.res]).toEqual([55, 1])
+  })
+
   it('Assassin gains 1 Energy every turn', () => {
     expect(resolveTurn(game('AS', [], [], 1), { p1: 'block', p2: 'charge' }).players.p1.res).toBe(2)
   })
@@ -58,10 +69,10 @@ describe('resources', () => {
 
   it("can't pay: drawbacks still fire, the rest stays off", () => {
     const mixed: EffectSpec = [{ hook: 'onResolve', do: [{ a: 'loseHp', who: 'self', n: 7 }, { a: 'heal', who: 'self', n: 5 }, { a: 'loseHp', who: 'enemy', n: 9 }] }]
-    const s = resolveTurn(game('BR', [c('S', 10, mixed, 2)]), { p1: 'strike', p2: 'charge' })
+    const s = resolveTurn(game('MG', [c('S', 10, mixed, 2)]), { p1: 'strike', p2: 'charge' })
     expect(s.players.p1.hp).toBe(43) // lost 7, no heal
     expect(s.players.p2.hp).toBe(90) // only the hit, no extra 9
-    const paid = resolveTurn(game('BR', [c('S', 10, mixed, 2)], [], 2), { p1: 'strike', p2: 'charge' })
+    const paid = resolveTurn(game('MG', [c('S', 10, mixed, 2)], [], 2), { p1: 'strike', p2: 'charge' })
     expect(paid.players.p1.hp).toBe(48)
     expect(paid.players.p2.hp).toBe(81)
   })
