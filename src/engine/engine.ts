@@ -1,5 +1,6 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { getEffect } from './effects/registry'
+import { checkCombo } from './combos'
 import { getStyle } from './styles'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
@@ -49,8 +50,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   // Every turn (before attack): right after actions are revealed, so its statuses count this turn
   resolveHeld(state, actions, env, 'onHeldBefore')
 
-  // Block size comes from statuses active this turn, read before they tick
+  // Block size and True Damage come from statuses active this turn, read before they tick
   const blockStops = { p1: blockStopsFor(state, 'p1'), p2: blockStopsFor(state, 'p2') }
+  const trueDmg = { p1: hasStatus(state, 'p1', 'trueDmg'), p2: hasStatus(state, 'p2', 'trueDmg') }
 
   // statuses were checked above; they tick down now (new ones from this turn last into the next)
   for (const side of SIDES) {
@@ -59,7 +61,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   }
 
   // runs every turn: Before action fires for held cards too (e.g. "if you played Charge"); After action ends it
-  resolveStrikes(state, actions, env, blockStops)
+  resolveStrikes(state, actions, env, blockStops, trueDmg)
 
   // Styles that react to this turn's hits
   for (const side of SIDES) {
@@ -115,6 +117,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   return state
 }
 
+const hasStatus = (state: GameState, side: Side, kind: string) => state.players[side].statuses.some((s) => s.kind === kind)
+
 /** How many hits this side's Block stops: base rule + every active "Block ±N hit" status (never below 0). */
 function blockStopsFor(state: GameState, side: Side): number {
   const extra = state.players[side].statuses.filter((s) => s.kind === 'blockPlus').reduce((t, s) => t + (s.n ?? 1), 0)
@@ -126,6 +130,7 @@ function resolveStrikes(
   actions: Record<Side, Action>,
   env: TurnEnv,
   blockStops: Record<Side, number>,
+  trueDmg: Record<Side, boolean>,
 ) {
   const { handAtStart, hitsBlocked, hitDmgTaken } = env
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
@@ -177,8 +182,11 @@ function resolveStrikes(
   const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side))
   const dmgOf = (side: Side, i: number) => {
     const card = chains[side]![i]
-    const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + bonus[side]![i]
-    return Math.max(0, Math.floor(raw * mult[side]![i]))
+    // True Damage: dmg cuts (negative bonus, multiplier below 1) don't apply; only Block stops the hit
+    const b = trueDmg[side] ? Math.max(0, bonus[side]![i]) : bonus[side]![i]
+    const m = trueDmg[side] ? Math.max(1, mult[side]![i]) : mult[side]![i]
+    const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + b
+    return Math.max(0, Math.floor(raw * m))
   }
   // Styles that boost the chain (e.g. Fury)
   for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!)
@@ -212,6 +220,11 @@ function resolveStrikes(
       hitResults.set(card.uid, { blocked, clean: !blocked && dmg > 0 })
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
+  }
+
+  // Signature combos (3 cards in a row with the right P/K/S types)
+  for (const side of strikers) {
+    checkCombo(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })))
   }
 
   // Styles that add to a finished chain (e.g. Sonic Bliz extra hits)
