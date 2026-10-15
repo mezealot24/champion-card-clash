@@ -48,7 +48,7 @@ export function describeCond(c: CondSpec): string {
 }
 
 function describeTarget(t: DmgTarget): string {
-  if (typeof t === 'object') return `card in slot ${t.slot}`
+  if (typeof t === 'object') return 'enemySlot' in t ? `opponent's card in slot ${t.enemySlot}` : `card in slot ${t.slot}`
   return { this: 'this card', next: 'next card', following: 'all following cards', facing: 'facing card', enemyAll: "all opponent's cards" }[t]
 }
 

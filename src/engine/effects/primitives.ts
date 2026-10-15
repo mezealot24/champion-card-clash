@@ -109,15 +109,16 @@ export type DmgTarget =
   | 'next' // ใบถัดไป 1 ใบ
   | 'following' // ทุกใบที่ตามหลัง
   | { slot: number } // ช่องที่ n (นับ 1)
+  | { enemySlot: number } // ช่องที่ n ในสายศัตรู (มีผลเมื่อศัตรู Strike)
   | 'facing' // ใบประจันหน้าของศัตรู (มีผลเมื่อศัตรู Strike)
   | 'enemyAll' // ทุกใบในสายศัตรู (มีผลเมื่อศัตรู Strike)
 
 /** Apply fn to every slot the target points at: (array of that chain, slot). */
 function eachTarget(ctx: ChainCtx, target: DmgTarget, onlyType: CardType | undefined, mine: number[], theirs: number[] | null, fn: (arr: number[], i: number) => void) {
   const ok = (c?: { def: { type: CardType } }) => !!c && (!onlyType || c.def.type === onlyType)
-  if (target === 'facing' || target === 'enemyAll') {
+  if (target === 'facing' || target === 'enemyAll' || (typeof target === 'object' && 'enemySlot' in target)) {
     if (!theirs || !ctx.enemyChain) return
-    const slots = target === 'facing' ? [ctx.slot] : ctx.enemyChain.map((_, i) => i)
+    const slots = target === 'facing' ? [ctx.slot] : target === 'enemyAll' ? ctx.enemyChain.map((_, i) => i) : [target.enemySlot - 1]
     for (const i of slots) if (ok(ctx.enemyChain[i])) fn(theirs, i)
     return
   }
@@ -135,7 +136,7 @@ export const mulDmg =
   (ctx) =>
     eachTarget(ctx, target, onlyType, ctx.mult, ctx.enemyMult, (arr, i) => (arr[i] *= pct / 100))
 
-function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing' | 'enemyAll'>): number[] {
+function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing' | 'enemyAll' | { enemySlot: number }>): number[] {
   if (target === 'this') return [ctx.slot]
   if (target === 'next') return [ctx.slot + 1]
   if (target === 'following') return ctx.chain.map((_, i) => i).filter((i) => i > ctx.slot)

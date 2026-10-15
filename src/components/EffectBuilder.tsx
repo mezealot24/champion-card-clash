@@ -216,13 +216,18 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
       {(value.a === 'addDmg' || value.a === 'mulDmg') && (
         <>
           <select
-            value={typeof value.target === 'object' ? 'slot' : value.target}
-            onChange={(e) => onChange({ ...value, target: e.target.value === 'slot' ? { slot: 1 } : (e.target.value as 'this') })}
+            value={typeof value.target === 'object' ? ('enemySlot' in value.target ? 'enemySlot' : 'slot') : value.target}
+            onChange={(e) => {
+              const v = e.target.value
+              onChange({ ...value, target: v === 'slot' ? { slot: 1 } : v === 'enemySlot' ? { enemySlot: 1 } : (v as 'this') })
+            }}
           >
             <option value="this">this card</option><option value="next">next card</option><option value="following">all following</option>
             <option value="slot">slot…</option><option value="facing">facing card</option><option value="enemyAll">all opponent's cards</option>
+            <option value="enemySlot">opponent's slot…</option>
           </select>
-          {typeof value.target === 'object' && <Num value={value.target.slot} min={1} onChange={(slot) => onChange({ ...value, target: { slot } })} />}
+          {typeof value.target === 'object' && 'slot' in value.target && <Num value={value.target.slot} min={1} onChange={(slot) => onChange({ ...value, target: { slot } })} />}
+          {typeof value.target === 'object' && 'enemySlot' in value.target && <Num value={value.target.enemySlot} min={1} onChange={(enemySlot) => onChange({ ...value, target: { enemySlot } })} />}
           <TypeSelect value={value.onlyType} allowAny onChange={(onlyType) => onChange({ ...value, onlyType })} />
         </>
       )}
