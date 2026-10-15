@@ -58,7 +58,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     p.statuses = p.statuses.map((s) => ({ ...s, turns: s.turns - 1 })).filter((s) => s.turns > 0)
   }
 
-  // runs every turn: Before attack also fires for held cards when nobody Strikes (e.g. "if you played Charge")
+  // runs every turn: Before action fires for held cards too (e.g. "if you played Charge"); After action ends it
   resolveStrikes(state, actions, env, blockStops)
 
   // Styles that react to this turn's hits
@@ -167,7 +167,7 @@ function resolveStrikes(
     }
   }
 
-  // 1) Before attack: chain auras, plus held cards of a side that didn't Strike (e.g. "if you played Charge")
+  // 1) Before action: chain auras, plus held cards of a side that didn't Strike (e.g. "if you played Charge")
   for (const side of SIDES) {
     if (actions[side] === 'strike') chains[side]!.forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false)))
     else handAtStart[side].forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false, false, true)))
@@ -192,6 +192,7 @@ function resolveStrikes(
 
   // 2) hits, slot by slot (both chains interleave when Strike meets Strike)
   const cleanHits: Record<Side, number> = { p1: 0, p2: 0 }
+  const hitResults = new Map<string, { blocked: boolean; clean: boolean }>()
   const longest = Math.max(...strikers.map((s) => chains[s]!.length))
   for (let i = 0; i < longest; i++) {
     for (const side of strikers) {
@@ -207,12 +208,8 @@ function resolveStrikes(
         env.hitsTaken[enemy]++
       }
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
-      const fx = getEffect(card.def)
       if (!blocked && dmg > 0) cleanHits[side]++
-      const ctx = ctxFor(side, i, blocked, !blocked && dmg > 0)
-      fx?.onResolve?.(ctx)
-      if (blocked) fx?.onBlocked?.(ctx)
-      else if (dmg > 0) fx?.onClean?.(ctx)
+      hitResults.set(card.uid, { blocked, clean: !blocked && dmg > 0 })
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
   }
@@ -230,6 +227,21 @@ function resolveStrikes(
   // 3) used cards go under the deck, then draws from effects enter the hand
   for (const side of strikers) toDeckBottom(state, side, chains[side]!)
   for (const side of SIDES) if (pending[side]) drawCards(state, side, pending[side])
+
+  // 4) After action (Q 2026-10-15): end of the turn, every card that was on the Field when actions were
+  //    revealed, whatever action its side picked. Struck cards still know how their hit went.
+  for (const side of SIDES) {
+    const struck = actions[side] === 'strike'
+    handAtStart[side].forEach((card, i) => {
+      const fx = getEffect(card.def)
+      if (!fx?.onResolve && !fx?.onClean && !fx?.onBlocked) return
+      const r = hitResults.get(card.uid) ?? { blocked: false, clean: false }
+      const ctx = { ...ctxFor(side, i, r.blocked, r.clean, !struck), pending: null }
+      fx.onResolve?.(ctx)
+      if (r.blocked) fx.onBlocked?.(ctx)
+      else if (r.clean) fx.onClean?.(ctx)
+    })
+  }
 }
 
 // Every turn: cards on the Field of a side that didn't Strike.

@@ -4,12 +4,12 @@ import { normalizeSpec } from './spec'
 import type { DmgTarget, Per, Who } from './primitives'
 
 export const HOOK_LABEL: Record<Hook, string> = {
-  modify: 'Before attack',
-  onResolve: 'After attack',
+  modify: 'Before action',
+  onResolve: 'After action',
   onHeld: 'Every turn (Hold)',
   onDraw: 'Comes into play',
-  onClean: 'After attack (clean)',
-  onBlocked: 'After attack (blocked)',
+  onClean: 'After action (clean hit)',
+  onBlocked: 'After action (blocked)',
 }
 const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
@@ -89,7 +89,7 @@ export function describeSpec(spec: EffectSpec | null | undefined): string {
   return normalizeSpec(spec ?? [])
     .map((r) => {
       const conds = (r.if ?? []).map(describeCond)
-      const when = r.hook === 'onHeld' && r.at === 'before' ? `${HOOK_LABEL[r.hook]}, before attack` : HOOK_LABEL[r.hook]
+      const when = r.hook === 'onHeld' && r.at === 'before' ? `${HOOK_LABEL[r.hook]}, start of turn` : HOOK_LABEL[r.hook]
       const head = [when, conds.length ? `if ${conds.join(' and ')}` : ''].filter(Boolean).join(', ')
       return `${head}: ${cap(r.do.map((a) => describeAct(a, r.at === 'before')).join(', '))}${r.once ? ' (once per game)' : ''}`
     })

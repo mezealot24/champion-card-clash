@@ -83,8 +83,8 @@ export function EffectBuilder({ value, onChange, onUseText }: Props) {
                 onChange={(e) => set(replaceAt(rules, ri, { ...rule, at: e.target.value === 'before' ? 'before' : undefined }))}
                 title="When in the turn it fires"
               >
-                <option value="after">after attack (effects land next turn)</option>
-                <option value="before">before attack (effects land this turn)</option>
+                <option value="after">end of turn (effects land next turn)</option>
+                <option value="before">start of turn (effects land this turn)</option>
               </select>
             )}
             <label className="inline" title="Fires at most once per game for each copy of this card">
@@ -92,8 +92,9 @@ export function EffectBuilder({ value, onChange, onUseText }: Props) {
             </label>
             <button type="button" className="danger" onClick={() => set(removeAt(rules, ri))} title="Delete rule">✕</button>
           </div>
-          {rule.hook === 'modify' && <p className="muted hint">Before the first hit. Fires in your Strike chain, and also while held when you didn't Strike (add "You play Charge/Block"). Use with "Change dmg", "Dmg × %" or "Block ±N hits (this turn)".</p>}
-          {rule.hook === 'onHeld' && <p className="muted hint">Every turn this card stays on your Field (you didn't Strike). After attack by default; pick "before attack" for effects that should count this turn. Each copy fires on its own. Add "you play Block" to fire only on Block.</p>}
+          {rule.hook === 'modify' && <p className="muted hint">Right after actions are revealed, before any hit, whatever action you picked (Strike, Block or Charge). Add "You play Strike" if it should only work in your chain. Use with "Change dmg", "Dmg × %" or "Block ±N hits (this turn)".</p>}
+          {rule.hook === 'onResolve' && <p className="muted hint">End of the turn, whatever action you picked (Strike, Block or Charge). Add "You play Strike" if it should only work when this card attacked. "Hit result" checks how this card's own hit went.</p>}
+          {rule.hook === 'onHeld' && <p className="muted hint">Every turn this card stays on your Field (you didn't Strike). End of turn by default; pick "start of turn" for effects that should count this turn. Each copy fires on its own. Add "you play Block" to fire only on Block.</p>}
 
           {(rule.if ?? []).map((cond, ci) => (
             <div className="rule-row" key={`c${ci}`}>
