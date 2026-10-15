@@ -193,7 +193,8 @@ function resolveStrikes(
   // Before action combos (card types only), then Conqueror stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
   for (const side of SIDES) applyConqueror(state, side, actions, bonus[side], mult[other(side)])
-  const dealtOf = (side: Side, i: number) => (isBlocked(side, i) ? 0 : dmgOf(side, i))
+  // Guard Crush: a hit stopped by Block still deals half (rounded down)
+  const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : guardBreak[side] ? Math.floor(dmgOf(side, i) / 2) : 0)
 
   // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
   const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }
@@ -223,7 +224,7 @@ function resolveStrikes(
       if (!blocked) env.hitsTaken[enemy]++
       if (dealt > 0) loseHp(state, enemy, dealt)
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
-      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${critTag}` : `ตี ${dmg}${critTag}`}`)
+      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (Guard Crush ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
       if (ls > 0) {
         heal(state, side, ls)

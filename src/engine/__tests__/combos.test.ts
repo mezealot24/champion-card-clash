@@ -73,7 +73,7 @@ describe('Bruiser S > P > P (Guard Crush)', () => {
     s.players.p2.hand = [a, b, keep]
     const hp = s.players.p2.hp
     s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-    expect(hp - s.players.p2.hp).toBe(11) // Block still stops 2 hits fully
+    expect(hp - s.players.p2.hp).toBe(5 + 5 + 11) // 2 blocked hits deal half (rounded down), 3rd lands
     expect(s.players.p2.hand.map((x) => x.uid)).toEqual([keep.uid])
     expect(s.players.p1.statuses.some((x) => x.kind === 'guardBreak')).toBe(false)
     // used up: next blocked Strike discards nothing
