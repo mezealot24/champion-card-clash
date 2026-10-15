@@ -43,6 +43,8 @@ export type CardRow = {
   dmg_tentative: boolean
   effect: string
   effect_json: EffectSpec | null // see src/engine/effects/spec.ts
+  /** Resource cost when it strikes (src/engine/resources.ts). Null on an S card = class default. */
+  cost: number | null
   copies: number
   in_deck: boolean
   sort_order: number

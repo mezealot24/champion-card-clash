@@ -1,6 +1,7 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { getStyle } from './styles'
+import { gainRes, payChain } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, effectOf, heal, log, loseHp, toDeckBottom } from './state'
@@ -66,7 +67,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   }
 
   // runs every turn: Before action fires for held cards too (e.g. "if you played Charge"); After action ends it
-  resolveStrikes(state, actions, env, blockStops, trueDmg, guardBreak)
+  const cleanHits = resolveStrikes(state, actions, env, blockStops, trueDmg, guardBreak)
 
   // Styles that react to this turn's hits
   for (const side of SIDES) {
@@ -113,10 +114,15 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     state.blockStreak = 0
   }
 
+  // class resources fill at the end of the turn, so what you earn now is spent next turn
+  for (const side of SIDES) {
+    gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side] })
+  }
   for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side)
   for (const side of SIDES) {
     const p = state.players[side]
     p.silenced = false
+    p.unpaid = undefined
     // Shields from before this turn lose a turn; used-up or expired ones go
     for (const s of p.statuses) if (oldShields.includes(s)) s.turns--
     p.statuses = p.statuses.filter((s) => s.kind !== 'shield' || (s.turns > 0 && (s.n ?? 0) > 0))
@@ -144,18 +150,22 @@ function resolveStrikes(
   blockStops: Record<Side, number>,
   trueDmg: Record<Side, boolean>,
   guardBreak: Record<Side, boolean>,
-) {
+): Record<Side, number> {
   const { handAtStart, hitsBlocked, hitDmgTaken } = env
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
   const pending: Record<Side, number> = { p1: 0, p2: 0 }
   const chains: Partial<Record<Side, CardInst[]>> = {}
   const bonus: Partial<Record<Side, number[]>> = {}
   const mult: Partial<Record<Side, number[]>> = {}
+  const pierce: Partial<Record<Side, number[]>> = {}
   for (const side of strikers) {
     chains[side] = state.players[side].hand
     state.players[side].hand = [] // Strike uses the whole hand
     bonus[side] = chains[side].map(() => 0)
     mult[side] = chains[side].map(() => 1)
+    pierce[side] = chains[side].map(() => 0)
+    // resource costs, in chain order: an unpaid card still hits but its effects are off this turn
+    payChain(state, side, chains[side])
   }
 
   // held = a card in the hand of a side that didn't Strike (it has no chain of its own)
@@ -180,6 +190,7 @@ function resolveStrikes(
       enemyBonus: bonus[enemy] ?? null,
       mult: held ? [] : mult[side]!,
       enemyMult: mult[enemy] ?? null,
+      pierce: held ? [] : pierce[side]!,
       blocked,
       clean,
     }
@@ -192,7 +203,8 @@ function resolveStrikes(
   }
 
   const stops = (side: Side) => Math.max(0, blockStops[side] + env.blockNow[side])
-  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side))
+  // Pierce: a hit marked by an effect ignores Block
+  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side)) && !pierce[side]![i]
   const dmgOf = (side: Side, i: number) => {
     const card = chains[side]![i]
     // True Damage: dmg cuts (negative bonus, multiplier below 1) don't apply; only Block stops the hit
@@ -319,6 +331,7 @@ function resolveStrikes(
       else if (r.clean) fx.onClean?.(ctx)
     })
   }
+  return cleanHits
 }
 
 // Every turn: cards on the Field of a side that didn't Strike.
@@ -352,6 +365,7 @@ function resolveHeld(
         enemyBonus: null,
         mult: [],
         enemyMult: null,
+        pierce: [],
         blocked: false,
         clean: false,
       })
@@ -369,6 +383,7 @@ export type CardRowLike = {
   copies: number
   in_deck?: boolean
   effect_json?: EffectSpec | null
+  cost?: number | null
 }
 
 /** DB rows → deck list, expanded by copies. Rows with in_deck = false are left out. */
@@ -381,5 +396,6 @@ export function buildDeck(rows: CardRowLike[]): CardDef[] {
       dmg: r.dmg,
       effectText: r.effect,
       effectSpec: r.effect_json ?? null,
+      cost: r.cost ?? null,
     })))
 }

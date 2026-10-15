@@ -15,7 +15,7 @@ const plain = (dmg = 1, type: CardType = 'P'): CardInst => ({ uid: `x${uid++}`, 
 // p1 = Mage at 60/80 HP, p2 at 100; decks are plain 1-dmg cards
 function game(p1: CardInst[], p2: CardInst[], hp = 60): GameState {
   const deck = Array.from({ length: 10 }, (_, i): CardDef => ({ id: `XX-${i}`, type: 'P', dmg: 1, effectText: '' }))
-  const s = createGame({ championId: 'MG', hpStart: hp, hpMax: 80, deck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 7 })
+  const s = createGame({ championId: 'MG', hpStart: hp, hpMax: 80, deck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 7, rules: { resources: false } })
   s.players.p1.hand = p1
   s.players.p2.hand = p2
   return s

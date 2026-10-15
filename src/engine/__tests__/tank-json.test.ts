@@ -18,7 +18,7 @@ function game(p1: CardInst[], p2: CardInst[], p1Deck?: CardDef[]): GameState {
   const s = createGame(
     { championId: 'TK', hpStart: 50, hpMax: 100, deck: p1Deck ?? deck },
     { championId: 'XX', hpStart: 100, hpMax: 100, deck },
-    { seed: 7 },
+    { seed: 7, rules: { resources: false } },
   )
   s.players.p1.hand = p1
   s.players.p2.hand = p2

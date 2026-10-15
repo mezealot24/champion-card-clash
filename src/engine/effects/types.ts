@@ -34,6 +34,8 @@ export type ChainCtx = BaseCtx & {
   /** Dmg multiplier per slot (1 = normal, 0.5 = half), applied after bonus, rounded down. */
   mult: number[]
   enemyMult: number[] | null
+  /** 1 = that slot of my chain ignores Block (Pierce). */
+  pierce: number[]
   /** Hit phase only: was this hit stopped by Block? */
   blocked: boolean
   /** Hit phase only: did this hit land clean (not blocked, dmg > 0)? */

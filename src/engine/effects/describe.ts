@@ -46,6 +46,7 @@ export function describeCond(c: CondSpec): string {
     case 'enteredWith': return `you had ${c.n}+ cards (this one included) when this card came into play`
     case 'silenced': return c.who === 'self' ? 'you are Silenced' : 'opponent is Silenced'
     case 'hasStatus': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${STATUS[c.kind]}`
+    case 'res': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.n}+ resource`
   }
 }
 
@@ -77,6 +78,9 @@ export function describeAct(a: ActSpec, now = false): string {
       const n = Math.abs(a.n)
       return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops ${n} ${a.n >= 0 ? 'more' : 'fewer'} hit${n === 1 ? '' : 's'} this turn`
     }
+    case 'pierce': return `${{ this: 'this card', next: 'next card', following: 'all following cards', chain: 'your whole chain' }[a.target]} ignore${a.target === 'this' || a.target === 'next' ? 's' : ''} Block`
+    case 'steal': return "steal the opponent's card in this slot onto your Field"
+    case 'gainRes': return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gain`} ${a.n} resource`
     case 'mulDmg': {
       const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`
       if (a.pct < 100) return `${what} lose ${100 - a.pct}% dmg`

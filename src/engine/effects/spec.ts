@@ -32,6 +32,7 @@ export type CondSpec =
   | { c: 'enteredWith'; n: number }
   | { c: 'silenced'; who: 'self' | 'enemy' }
   | { c: 'hasStatus'; who: 'self' | 'enemy'; kind: StatusKind }
+  | { c: 'res'; who: 'self' | 'enemy'; n: number }
 
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
@@ -41,6 +42,9 @@ export type ActSpec =
   | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType }
   | { a: 'mulDmg'; target: P.DmgTarget; pct: number; onlyType?: CardType }
   | { a: 'blockNow'; who: P.Who; n: number }
+  | { a: 'pierce'; target: 'this' | 'next' | 'following' | 'chain' }
+  | { a: 'steal' }
+  | { a: 'gainRes'; who: P.Who; n: number }
 
 /**
  * One rule = when [hook], if all [if], do all [do]. A card can have several rules.
@@ -72,6 +76,7 @@ function cond(s: CondSpec): Cond {
     case 'enteredWith': return P.enteredWith(s.n)
     case 'silenced': return P.silenced(s.who)
     case 'hasStatus': return P.hasStatus(s.who, s.kind)
+    case 'res': return P.resAtLeast(s.who, s.n)
   }
 }
 
@@ -86,6 +91,9 @@ function act(s: ActSpec): Act {
     case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType)
     case 'mulDmg': return P.mulDmg(s.target, s.pct, s.onlyType)
     case 'blockNow': return P.blockNow(s.who, s.n)
+    case 'pierce': return P.pierce(s.target)
+    case 'steal': return P.steal
+    case 'gainRes': return P.gainRes(s.who, s.n)
   }
 }
 

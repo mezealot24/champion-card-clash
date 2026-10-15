@@ -38,6 +38,7 @@ tr.dirty { background: var(--dirty); }
 .actions, .save { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
 .actions input { width: 160px; }
 .muted { color: var(--muted); } .ok { color: var(--ok); } .warn { color: var(--warn); } .error { color: var(--danger); }
+.res { color: var(--accent); font-weight: 600; } .cost { color: var(--accent); }
 code { font-size: 13px; }
 .filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
 .filters input { width: 220px; } .filters select { width: auto; } .spacer { flex: 1; }
