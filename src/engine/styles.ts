@@ -67,7 +67,8 @@ export const STYLES: Record<string, StyleDef> = {
 
   /**
    * Tank · Overgrowth: Max HP starts at 160. Each time attacked: +1 per hit taken,
-   * +2 per hit blocked, +3 per facing card. Cap 500. Current HP goes up by the same amount (Q: B).
+   * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
+   * heal (Q nerf 2026-10-15).
    */
   'TK:2': {
     name: 'Overgrowth',
@@ -81,8 +82,7 @@ export const STYLES: Record<string, StyleDef> = {
       const gain = Math.min(500 - p.maxHp, r.hitsTaken + r.hitsBlocked * 2 + r.facing * 3)
       if (gain <= 0) return
       p.maxHp += gain
-      if (p.hp > 0) p.hp += gain
-      say(state, side, `Overgrowth: Max HP +${gain} → ${p.maxHp} (HP +${gain})`)
+      say(state, side, `Overgrowth: Max HP +${gain} → ${p.maxHp}`)
     },
   },
 }
