@@ -69,10 +69,10 @@ function emptyPlayer(setup: ChampionSetup, side: Side): PlayerState {
 }
 
 /** A card's effect, or nothing while its owner is Silenced. */
-/** Also nothing for a chain card whose resource cost couldn't be paid this turn. */
+/** A chain card whose resource cost couldn't be paid this turn keeps only its drawbacks (Q 2026-10-15). */
 export function effectOf(state: GameState, side: Side, card: CardInst) {
   const p = state.players[side]
-  return p.silenced || p.unpaid?.includes(card.uid) ? undefined : getEffect(card.def)
+  return p.silenced ? undefined : getEffect(card.def, !!p.unpaid?.includes(card.uid))
 }
 
 /**

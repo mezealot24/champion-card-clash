@@ -1,5 +1,6 @@
 // Class resources (Q 2026-10-15, thread "S card resource"): every S card has a cost.
-// Paid when the card fires in a Strike chain, in chain order. Can't pay → the card still hits, its effects are off.
+// Paid when the card fires in a Strike chain, in chain order. Can't pay → the card still hits, its effects are off
+// except its drawbacks (lose HP etc., Q 2026-10-15).
 // Spec: /mnt/project-files/plans/s-card-resource-system.md. Numbers are starting values for playtest.
 import type { Action, CardInst, GameState, Side } from './types'
 
@@ -63,7 +64,7 @@ export function addRes(state: GameState, side: Side, n: number) {
   p.res = Math.max(0, Math.min(def.cap, (p.res ?? 0) + n))
 }
 
-/** Pay for every card in the chain, in order. Cards that can't be paid go into p.unpaid (effects off this turn). */
+/** Pay for every card in the chain, in order. Cards that can't be paid go into p.unpaid (only drawbacks fire this turn). */
 export function payChain(state: GameState, side: Side, chain: CardInst[]) {
   const p = state.players[side]
   const def = resourceOf(p.championId)
@@ -78,7 +79,7 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
       log(state, `${side} จ่าย ${cost} ${def.name} ให้ ${card.def.id}`)
     } else {
       p.unpaid.push(card.uid)
-      log(state, `${side} ${def.name} ไม่พอสำหรับ ${card.def.id} (ต้องการ ${cost}): ตีได้แต่ effect ไม่ทำงาน`)
+      log(state, `${side} ${def.name} ไม่พอสำหรับ ${card.def.id} (ต้องการ ${cost}): ตีได้ แต่เหลือแค่ผลเสีย`)
     }
   }
 }

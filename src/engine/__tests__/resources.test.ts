@@ -56,6 +56,16 @@ describe('resources', () => {
     expect(s.players.p2.hp).toBe(90)
   })
 
+  it("can't pay: drawbacks still fire, the rest stays off", () => {
+    const mixed: EffectSpec = [{ hook: 'onResolve', do: [{ a: 'loseHp', who: 'self', n: 7 }, { a: 'heal', who: 'self', n: 5 }, { a: 'loseHp', who: 'enemy', n: 9 }] }]
+    const s = resolveTurn(game('BR', [c('S', 10, mixed, 2)]), { p1: 'strike', p2: 'charge' })
+    expect(s.players.p1.hp).toBe(43) // lost 7, no heal
+    expect(s.players.p2.hp).toBe(90) // only the hit, no extra 9
+    const paid = resolveTurn(game('BR', [c('S', 10, mixed, 2)], [], 2), { p1: 'strike', p2: 'charge' })
+    expect(paid.players.p1.hp).toBe(48)
+    expect(paid.players.p2.hp).toBe(81)
+  })
+
   it('pays in chain order: the later S card goes unpaid when the bar runs out', () => {
     const s = resolveTurn(game('AS', [c('S', 1, heal5, 2), c('S', 1, heal5, 2)], [], 3), { p1: 'strike', p2: 'charge' })
     expect(s.players.p1.hp).toBe(55) // only the first heal

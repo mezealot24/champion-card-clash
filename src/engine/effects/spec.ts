@@ -106,9 +106,32 @@ export function normalizeSpec(spec: EffectSpec): EffectSpec {
   )
 }
 
+const BAD_FOR_SELF: StatusKind[] = ['noStrike', 'noBlock', 'noCharge', 'silence']
+/**
+ * A drawback = an action that only hurts its own side (e.g. lose HP, Max HP −, can't Block, lose resource).
+ * Q 2026-10-15: an S card you couldn't pay for still pays its drawbacks; everything else is off.
+ */
+export function isDrawback(a: ActSpec): boolean {
+  if (!('who' in a) || a.who !== 'self') return false
+  switch (a.a) {
+    case 'loseHp': return a.n > 0
+    case 'maxHp':
+    case 'gainRes':
+    case 'blockNow': return a.n < 0
+    case 'status': return BAD_FOR_SELF.includes(a.kind) || (a.kind === 'blockPlus' && (a.n ?? 1) < 0)
+    default: return false
+  }
+}
+
+/** The same rules with only their drawback actions; rules with none are dropped. Rule indexes stay (for once per game). */
+export function drawbacksOf(spec: EffectSpec): EffectSpec {
+  return normalizeSpec(spec).map((rule) => ({ ...rule, do: rule.do.filter(isDrawback) }))
+}
+
 export function compileSpec(spec: EffectSpec): CardEffect {
   const out: CardEffect = {}
   normalizeSpec(spec).forEach((rule, ri) => {
+    if (!rule.do.length) return
     const conds = (rule.if ?? []).map(cond)
     const acts = rule.do.map(act)
     // once per game: remember on the card copy that this rule already fired
