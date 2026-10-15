@@ -1,15 +1,15 @@
 -- Mage deck v2: 20 cards (MG-001..020), Claude's improvisation for Q on 2026-10-15.
--- Rewrites the 15 placeholder MG cards and adds MG-016..020. 15 in_deck, 5 in the pool (Q swaps freely).
+-- Rewrites the 15 placeholder MG cards and adds MG-016..020, all 20 in the deck (deck size 20, Q 16:39Z).
 -- Identity: low HP control caster. Spells (S) feed the S + S + S signature combo; P/K cards punish
 -- the opponent's action choice; Hold cards lock actions (each lock lasts 1 turn, Q21).
--- Only uses actions the engine already has (no discard / Silence yet).
+-- Silence (status 'silence', cond 'silenced') was added with this deck; no discard yet.
 insert into public.cards (id, champion_id, name, source, line, type, dmg, effect, copies, sort_order, in_deck, tags, effect_json) values
   ('MG-001', 'MG', 'Mana Surge', 'Q', 'Spell', 'S', 4, 'Before action, if you play Strike: the next card gets +8 dmg.', 1, 1, true, '{Spell}',
    '[{"hook":"modify","if":[{"c":"selfAction","a":"strike"}],"do":[{"a":"addDmg","target":"next","n":8}]}]'),
   ('MG-002', 'MG', 'Chain Lightning', 'Q', 'Spell', 'S', 4, 'Before action, if you play Strike with 3+ cards: this card +6 dmg. With 5 cards: +6 more.', 1, 2, true, '{Spell}',
    '[{"hook":"modify","if":[{"c":"selfAction","a":"strike"},{"c":"chainLength","op":">=","n":3}],"do":[{"a":"addDmg","target":"this","n":6}]},{"hook":"modify","if":[{"c":"selfAction","a":"strike"},{"c":"chainLength","op":">=","n":5}],"do":[{"a":"addDmg","target":"this","n":6}]}]'),
-  ('MG-003', 'MG', 'Meteor Strike', 'Q', 'Spell', 'S', 14, 'Before action, if you play Strike and every card in your chain is S: this card deals x2 dmg.', 1, 3, true, '{Spell}',
-   '[{"hook":"modify","if":[{"c":"selfAction","a":"strike"},{"c":"chainAll","type":"S"}],"do":[{"a":"mulDmg","target":"this","pct":200}]}]'),
+  ('MG-003', 'MG', 'Meteor Strike', 'Q', 'Spell', 'S', 14, 'Before action, if you play Strike and the opponent is Silenced: this card deals x2 dmg.', 1, 3, true, '{Spell}',
+   '[{"hook":"modify","if":[{"c":"selfAction","a":"strike"},{"c":"silenced","who":"enemy"}],"do":[{"a":"mulDmg","target":"this","pct":200}]}]'),
   ('MG-004', 'MG', 'Frostbite', 'Q', 'Spell', 'S', 4, 'After action, if this card hit clean: the opponent can''t Strike next turn.', 1, 4, true, '{Spell,Control}',
    '[{"hook":"onResolve","if":[{"c":"selfAction","a":"strike"},{"c":"hitResult","r":"clean"}],"do":[{"a":"status","who":"enemy","kind":"noStrike","turns":1}]}]'),
   ('MG-005', 'MG', 'Mind Boggle', 'Q', 'Spell', 'S', 4, 'After action, if this card hit clean: the opponent can''t Block next turn.', 1, 5, true, '{Spell,Control}',
@@ -26,15 +26,15 @@ insert into public.cards (id, champion_id, name, source, line, type, dmg, effect
    '[{"hook":"modify","if":[{"c":"enemyAction","a":"strike"}],"do":[{"a":"addDmg","target":"facing","n":-6}]}]'),
   ('MG-011', 'MG', 'Hex Kick', 'Lili', 'Control', 'K', 9, 'Before action, if the opponent plays Strike with 3+ cards: the enemy card facing this one gets -16 dmg.', 1, 11, true, '{Control,Defend}',
    '[{"hook":"modify","if":[{"c":"enemyAction","a":"strike"},{"c":"enemyHandAtLeast","n":3}],"do":[{"a":"addDmg","target":"facing","n":-16}]}]'),
-  ('MG-012', 'MG', 'Arcane Palm', 'Lili', 'Control', 'P', 6, 'Before action, if you play Strike and the opponent has 3+ cards: the next card gets +3 dmg.', 1, 12, false, '{Control}',
+  ('MG-012', 'MG', 'Arcane Palm', 'Lili', 'Control', 'P', 6, 'Before action, if you play Strike and the opponent has 3+ cards: the next card gets +3 dmg.', 1, 12, true, '{Control}',
    '[{"hook":"modify","if":[{"c":"selfAction","a":"strike"},{"c":"enemyHandAtLeast","n":3}],"do":[{"a":"addDmg","target":"next","n":3}]}]'),
-  ('MG-013', 'MG', 'Overcharged Palm', 'Lili', 'Control', 'P', 8, 'Before action, if you play Strike and the opponent has 3+ cards: this card +10 dmg.', 1, 13, false, '{Control,Attack}',
-   '[{"hook":"modify","if":[{"c":"selfAction","a":"strike"},{"c":"enemyHandAtLeast","n":3}],"do":[{"a":"addDmg","target":"this","n":10}]}]'),
-  ('MG-014', 'MG', 'Insight', 'Lili', 'Control', 'P', 10, 'After action, if you play Strike, you had fewer cards than the opponent and they had 3+: draw 1.', 1, 14, false, '{Control,Speed}',
+  ('MG-013', 'MG', 'Tempest', 'Lili', 'Control', 'S', 8, 'After action, if this card hit clean: the opponent is Silenced next turn (their card effects don''t fire).', 1, 13, true, '{Spell,Control}',
+   '[{"hook":"onResolve","if":[{"c":"selfAction","a":"strike"},{"c":"hitResult","r":"clean"}],"do":[{"a":"status","who":"enemy","kind":"silence","turns":1}]}]'),
+  ('MG-014', 'MG', 'Insight', 'Lili', 'Control', 'P', 10, 'After action, if you play Strike, you had fewer cards than the opponent and they had 3+: draw 1.', 1, 14, true, '{Control,Speed}',
    '[{"hook":"onResolve","if":[{"c":"selfAction","a":"strike"},{"c":"handCompare","op":"<"},{"c":"enemyHandAtLeast","n":3}],"do":[{"a":"draw","who":"self","n":1}]}]'),
   ('MG-015', 'MG', 'Leyline Tap', 'Lili', 'Control', 'P', 6, 'After action, if you play Strike and your HP is not above the opponent''s: you draw 2, the opponent draws 1.', 1, 15, true, '{Control,Speed}',
    '[{"hook":"onResolve","if":[{"c":"selfAction","a":"strike"},{"c":"hpNotAbove"}],"do":[{"a":"draw","who":"self","n":2},{"a":"draw","who":"enemy","n":1}]}]'),
-  ('MG-016', 'MG', 'Arcane Barrier', 'Claude', 'Defend', 'P', 5, 'Before action, if you play Block: your Block stops 1 more hit this turn.', 1, 16, false, '{Defend}',
+  ('MG-016', 'MG', 'Arcane Barrier', 'Claude', 'Defend', 'P', 5, 'Before action, if you play Block: your Block stops 1 more hit this turn.', 1, 16, true, '{Defend}',
    '[{"hook":"modify","if":[{"c":"selfAction","a":"block"}],"do":[{"a":"blockNow","who":"self","n":1}]}]'),
   ('MG-017', 'MG', 'Mana Shield', 'Claude', 'Defend', 'K', 6, 'After action, if you play Block: heal 3 per hit you blocked.', 1, 17, true, '{Defend}',
    '[{"hook":"onResolve","if":[{"c":"selfAction","a":"block"}],"do":[{"a":"heal","who":"self","n":3,"per":"hitBlocked"}]}]'),
@@ -42,7 +42,7 @@ insert into public.cards (id, champion_id, name, source, line, type, dmg, effect
    '[{"hook":"onDraw","do":[{"a":"draw","who":"self","n":1}]}]'),
   ('MG-019', 'MG', 'Shatter', 'Claude', 'Spell', 'S', 6, 'After action, if this card hit clean: the opponent''s Block stops 1 fewer hit next turn.', 1, 19, true, '{Spell,Control}',
    '[{"hook":"onResolve","if":[{"c":"selfAction","a":"strike"},{"c":"hitResult","r":"clean"}],"do":[{"a":"status","who":"enemy","kind":"blockPlus","turns":1,"n":-1}]}]'),
-  ('MG-020', 'MG', 'Arcane Missile', 'Claude', 'Spell', 'S', 7, 'Before action, if you play Strike and the opponent plays Charge: this card +8 dmg.', 1, 20, false, '{Spell,Attack}',
+  ('MG-020', 'MG', 'Arcane Missile', 'Claude', 'Spell', 'S', 7, 'Before action, if you play Strike and the opponent plays Charge: this card +8 dmg.', 1, 20, true, '{Spell,Attack}',
    '[{"hook":"modify","if":[{"c":"selfAction","a":"strike"},{"c":"enemyAction","a":"charge"}],"do":[{"a":"addDmg","target":"this","n":8}]}]')
 on conflict (id) do update set
   champion_id = excluded.champion_id, name = excluded.name, source = excluded.source, line = excluded.line,

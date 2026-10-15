@@ -217,3 +217,5 @@ export const enteredWith = (n: number): Cond => (ctx) => (ctx.card.enteredWith ?
 
 export const hpAtMost = (n: number): Cond => (ctx) => ctx.state.players[ctx.self].hp <= n
 export const hpNotAbove: Cond = (ctx) => ctx.state.players[ctx.self].hp <= ctx.state.players[ctx.enemy].hp
+/** you / the opponent are Silenced this turn */
+export const silenced = (who: 'self' | 'enemy'): Cond => (ctx) => !!ctx.state.players[who === 'self' ? ctx.self : ctx.enemy].silenced

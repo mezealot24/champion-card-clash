@@ -25,7 +25,8 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
 
 /** trueDmg = your hits ignore dmg cuts (only Block stops them) */
 /** guardBreak = Guard Crush: on your next Strike, blocked hits deal half and a Blocking opponent loses their 2 oldest Field cards */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak'
+/** silence = your cards' effects don't fire this turn (Styles and combos still work) */
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence'
 /** n = size, used by blockPlus (Block stops n more hits; negative = fewer) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
 
@@ -42,6 +43,10 @@ export type PlayerState = {
   styleData?: Record<string, number>
   /** Signature combo bookkeeping (e.g. Bruiser Conqueror stacks). */
   comboData?: Record<string, number>
+  /** Silenced this turn (from a silence status active when the turn started). */
+  silenced?: boolean
+  /** Cards drawn since the last shuffle; the deck reshuffles once a whole deck's worth is drawn. */
+  drawsSinceShuffle?: number
 }
 
 export type RulesConfig = {

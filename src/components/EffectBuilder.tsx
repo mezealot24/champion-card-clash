@@ -24,6 +24,7 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   hpNotAbove: { c: 'hpNotAbove' },
   hp: { c: 'hp', who: 'self', op: '<', n: 30, pct: true },
   enteredWith: { c: 'enteredWith', n: 2 },
+  silenced: { c: 'silenced', who: 'enemy' },
 }
 const COND_LABEL: Record<CondSpec['c'], string> = {
   hitResult: 'Hit result is…',
@@ -43,6 +44,7 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   hpNotAbove: "Your HP ≤ opponent's HP",
   hp: 'HP compare (you / opponent, number or %)',
   enteredWith: 'You had N+ cards when this came into play',
+  silenced: 'You / opponent is Silenced',
 }
 const ACT_DEFAULTS: Record<string, ActSpec> = {
   draw: { a: 'draw', who: 'self', n: 1 },
@@ -166,6 +168,11 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
           <option value="strike">Strike</option><option value="block">Block</option><option value="charge">Charge</option>
         </select>
       )}
+      {value.c === 'silenced' && (
+        <select value={value.who} onChange={(e) => onChange({ ...value, who: e.target.value as 'self' | 'enemy' })}>
+          <option value="enemy">opponent</option><option value="self">you</option>
+        </select>
+      )}
       {value.c === 'hp' && (
         <>
           <select value={value.who} onChange={(e) => onChange({ ...value, who: e.target.value as 'self' | 'enemy' })}>
@@ -207,7 +214,7 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
               onChange(kind === 'blockPlus' ? { ...value, kind, n: value.n ?? 1 } : { a: 'status', who: value.who, kind, turns: value.turns })
             }}
           >
-            <option value="noStrike">can't Strike</option><option value="noBlock">can't Block</option><option value="noCharge">can't Charge</option>
+            <option value="noStrike">can't Strike</option><option value="noBlock">can't Block</option><option value="noCharge">can't Charge</option><option value="silence">Silenced (card effects off)</option>
             <option value="blockPlus">Block stops ±N hits</option>
           </select>
           {value.kind === 'blockPlus' && <><Num value={value.n ?? 1} onChange={(n) => onChange({ ...value, n })} /> hit(s) (negative = fewer),</>}

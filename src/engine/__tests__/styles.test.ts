@@ -43,24 +43,24 @@ describe('Second Wind', () => {
 })
 
 describe('Overgrowth', () => {
-  it('starts at Max HP 160', () => {
-    const s = game('TK:2', 160, 250)
-    expect([s.players.p1.hp, s.players.p1.maxHp]).toEqual([160, 160])
+  it('starts at Max HP 210', () => {
+    const s = game('TK:2', 210, 300)
+    expect([s.players.p1.hp, s.players.p1.maxHp]).toEqual([210, 210])
   })
 
   it('+1 per hit, +2 per hit blocked, +3 per facing card when attacked (Max HP only)', () => {
-    const s = game('TK:2', 160, 250)
+    const s = game('TK:2', 210, 300)
     s.players.p1.hand = [hit(1), hit(1)]
     s.players.p2.hand = [hit(1), hit(1), hit(1)]
     // Block stops 2 (+4), 1 hit lands (+1), 2 facing pairs (+6)
     const after = resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1
-    expect([after.maxHp, after.hp]).toEqual([171, 160 - 1]) // Max HP grows, current HP does not heal
-    const quiet = game('TK:2', 160, 250)
-    expect(resolveTurn(quiet, { p1: 'charge', p2: 'charge' }).players.p1.maxHp).toBe(160)
+    expect([after.maxHp, after.hp]).toEqual([221, 210 - 1]) // Max HP grows, current HP does not heal
+    const quiet = game('TK:2', 210, 300)
+    expect(resolveTurn(quiet, { p1: 'charge', p2: 'charge' }).players.p1.maxHp).toBe(210)
   })
 
   it('caps at 500', () => {
-    const s = game('TK:2', 160, 250)
+    const s = game('TK:2', 210, 300)
     s.players.p1.maxHp = 499
     s.players.p2.hand = [hit(1), hit(1), hit(1)]
     expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.maxHp).toBe(500)

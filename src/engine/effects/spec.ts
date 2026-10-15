@@ -30,6 +30,7 @@ export type CondSpec =
   | { c: 'hpNotAbove' }
   | { c: 'hp'; who: 'self' | 'enemy'; op: P.HpOp; n: number; pct?: boolean }
   | { c: 'enteredWith'; n: number }
+  | { c: 'silenced'; who: 'self' | 'enemy' }
 
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
@@ -68,6 +69,7 @@ function cond(s: CondSpec): Cond {
     case 'hpNotAbove': return P.hpNotAbove
     case 'hp': return P.hp(s.who, s.op, s.n, s.pct)
     case 'enteredWith': return P.enteredWith(s.n)
+    case 'silenced': return P.silenced(s.who)
   }
 }
 

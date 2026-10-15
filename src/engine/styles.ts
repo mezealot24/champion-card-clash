@@ -69,14 +69,14 @@ export const STYLES: Record<string, StyleDef> = {
   },
 
   /**
-   * Tank · Overgrowth: Max HP starts at 160. Each time attacked: +1 per hit taken,
+   * Tank · Overgrowth: Max HP starts at 210 (160 + 50, Q 2026-10-15). Each time attacked: +1 per hit taken,
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
    */
   'TK:2': {
     name: 'Overgrowth',
     setup: (p) => {
-      p.maxHp = 160
+      p.maxHp = 210
       p.hp = Math.min(p.hp, p.maxHp)
     },
     afterHits: (state, side, r) => {

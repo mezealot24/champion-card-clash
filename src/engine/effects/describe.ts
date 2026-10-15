@@ -14,7 +14,7 @@ export const HOOK_LABEL: Record<Hook, string> = {
 const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush' }
+const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)' }
 export const PER_LABEL: Record<Per, string> = {
   hitBlocked: 'hit you blocked this turn',
   chainCard: 'card in your chain',
@@ -44,6 +44,7 @@ export function describeCond(c: CondSpec): string {
     case 'hpNotAbove': return "your HP ≤ opponent's HP"
     case 'hp': return `${c.who === 'self' ? 'your' : "opponent's"} HP ${{ '<': '<', '<=': '≤', '>': '>', '>=': '≥' }[c.op]} ${c.n}${c.pct ? '%' : ''}`
     case 'enteredWith': return `you had ${c.n}+ cards (this one included) when this card came into play`
+    case 'silenced': return c.who === 'self' ? 'you are Silenced' : 'opponent is Silenced'
   }
 }
 

@@ -23,9 +23,9 @@ function game(p1: CardInst[], p2: CardInst[], hp = 60): GameState {
 const turn = (s: GameState, p1: Action, p2: Action) => resolveTurn(s, { p1, p2 })
 const foeHp = (s: GameState) => s.players.p2.hp
 
-it('has 20 MG cards, 15 of them in the deck', () => {
+it('has 20 MG cards, all in the deck', () => {
   expect(rows).toHaveLength(20)
-  expect(rows.filter((m) => m[4] === 'true')).toHaveLength(15)
+  expect(rows.filter((m) => m[4] === 'true')).toHaveLength(20)
 })
 
 describe('Mage cards', () => {
@@ -38,9 +38,12 @@ describe('Mage cards', () => {
     expect([t(2), t(3), t(5)]).toEqual([96, 90, 84])
   })
 
-  it('MG-003 doubles in an all-S chain', () => {
-    expect(foeHp(turn(game([mg('MG-003', 'S', 14), plain(0, 'S')], []), 'strike', 'charge'))).toBe(72)
-    expect(foeHp(turn(game([mg('MG-003', 'S', 14), plain(0, 'P')], []), 'strike', 'charge'))).toBe(86)
+  it('MG-013 Silences on a clean hit; MG-003 doubles vs a Silenced opponent', () => {
+    let s = turn(game([mg('MG-013', 'S', 8)], []), 'strike', 'charge')
+    expect(s.players.p2.statuses.some((x) => x.kind === 'silence')).toBe(true)
+    s.players.p1.hand = [mg('MG-003', 'S', 14)]
+    expect(foeHp(turn(s, 'strike', 'charge'))).toBe(100 - 8 - 28)
+    expect(foeHp(turn(game([mg('MG-003', 'S', 14)], []), 'strike', 'charge'))).toBe(86)
   })
 
   it('MG-004 / MG-005 lock Strike / Block next turn on a clean hit only', () => {
@@ -69,11 +72,9 @@ describe('Mage cards', () => {
     expect(legalActions(turn(game([mg('MG-009', 'K', 6)], []), 'charge', 'block'), 'p2')).not.toContain('block')
   })
 
-  it('MG-012 / 013 need 3+ enemy cards', () => {
+  it('MG-012 needs 3+ enemy cards', () => {
     const foe3 = () => [plain(), plain(), plain()]
     expect(foeHp(turn(game([mg('MG-012', 'P', 6), plain(1)], foe3()), 'strike', 'charge'))).toBe(100 - 6 - 4)
-    expect(foeHp(turn(game([mg('MG-013', 'P', 8)], foe3()), 'strike', 'charge'))).toBe(82)
-    expect(foeHp(turn(game([mg('MG-013', 'P', 8)], []), 'strike', 'charge'))).toBe(92)
   })
 
   it('MG-014 / 015 draw', () => {
