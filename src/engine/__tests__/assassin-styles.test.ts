@@ -49,3 +49,12 @@ describe('Coup de grâce', () => {
     expect(s.players.p1.styleData?.attacks).toBe(6)
   })
 })
+
+describe('Sonic Bliz extra hits', () => {
+  it('count as hit dmg for the opponent\'s "you take N+ dmg" cards', () => {
+    const watcher: CardInst = { uid: 'w', def: { id: 'XX-W', type: 'P', dmg: 1, effectText: '', effectSpec: [{ hook: 'onResolve', if: [{ c: 'tookDmg', n: 15 }], do: [{ a: 'heal', who: 'self', n: 50 }] }] } }
+    // chain 3 x 2 = 6 dmg, + 3 extra hits x 3 = 9 → 15 taken → watcher heals 50 (capped at 100)
+    const s = resolveTurn(game('AS:1', [hit(2), hit(2), hit(2)], [watcher, hit(0), hit(0)]), { p1: 'strike', p2: 'charge' })
+    expect(s.players.p2.hp).toBe(100)
+  })
+})

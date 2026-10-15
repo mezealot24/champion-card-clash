@@ -216,12 +216,15 @@ function resolveStrikes(
 
   // Styles that add to a finished chain (e.g. Sonic Bliz extra hits)
   for (const side of strikers) {
+    const foe = state.players[other(side)]
+    const hpBefore = foe.hp
     const extra = getStyle(state.players[side].style)?.afterChain?.(state, side, {
       chainLength: chains[side]!.length,
       cleanHits: cleanHits[side],
       enemyField: handAtStart[other(side)].length,
     })
     if (extra) env.hitsTaken[other(side)] += extra
+    hitDmgTaken[other(side)] += hpBefore - foe.hp // extra hits count as hit dmg (e.g. "you take N+ dmg")
   }
 
   // 3) used cards go under the deck, then draws from effects enter the hand
