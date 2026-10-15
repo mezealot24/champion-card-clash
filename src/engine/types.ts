@@ -24,7 +24,8 @@ export type CardDef = {
 export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number }
 
 /** trueDmg = your hits ignore dmg cuts (only Block stops them) */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg'
+/** guardBreak = your blocked hits still deal half dmg (used up by your next Strike) */
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak'
 /** n = size, used by blockPlus (Block stops n more hits; negative = fewer) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
 
@@ -39,6 +40,8 @@ export type PlayerState = {
   style?: string
   /** Style bookkeeping (e.g. Second Wind already spent). */
   styleData?: Record<string, number>
+  /** Signature combo bookkeeping (e.g. Bruiser Conqueror stacks). */
+  comboData?: Record<string, number>
 }
 
 export type RulesConfig = {

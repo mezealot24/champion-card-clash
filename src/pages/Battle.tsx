@@ -165,9 +165,10 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
           HP {p.hp} / {p.maxHp}
         </span>
         <span className="muted">มือ {p.hand.length} · กอง {p.deck.length}</span>
+        {!!p.comboData?.conqueror && <span className="warn">Conqueror {p.comboData.conqueror}/6</span>}
         {p.statuses.map((s, i) => (
           <span key={i} className="warn">
-            {s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Damage' : s.kind} ({s.turns})
+            {s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Damage' : s.kind === 'guardBreak' ? 'Guard Break' : s.kind} ({s.turns})
           </span>
         ))}
       </div>
