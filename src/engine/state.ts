@@ -3,6 +3,7 @@
 import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side } from './types'
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
+import { getStyle } from './styles'
 
 // --- seeded RNG (mulberry32) so a match can be replayed from its seed ---
 export function nextRandom(state: GameState): number {
@@ -26,6 +27,7 @@ export type ChampionSetup = {
   hpStart: number
   hpMax: number
   deck: CardDef[] // already expanded by copies (see buildDeck)
+  style?: string // "CHAMP:slot", see engine/styles.ts
 }
 
 export function createGame(
@@ -44,6 +46,7 @@ export function createGame(
   }
   for (const side of ['p1', 'p2'] as const) {
     const p = state.players[side]
+    getStyle(p.style)?.setup?.(p)
     p.deck = shuffle(state, p.deck) // shuffle once; afterwards order is learnable
     drawCards(state, side, state.rules.startHand)
   }
@@ -58,6 +61,7 @@ function emptyPlayer(setup: ChampionSetup, side: Side): PlayerState {
     hand: [],
     deck: setup.deck.map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
     statuses: [],
+    style: setup.style,
   }
 }
 
@@ -68,6 +72,7 @@ export function drawCards(state: GameState, side: Side, n: number): number {
   for (let i = 0; i < n && p.hand.length < state.rules.handMax && p.deck.length > 0; i++) {
     const card = p.deck.shift()!
     p.hand.push(card)
+    card.enteredWith = p.hand.length
     drawn++
     getEffect(card.def)?.onDraw?.({ state, self: side, enemy: side === 'p1' ? 'p2' : 'p1', card, pending: null })
   }

@@ -1,5 +1,6 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { getEffect } from './effects/registry'
+import { getStyle } from './styles'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, log, loseHp, toDeckBottom } from './state'
@@ -7,6 +8,16 @@ import type { Action, CardDef, CardInst, CardType, GameState, Side } from './typ
 import { other } from './types'
 
 const SIDES: Side[] = ['p1', 'p2']
+
+/** Per-turn bookkeeping shared by every effect this turn. */
+type TurnEnv = {
+  handAtStart: Record<Side, CardInst[]>
+  hitsBlocked: Record<Side, number>
+  hitDmgTaken: Record<Side, number>
+  blockNow: Record<Side, number>
+  /** Hits each side took that Block didn't stop. */
+  hitsTaken: Record<Side, number>
+}
 
 export function legalActions(state: GameState, side: Side): Action[] {
   const p = state.players[side]
@@ -31,9 +42,12 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
   const hitsBlocked: Record<Side, number> = { p1: 0, p2: 0 }
   const hitDmgTaken: Record<Side, number> = { p1: 0, p2: 0 }
+  const blockNow: Record<Side, number> = { p1: 0, p2: 0 }
+  const hitsTaken: Record<Side, number> = { p1: 0, p2: 0 }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken }
 
   // Every turn (before attack): right after actions are revealed, so its statuses count this turn
-  resolveHeld(state, actions, handAtStart, hitsBlocked, hitDmgTaken, 'onHeldBefore')
+  resolveHeld(state, actions, env, 'onHeldBefore')
 
   // Block size comes from statuses active this turn, read before they tick
   const blockStops = { p1: blockStopsFor(state, 'p1'), p2: blockStopsFor(state, 'p2') }
@@ -44,16 +58,31 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     p.statuses = p.statuses.map((s) => ({ ...s, turns: s.turns - 1 })).filter((s) => s.turns > 0)
   }
 
-  if (actions.p1 === 'strike' || actions.p2 === 'strike') resolveStrikes(state, actions, handAtStart, blockStops, hitsBlocked, hitDmgTaken)
-  resolveHeld(state, actions, handAtStart, hitsBlocked, hitDmgTaken, 'onHeld')
+  // runs every turn: Before attack also fires for held cards when nobody Strikes (e.g. "if you played Charge")
+  resolveStrikes(state, actions, env, blockStops)
+
+  // Styles that react to this turn's hits
+  for (const side of SIDES) {
+    const enemy = other(side)
+    const attacked = actions[enemy] === 'strike'
+    getStyle(state.players[side].style)?.afterHits?.(state, side, {
+      attacked,
+      hitsTaken: hitsTaken[side],
+      hitsBlocked: hitsBlocked[side],
+      facing: attacked ? Math.min(handAtStart[enemy].length, handAtStart[side].length) : 0,
+    })
+  }
+  resolveHeld(state, actions, env, 'onHeld')
 
   for (const side of SIDES) {
     if (actions[side] !== 'charge') continue
     const p = state.players[side]
     if (actions[other(side)] === 'strike') {
       // Strike > Charge: charger loses the oldest card if holding more than 1
-      if (p.hand.length > 1) {
-        const lost = p.hand.shift()!
+      // (a Style like Tenacity can keep the first slots safe; the next card goes instead)
+      const safe = getStyle(p.style)?.chargeBreakSafe?.(state, side) ?? 0
+      if (p.hand.length > Math.max(1, safe)) {
+        const lost = p.hand.splice(safe, 1)[0]
         toDeckBottom(state, side, [lost])
         log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge)`)
       }
@@ -77,6 +106,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     state.blockStreak = 0
   }
 
+  for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side)
+
   const dead = SIDES.filter((s) => state.players[s].hp <= 0)
   if (dead.length === 2) state.winner = 'draw'
   else if (dead.length === 1) state.winner = other(dead[0])
@@ -93,11 +124,10 @@ function blockStopsFor(state: GameState, side: Side): number {
 function resolveStrikes(
   state: GameState,
   actions: Record<Side, Action>,
-  handAtStart: Record<Side, CardInst[]>,
+  env: TurnEnv,
   blockStops: Record<Side, number>,
-  hitsBlocked: Record<Side, number>,
-  hitDmgTaken: Record<Side, number>,
 ) {
+  const { handAtStart, hitsBlocked, hitDmgTaken } = env
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
   const pending: Record<Side, number> = { p1: 0, p2: 0 }
   const chains: Partial<Record<Side, CardInst[]>> = {}
@@ -127,6 +157,7 @@ function resolveStrikes(
       handAtStart,
       hitsBlocked,
       hitDmgTaken,
+      blockNow: env.blockNow,
       bonus: held ? [] : bonus[side]!,
       enemyBonus: bonus[enemy] ?? null,
       mult: held ? [] : mult[side]!,
@@ -142,12 +173,16 @@ function resolveStrikes(
     else handAtStart[side].forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false, false, true)))
   }
 
-  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < blockStops[other(side)]
+  const stops = (side: Side) => Math.max(0, blockStops[side] + env.blockNow[side])
+  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side))
   const dmgOf = (side: Side, i: number) => {
     const card = chains[side]![i]
     const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + bonus[side]![i]
     return Math.max(0, Math.floor(raw * mult[side]![i]))
   }
+  // Styles that boost the chain (e.g. Fury)
+  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!)
+
   // dmg each side will take from hits this turn is known now (later effects can't change it)
   for (const side of strikers) {
     chains[side]!.forEach((_, i) => {
@@ -166,7 +201,10 @@ function resolveStrikes(
       if (blocked) hitsBlocked[enemy]++
       const usedNext = card.growNext ?? 0
       const dmg = dmgOf(side, i)
-      if (!blocked) loseHp(state, enemy, dmg)
+      if (!blocked) {
+        loseHp(state, enemy, dmg)
+        env.hitsTaken[enemy]++
+      }
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
       const fx = getEffect(card.def)
       const ctx = ctxFor(side, i, blocked, !blocked && dmg > 0)
@@ -187,11 +225,10 @@ function resolveStrikes(
 function resolveHeld(
   state: GameState,
   actions: Record<Side, Action>,
-  handAtStart: Record<Side, CardInst[]>,
-  hitsBlocked: Record<Side, number>,
-  hitDmgTaken: Record<Side, number>,
+  env: TurnEnv,
   hook: 'onHeld' | 'onHeldBefore',
 ) {
+  const { handAtStart, hitsBlocked, hitDmgTaken, blockNow } = env
   for (const side of SIDES) {
     if (actions[side] === 'strike') continue
     handAtStart[side].forEach((card, slot) => {
@@ -209,6 +246,7 @@ function resolveHeld(
         handAtStart,
         hitsBlocked,
         hitDmgTaken,
+        blockNow,
         bonus: [],
         enemyBonus: null,
         mult: [],

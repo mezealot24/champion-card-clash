@@ -19,8 +19,9 @@ export type CardDef = {
  * grow = dmg this copy has gained for the rest of the game; growNext = dmg it adds to its next attack only.
  * Both stay on the copy when it goes back to the deck.
  * usedOnce = indexes of this card's "once per game" rules that already fired.
+ * enteredWith = cards on the Field (this one included) when this copy last came into play.
  */
-export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[] }
+export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number }
 
 export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus'
 /** n = size, used by blockPlus (Block stops n more hits; negative = fewer) */
@@ -33,6 +34,10 @@ export type PlayerState = {
   hand: CardInst[] // index 0 = oldest = slot 1 of the Strike chain
   deck: CardInst[] // index 0 = top
   statuses: Status[]
+  /** Chosen Style (passive), key "CHAMP:slot" in engine/styles.ts. */
+  style?: string
+  /** Style bookkeeping (e.g. Second Wind already spent). */
+  styleData?: Record<string, number>
 }
 
 export type RulesConfig = {

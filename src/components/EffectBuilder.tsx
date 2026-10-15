@@ -22,6 +22,8 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   tookDmg: { c: 'tookDmg', n: 1 },
   hpAtMost: { c: 'hpAtMost', n: 30 },
   hpNotAbove: { c: 'hpNotAbove' },
+  hp: { c: 'hp', who: 'self', op: '<', n: 30, pct: true },
+  enteredWith: { c: 'enteredWith', n: 2 },
 }
 const COND_LABEL: Record<CondSpec['c'], string> = {
   hitResult: 'Hit result is…',
@@ -39,6 +41,8 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   tookDmg: 'You take N+ dmg from hits this turn',
   hpAtMost: 'Your HP ≤ N',
   hpNotAbove: "Your HP ≤ opponent's HP",
+  hp: 'HP compare (you / opponent, number or %)',
+  enteredWith: 'You had N+ cards when this came into play',
 }
 const ACT_DEFAULTS: Record<string, ActSpec> = {
   draw: { a: 'draw', who: 'self', n: 1 },
@@ -49,9 +53,10 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
   addDmg: { a: 'addDmg', target: 'this', n: 2 },
   mulDmg: { a: 'mulDmg', target: 'enemyAll', pct: 50 },
   grow: { a: 'grow', n: 5, dur: 'next' },
+  blockNow: { a: 'blockNow', who: 'enemy', n: -1 },
 }
 const ACT_LABEL: Record<string, string> = {
-  draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', mulDmg: 'Dmg × % (this chain)', grow: 'Gain dmg (later attacks)',
+  draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', mulDmg: 'Dmg × % (this chain)', grow: 'Gain dmg (later attacks)', blockNow: 'Block ±N hits (this turn)',
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -87,7 +92,7 @@ export function EffectBuilder({ value, onChange, onUseText }: Props) {
             </label>
             <button type="button" className="danger" onClick={() => set(removeAt(rules, ri))} title="Delete rule">✕</button>
           </div>
-          {rule.hook === 'modify' && <p className="muted hint">Before the first hit. Fires in your Strike chain, and also while held when you didn't Strike (add "You play Charge/Block"). Use with "Change dmg" or "Dmg × %".</p>}
+          {rule.hook === 'modify' && <p className="muted hint">Before the first hit. Fires in your Strike chain, and also while held when you didn't Strike (add "You play Charge/Block"). Use with "Change dmg", "Dmg × %" or "Block ±N hits (this turn)".</p>}
           {rule.hook === 'onHeld' && <p className="muted hint">Every turn this card stays on your Field (you didn't Strike). After attack by default; pick "before attack" for effects that should count this turn. Each copy fires on its own. Add "you play Block" to fire only on Block.</p>}
 
           {(rule.if ?? []).map((cond, ci) => (
@@ -134,7 +139,7 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
       <select value={value.c} onChange={(e) => onChange(COND_DEFAULTS[e.target.value as CondSpec['c']])}>
         {Object.values(COND_DEFAULTS).map((d) => <option key={d.c} value={d.c}>{COND_LABEL[d.c]}</option>)}
       </select>
-      {'n' in value && <Num value={value.n} onChange={(n) => onChange({ ...value, n })} />}
+      {'n' in value && value.c !== 'hp' && <Num value={value.n} onChange={(n) => onChange({ ...value, n })} />}
       {value.c === 'handCompare' && (
         <select value={value.op} onChange={(e) => onChange({ ...value, op: e.target.value as '<' | '=' | '>' })}>
           <option value="<">fewer</option><option value="=">equal</option><option value=">">more</option>
@@ -159,6 +164,22 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
         <select value={value.a} onChange={(e) => onChange({ ...value, a: e.target.value as 'strike' | 'block' | 'charge' })}>
           <option value="strike">Strike</option><option value="block">Block</option><option value="charge">Charge</option>
         </select>
+      )}
+      {value.c === 'hp' && (
+        <>
+          <select value={value.who} onChange={(e) => onChange({ ...value, who: e.target.value as 'self' | 'enemy' })}>
+            <option value="self">your HP</option><option value="enemy">opponent's HP</option>
+          </select>
+          <select value={value.op} onChange={(e) => onChange({ ...value, op: e.target.value as typeof value.op })}>
+            <option value="<">&lt;</option><option value="<=">≤</option><option value=">">&gt;</option><option value=">=">≥</option>
+          </select>
+        </>
+      )}
+      {'n' in value && value.c === 'hp' && <Num value={value.n} min={0} onChange={(n) => onChange({ ...value, n })} />}
+      {value.c === 'hp' && (
+        <label className="inline" title="N is a % of Max HP">
+          <input type="checkbox" checked={!!value.pct} onChange={(e) => onChange({ ...value, pct: e.target.checked || undefined })} /> % of Max HP
+        </label>
       )}
       {value.c === 'chainAll' && <TypeSelect value={value.type} onChange={(type) => onChange({ ...value, type: type! })} />}
     </>
@@ -216,7 +237,7 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
         </label>
       )}
       {value.a === 'mulDmg' && <><Num value={value.pct} min={0} onChange={(pct) => onChange({ ...value, pct })} />%</>}
-      {value.a !== 'status' && value.a !== 'mulDmg' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
+      {value.a !== 'status' && value.a !== 'mulDmg' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' || value.a === 'blockNow' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
       {(value.a === 'draw' || value.a === 'heal' || value.a === 'loseHp') && (
         <select value={value.per ?? ''} onChange={(e) => onChange({ ...value, per: (e.target.value || undefined) as typeof value.per })} title="Multiply by a count">
           <option value="">(flat)</option>

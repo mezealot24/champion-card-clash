@@ -42,6 +42,8 @@ export function describeCond(c: CondSpec): string {
     case 'tookDmg': return c.n <= 1 ? 'you take dmg from a hit this turn' : `you take ${c.n}+ dmg from hits this turn`
     case 'hpAtMost': return `your HP ≤ ${c.n}`
     case 'hpNotAbove': return "your HP ≤ opponent's HP"
+    case 'hp': return `${c.who === 'self' ? 'your' : "opponent's"} HP ${{ '<': '<', '<=': '≤', '>': '>', '>=': '≥' }[c.op]} ${c.n}${c.pct ? '%' : ''}`
+    case 'enteredWith': return `you had ${c.n}+ cards (this one included) when this card came into play`
   }
 }
 
@@ -67,6 +69,10 @@ export function describeAct(a: ActSpec, now = false): string {
     }
     case 'grow': return `this card gains ${signed(a.n)} dmg ${a.dur === 'next' ? 'on its next attack' : 'for the rest of the game'}${a.stack ? ' (stacks)' : ''}`
     case 'addDmg': return `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''} ${signed(a.n)} dmg`
+    case 'blockNow': {
+      const n = Math.abs(a.n)
+      return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops ${n} ${a.n >= 0 ? 'more' : 'fewer'} hit${n === 1 ? '' : 's'} this turn`
+    }
     case 'mulDmg': {
       const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`
       if (a.pct < 100) return `${what} lose ${100 - a.pct}% dmg`

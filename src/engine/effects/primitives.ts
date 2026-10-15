@@ -81,6 +81,14 @@ export const status =
     log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind}${n === undefined ? '' : ` ${n}`} ${turns} เทิร์น`)
   }
 
+/** Before attack only: Block stops n more hits this turn (negative = fewer, never below 0). */
+export const blockNow =
+  (who: Who, n: number): Act =>
+  (ctx) => {
+    for (const s of sides(ctx, who)) ctx.blockNow[s] += n
+    log(ctx.state, `${ctx.card.def.id}: ${who} Block ${n >= 0 ? '+' : ''}${n} hit เทิร์นนี้`)
+  }
+
 /**
  * This card gains +n dmg on its next attack only, or for the rest of the game. Stays on this copy in the deck.
  * Doesn't stack unless `stack` (Q: a buff triggering again keeps it at +n).
@@ -192,6 +200,19 @@ export const facingSameType: Cond = (ctx) => handOf(ctx, 'enemy')[ctx.slot]?.def
 
 /** เราโดน hit รวม ≥ n dmg ในเทิร์นนี้ (Block ที่กันได้ไม่นับ) */
 export const tookDmg = (n: number): Cond => (ctx) => ctx.hitDmgTaken[ctx.self] >= n
+
+export type HpOp = '<' | '<=' | '>' | '>='
+/** HP compare. pct = n is a % of that side's Max HP (e.g. HP < 30%). */
+export const hp =
+  (who: 'self' | 'enemy', op: HpOp, n: number, pct = false): Cond =>
+  (ctx) => {
+    const p = ctx.state.players[who === 'self' ? ctx.self : ctx.enemy]
+    const v = pct ? (p.hp * 100) / p.maxHp : p.hp
+    return op === '<' ? v < n : op === '<=' ? v <= n : op === '>' ? v > n : v >= n
+  }
+
+/** You had n+ cards on your Field (this one included) when this card came into play. */
+export const enteredWith = (n: number): Cond => (ctx) => (ctx.card.enteredWith ?? 0) >= n
 
 export const hpAtMost = (n: number): Cond => (ctx) => ctx.state.players[ctx.self].hp <= n
 export const hpNotAbove: Cond = (ctx) => ctx.state.players[ctx.self].hp <= ctx.state.players[ctx.enemy].hp
