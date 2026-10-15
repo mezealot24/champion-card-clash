@@ -1,10 +1,9 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
-import { getEffect } from './effects/registry'
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { getStyle } from './styles'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
-import { drawCards, heal, log, loseHp, toDeckBottom } from './state'
+import { drawCards, effectOf, heal, log, loseHp, toDeckBottom } from './state'
 import type { Action, CardDef, CardInst, CardType, GameState, Side } from './types'
 import { other } from './types'
 
@@ -47,6 +46,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const hitsTaken: Record<Side, number> = { p1: 0, p2: 0 }
   const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken }
 
+  // Silence: a side Silenced at the start of the turn has no card effects all turn
+  for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
+
   // Every turn (before attack): right after actions are revealed, so its statuses count this turn
   resolveHeld(state, actions, env, 'onHeldBefore')
 
@@ -55,10 +57,12 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const trueDmg = { p1: hasStatus(state, 'p1', 'trueDmg'), p2: hasStatus(state, 'p2', 'trueDmg') }
   const guardBreak = { p1: hasStatus(state, 'p1', 'guardBreak'), p2: hasStatus(state, 'p2', 'guardBreak') }
 
-  // statuses were checked above; they tick down now (new ones from this turn last into the next)
+  // statuses were checked above; they tick down now (new ones from this turn last into the next).
+  // Shields tick at the end of the turn instead, so a Shield still guards this turn's hits.
+  const oldShields = SIDES.flatMap((side) => state.players[side].statuses.filter((s) => s.kind === 'shield'))
   for (const side of SIDES) {
     const p = state.players[side]
-    p.statuses = p.statuses.map((s) => ({ ...s, turns: s.turns - 1 })).filter((s) => s.turns > 0)
+    p.statuses = p.statuses.map((s) => (s.kind === 'shield' ? s : { ...s, turns: s.turns - 1 })).filter((s) => s.turns > 0)
   }
 
   // runs every turn: Before action fires for held cards too (e.g. "if you played Charge"); After action ends it
@@ -110,6 +114,13 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   }
 
   for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side)
+  for (const side of SIDES) {
+    const p = state.players[side]
+    p.silenced = false
+    // Shields from before this turn lose a turn; used-up or expired ones go
+    for (const s of p.statuses) if (oldShields.includes(s)) s.turns--
+    p.statuses = p.statuses.filter((s) => s.kind !== 'shield' || (s.turns > 0 && (s.n ?? 0) > 0))
+  }
 
   const dead = SIDES.filter((s) => state.players[s].hp <= 0)
   if (dead.length === 2) state.winner = 'draw'
@@ -176,8 +187,8 @@ function resolveStrikes(
 
   // 1) Before action: chain auras, plus held cards of a side that didn't Strike (e.g. "if you played Charge")
   for (const side of SIDES) {
-    if (actions[side] === 'strike') chains[side]!.forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false)))
-    else handAtStart[side].forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false, false, true)))
+    if (actions[side] === 'strike') chains[side]!.forEach((card, i) => effectOf(state, side, card)?.modify?.(ctxFor(side, i, false)))
+    else handAtStart[side].forEach((card, i) => effectOf(state, side, card)?.modify?.(ctxFor(side, i, false, false, true)))
   }
 
   const stops = (side: Side) => Math.max(0, blockStops[side] + env.blockNow[side])
@@ -200,17 +211,38 @@ function resolveStrikes(
   const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }
   for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!, crit[side])
 
-  // dmg each side will take from hits this turn is known now (later effects can't change it)
-  for (const side of strikers) {
-    chains[side]!.forEach((_, i) => {
-      hitDmgTaken[other(side)] += dealtOf(side, i)
-    })
+  // Every hit's outcome is worked out now, in hit order: Block, then Parry, then Shield, then HP.
+  // So dmg each side will take from hits this turn is known before any hit lands.
+  const longest = Math.max(...strikers.map((s) => chains[s]!.length))
+  const outcome = new Map<string, { dealt: number; parried: boolean; absorbed: number }>()
+  const sized = (side: Side, kind: 'shield' | 'parry') => state.players[side].statuses.filter((s) => s.kind === kind && (s.n ?? 0) > 0)
+  for (let i = 0; i < longest; i++) {
+    for (const side of strikers) {
+      const card = chains[side]![i]
+      if (!card) continue
+      const enemy = other(side)
+      let dealt = dealtOf(side, i)
+      const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
+      if (parry) parry.n = (parry.n ?? 1) - 1
+      let absorbed = 0
+      if (!parry) {
+        for (const sh of sized(enemy, 'shield')) {
+          const take = Math.min(sh.n ?? 0, dealt - absorbed)
+          sh.n = (sh.n ?? 0) - take
+          absorbed += take
+        }
+      }
+      if (parry) dealt = 0
+      else dealt -= absorbed
+      outcome.set(card.uid, { dealt, parried: !!parry, absorbed })
+      hitDmgTaken[enemy] += dealt
+    }
   }
+  for (const side of SIDES) state.players[side].statuses = state.players[side].statuses.filter((s) => s.kind !== 'parry' || (s.n ?? 0) > 0)
 
   // 2) hits, slot by slot (both chains interleave when Strike meets Strike)
   const cleanHits: Record<Side, number> = { p1: 0, p2: 0 }
   const hitResults = new Map<string, { blocked: boolean; clean: boolean }>()
-  const longest = Math.max(...strikers.map((s) => chains[s]!.length))
   for (let i = 0; i < longest; i++) {
     for (const side of strikers) {
       const card = chains[side]![i]
@@ -220,18 +252,22 @@ function resolveStrikes(
       if (blocked) hitsBlocked[enemy]++
       const usedNext = card.growNext ?? 0
       const dmg = dmgOf(side, i)
-      const dealt = dealtOf(side, i)
-      if (!blocked) env.hitsTaken[enemy]++
+      const { dealt, parried, absorbed } = outcome.get(card.uid)!
+      if (!blocked && !parried) env.hitsTaken[enemy]++
       if (dealt > 0) loseHp(state, enemy, dealt)
+      if (parried && dmg > 0) loseHp(state, side, dmg)
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
-      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (Guard Crush ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}`}`)
+      const guard = parried ? ` (${enemy} Parry: สะท้อน ${dmg} กลับ)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
+      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (Guard Crush ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}${guard}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
       if (ls > 0) {
         heal(state, side, ls)
         log(state, `${side} Omnivamp ฮีล ${ls}`)
       }
-      if (!blocked && dmg > 0) cleanHits[side]++
-      hitResults.set(card.uid, { blocked, clean: !blocked && dmg > 0 })
+      // clean = some dmg got through Block, Parry and Shield (GDD)
+      const clean = !blocked && dealt > 0
+      if (clean) cleanHits[side]++
+      hitResults.set(card.uid, { blocked, clean })
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
   }
@@ -274,7 +310,7 @@ function resolveStrikes(
   for (const side of SIDES) {
     const struck = actions[side] === 'strike'
     handAtStart[side].forEach((card, i) => {
-      const fx = getEffect(card.def)
+      const fx = effectOf(state, side, card)
       if (!fx?.onResolve && !fx?.onClean && !fx?.onBlocked) return
       const r = hitResults.get(card.uid) ?? { blocked: false, clean: false }
       const ctx = { ...ctxFor(side, i, r.blocked, r.clean, !struck), pending: null }
@@ -297,7 +333,7 @@ function resolveHeld(
   for (const side of SIDES) {
     if (actions[side] === 'strike') continue
     handAtStart[side].forEach((card, slot) => {
-      getEffect(card.def)?.[hook]?.({
+      effectOf(state, side, card)?.[hook]?.({
         state,
         self: side,
         enemy: other(side),

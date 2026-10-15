@@ -69,14 +69,14 @@ export const STYLES: Record<string, StyleDef> = {
   },
 
   /**
-   * Tank · Overgrowth: Max HP starts at 160. Each time attacked: +1 per hit taken,
+   * Tank · Overgrowth: Max HP starts at 210 (160 + 50, Q 2026-10-15). Each time attacked: +1 per hit taken,
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
    */
   'TK:2': {
     name: 'Overgrowth',
     setup: (p) => {
-      p.maxHp = 160
+      p.maxHp = 210
       p.hp = Math.min(p.hp, p.maxHp)
     },
     afterHits: (state, side, r) => {
@@ -116,7 +116,7 @@ Object.assign(STYLES, {
   /**
    * Assassin · Sonic Bliz: start the game with 3 cards on the Field (Q buff 2026-10-15).
    * 3+ clean hits in one chain → extra hits 6–10, one per card on the
-   * opponent's Field at the start of the turn. Each extra hit deals dmg = cards in your chain (Claude default for "cards in hand").
+   * opponent's Field at the start of the turn. Each extra hit deals dmg = cards in your chain + 1 (Claude default for "cards in hand"; Q buff 2026-10-15: 0–5 → 1–6).
    */
   'AS:1': {
     name: 'Sonic Bliz',
@@ -125,8 +125,9 @@ Object.assign(STYLES, {
       if (r.cleanHits < 3 || r.enemyField === 0) return 0
       const enemy = side === 'p1' ? 'p2' : 'p1'
       const p = state.players[enemy]
-      p.hp = Math.max(0, p.hp - r.enemyField * r.chainLength)
-      say(state, side, `Sonic Bliz: Extra Hit ${r.enemyField} ครั้ง x ${r.chainLength} dmg`)
+      const dmg = r.chainLength + 1
+      p.hp = Math.max(0, p.hp - r.enemyField * dmg)
+      say(state, side, `Sonic Bliz: Extra Hit ${r.enemyField} ครั้ง x ${dmg} dmg`)
       return r.enemyField
     },
   },

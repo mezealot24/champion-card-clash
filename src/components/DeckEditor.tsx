@@ -23,7 +23,7 @@ export function DeckEditor({ championId }: { championId: string }) {
     const cfg = Object.fromEntries(must(config).map((r) => [r.key, Number(r.value)]))
     return {
       cards: must(cards) as EditableCard[],
-      deckSize: cfg.deck_size ?? 15,
+      deckSize: cfg.deck_size ?? 20,
       budget: championId === 'TK' ? cfg.dmg_budget_tank : cfg.dmg_budget,
     }
   }, [championId])

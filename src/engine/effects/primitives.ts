@@ -217,3 +217,11 @@ export const enteredWith = (n: number): Cond => (ctx) => (ctx.card.enteredWith ?
 
 export const hpAtMost = (n: number): Cond => (ctx) => ctx.state.players[ctx.self].hp <= n
 export const hpNotAbove: Cond = (ctx) => ctx.state.players[ctx.self].hp <= ctx.state.players[ctx.enemy].hp
+/** you / the opponent are Silenced this turn */
+export const silenced = (who: 'self' | 'enemy'): Cond => (ctx) => !!ctx.state.players[who === 'self' ? ctx.self : ctx.enemy].silenced
+/** you / the opponent have an active status of this kind (e.g. a Shield that isn't used up) */
+export const hasStatus = (who: 'self' | 'enemy', kind: StatusKind): Cond => (ctx) =>
+  ctx.state.players[who === 'self' ? ctx.self : ctx.enemy].statuses.some((s) => s.kind === kind && (s.n ?? 1) > 0)
+
+/** Status kinds that carry a size n */
+export const SIZED: StatusKind[] = ['blockPlus', 'shield', 'parry']
