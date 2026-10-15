@@ -5,6 +5,7 @@ import {
   isEffectMissing,
   legalActions,
   pickAiAction,
+  STYLES,
   resolveTurn,
   type Action,
   type CardInst,
@@ -16,7 +17,8 @@ import { describeSpec } from '../engine/effects/describe'
 
 export type Champ = { id: string; name: string; hp_start: number; hp_max: number }
 export type Row = CardRowLike & { champion_id: string }
-export type BattleData = { champions: Champ[]; cards: Row[] }
+export type StyleRow = { champion_id: string; slot: number; name: string; effect: string }
+export type BattleData = { champions: Champ[]; cards: Row[]; styles?: StyleRow[] }
 
 const ACTIONS: { action: Action; label: string; hint: string }[] = [
   { action: 'strike', label: 'Strike', hint: 'ตีทั้งมือ ชนะ Charge' },
@@ -31,6 +33,14 @@ const readable = (line: string) => line.replace(/\bp1\b/g, NAME.p1).replace(/\bp
 /** The game screen. Data comes from Supabase (BattlePage) or a bundled snapshot (play.tsx). */
 export function Battle({ data }: { data: BattleData }) {
   const [picks, setPicks] = useState({ p1: 'BR', p2: 'BR' })
+  // Style per side: "CHAMP:slot", or '' for none. Defaults to slot 1 when it works in the engine.
+  const [stylePick, setStylePick] = useState<Record<Side, string | null>>({ p1: null, p2: null })
+  const stylesOf = (id: string) => (data.styles ?? []).filter((s) => s.champion_id === id && s.name)
+  const styleKey = (side: Side) => stylePick[side] ?? (STYLES[`${picks[side]}:1`] ? `${picks[side]}:1` : '')
+  const styleName = (side: Side, g: GameState) => {
+    const key = g.players[side].style
+    return key ? ` · ${STYLES[key]?.name ?? key}` : ''
+  }
   const [game, setGame] = useState<GameState | null>(null)
   const [lastLog, setLastLog] = useState<string[]>([])
 
@@ -43,7 +53,7 @@ export function Battle({ data }: { data: BattleData }) {
       const c = data.champions.find((x) => x.id === id)!
       return { championId: id, hpStart: c.hp_start, hpMax: c.hp_max, deck: deckOf(id) }
     }
-    setGame(createGame(setup(picks.p1), setup(picks.p2)))
+    setGame(createGame({ ...setup(picks.p1), style: styleKey('p1') || undefined }, { ...setup(picks.p2), style: styleKey('p2') || undefined }))
     setLastLog([])
   }
 
@@ -61,7 +71,13 @@ export function Battle({ data }: { data: BattleData }) {
         {(['p1', 'p2'] as const).map((side) => (
           <label key={side}>
             {side === 'p1' ? 'Champion ของคุณ' : 'Champion ของ AI'}
-            <select value={picks[side]} onChange={(e) => setPicks({ ...picks, [side]: e.target.value })}>
+            <select
+              value={picks[side]}
+              onChange={(e) => {
+                setPicks({ ...picks, [side]: e.target.value })
+                setStylePick({ ...stylePick, [side]: null })
+              }}
+            >
               {data.champions.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name} ({c.id}) · HP {c.hp_start}/{c.hp_max} · {deckOf(c.id).length} ใบ
@@ -69,6 +85,21 @@ export function Battle({ data }: { data: BattleData }) {
                 </option>
               ))}
             </select>
+            <select value={styleKey(side)} onChange={(e) => setStylePick({ ...stylePick, [side]: e.target.value })} title="Style (Passive)">
+              <option value="">ไม่ใช้ Style</option>
+              {stylesOf(picks[side]).map((s) => {
+                const key = `${s.champion_id}:${s.slot}`
+                return (
+                  <option key={key} value={key} disabled={!STYLES[key]}>
+                    Style: {s.name}
+                    {STYLES[key] ? '' : ' (ยังไม่ทำงาน)'}
+                  </option>
+                )
+              })}
+            </select>
+            {stylesOf(picks[side]).find((s) => `${s.champion_id}:${s.slot}` === styleKey(side)) && (
+              <span className="muted">{stylesOf(picks[side]).find((s) => `${s.champion_id}:${s.slot}` === styleKey(side))!.effect}</span>
+            )}
           </label>
         ))}
         <button onClick={start}>เริ่มเกม</button>
@@ -81,7 +112,7 @@ export function Battle({ data }: { data: BattleData }) {
 
   return (
     <div className="battle">
-      <PlayerPanel game={game} side="p2" title={`AI · ${champName('p2')}`} />
+      <PlayerPanel game={game} side="p2" title={`AI · ${champName('p2')}${styleName('p2', game)}`} />
 
       <div className="panel">
         {game.winner ? (
@@ -118,7 +149,7 @@ export function Battle({ data }: { data: BattleData }) {
         </details>
       </div>
 
-      <PlayerPanel game={game} side="p1" title={`คุณ · ${champName('p1')}`} />
+      <PlayerPanel game={game} side="p1" title={`คุณ · ${champName('p1')}${styleName('p1', game)}`} />
     </div>
   )
 }

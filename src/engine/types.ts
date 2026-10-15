@@ -34,6 +34,10 @@ export type PlayerState = {
   hand: CardInst[] // index 0 = oldest = slot 1 of the Strike chain
   deck: CardInst[] // index 0 = top
   statuses: Status[]
+  /** Chosen Style (passive), key "CHAMP:slot" in engine/styles.ts. */
+  style?: string
+  /** Style bookkeeping (e.g. Second Wind already spent). */
+  styleData?: Record<string, number>
 }
 
 export type RulesConfig = {
