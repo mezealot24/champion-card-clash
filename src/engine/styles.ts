@@ -21,13 +21,16 @@ export type StyleDef = {
   name: string
   /** once, when the game is created */
   setup?: (p: PlayerState) => void
+  /** extra cards drawn onto the Field when the game starts */
+  startDraw?: number
   /** after all hits land, before Every turn (after) and Charge draws */
   afterHits?: (state: GameState, side: Side, r: HitReport) => void
   /**
    * Strike chains only: after Before attack effects, before any hit.
-   * bonus = dmg added per slot of this side's chain, mult = dmg multiplier per slot (applied after bonus)
+   * bonus = dmg added per slot of this side's chain, mult = dmg multiplier per slot (applied after bonus),
+   * crit = add a slot index to show that hit as Critical in the log
    */
-  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[]) => void
+  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
@@ -111,11 +114,13 @@ Object.assign(STYLES, {
 
 Object.assign(STYLES, {
   /**
-   * Assassin · Sonic Bliz: 3+ clean hits in one chain → extra hits 6–10, one per card on the
+   * Assassin · Sonic Bliz: start the game with 3 cards on the Field (Q buff 2026-10-15).
+   * 3+ clean hits in one chain → extra hits 6–10, one per card on the
    * opponent's Field at the start of the turn. Each extra hit deals dmg = cards in your chain (Claude default for "cards in hand").
    */
   'AS:1': {
     name: 'Sonic Bliz',
+    startDraw: 3,
     afterChain: (state, side, r) => {
       if (r.cleanHits < 3 || r.enemyField === 0) return 0
       const enemy = side === 'p1' ? 'p2' : 'p1'
@@ -125,16 +130,17 @@ Object.assign(STYLES, {
       return r.enemyField
     },
   },
-  /** Assassin · Coup de grâce: every 5th attack (counted across turns, blocked ones too) deals 3x dmg. */
+  /** Assassin · Coup de grâce: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg. */
   'AS:2': {
     name: 'Coup de grâce',
-    beforeHits: (state, side, _bonus, mult) => {
+    beforeHits: (state, side, _bonus, mult, crit) => {
       const p = state.players[side]
       const before = p.styleData?.attacks ?? 0
       mult.forEach((_, i) => {
-        if ((before + i + 1) % 5 === 0) {
+        if ((before + i + 1) % 4 === 0) {
           mult[i] *= 3
-          say(state, side, `Coup de grâce: ช่อง ${i + 1} (ตีครั้งที่ ${before + i + 1}) dmg x3`)
+          crit.add(i)
+          say(state, side, `Coup de grâce Critical: ช่อง ${i + 1} (ตีครั้งที่ ${before + i + 1}) dmg x3`)
         }
       })
       p.styleData = { ...p.styleData, attacks: before + mult.length }

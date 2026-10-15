@@ -64,20 +64,29 @@ describe('Mage S + S + S', () => {
   })
 })
 
-describe('Bruiser S > P > P (Guard Break)', () => {
-  it('gives Guard Break; next Strike: blocked hits deal half (rounded down), then it is used up', () => {
+describe('Bruiser S > P > P (Guard Crush)', () => {
+  it('gives Guard Crush; if the opponent Blocks the next Strike they lose their 2 oldest Field cards, then it is used up', () => {
     let s = resolveTurn(game('BR', [c('S'), c('P'), c('P')]), { p1: 'strike', p2: 'charge' })
     expect(s.players.p1.statuses).toContainEqual({ kind: 'guardBreak', turns: 3 })
+    const [a, b, keep] = [c('P'), c('P'), c('P')]
     s.players.p1.hand = [c('P', 11), c('P', 11), c('P', 11)]
-    let hp = s.players.p2.hp
+    s.players.p2.hand = [a, b, keep]
+    const hp = s.players.p2.hp
     s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-    // Block stops 2 hits: 5 + 5 half dmg, third lands for 11
-    expect(hp - s.players.p2.hp).toBe(21)
+    expect(hp - s.players.p2.hp).toBe(11) // Block still stops 2 hits fully
+    expect(s.players.p2.hand.map((x) => x.uid)).toEqual([keep.uid])
     expect(s.players.p1.statuses.some((x) => x.kind === 'guardBreak')).toBe(false)
+    // used up: next blocked Strike discards nothing
     s.players.p1.hand = [c('P', 11)]
-    hp = s.players.p2.hp
-    s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-    expect(hp - s.players.p2.hp).toBe(0)
+    s.players.p2.hand = [c('P'), c('P')]
+    expect(resolveTurn(s, { p1: 'strike', p2: 'block' }).players.p2.hand).toHaveLength(2)
+  })
+  it('a Strike the opponent does not Block uses it up without discarding', () => {
+    const s = resolveTurn(game('BR', [c('S'), c('P'), c('P')]), { p1: 'strike', p2: 'charge' })
+    s.players.p1.hand = [c('P')]
+    s.players.p2.hand = [c('P'), c('P')]
+    const t = resolveTurn(s, { p1: 'strike', p2: 'strike' })
+    expect(t.players.p1.statuses.some((x) => x.kind === 'guardBreak')).toBe(false)
   })
   it('lasts 3 turns if you do not Strike', () => {
     let s = resolveTurn(game('BR', [c('S'), c('P'), c('P')]), { p1: 'strike', p2: 'charge' })

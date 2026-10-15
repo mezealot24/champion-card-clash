@@ -64,8 +64,8 @@ export const COMBOS: Record<string, ComboDef[]> = {
   ],
   BR: [
     /**
-     * Bruiser · S > P > P: Guard Break for up to 3 turns, used up by your next Strike.
-     * Guard Break: hits stopped by Block still deal half dmg (rounded down).
+     * Bruiser · S > P > P: Guard Crush for up to 3 turns, used up by your next Strike.
+     * Guard Crush: if the opponent Blocks that Strike, they lose their 2 oldest Field cards (Q 2026-10-15).
      */
     {
       name: 'S > P > P',
@@ -73,7 +73,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
       fire: (state, side) => {
         const p = state.players[side]
         p.statuses = [...p.statuses.filter((s) => s.kind !== 'guardBreak'), { kind: 'guardBreak', turns: 3 }]
-        say(state, side, 'Combo S > P > P: Guard Break (ใช้กับ Strike ครั้งถัดไป ภายใน 3 เทิร์น)')
+        say(state, side, 'Combo S > P > P: Guard Crush (ใช้กับ Strike ครั้งถัดไป ภายใน 3 เทิร์น)')
       },
     },
     /**

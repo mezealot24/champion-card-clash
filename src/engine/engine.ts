@@ -193,11 +193,11 @@ function resolveStrikes(
   // Before action combos (card types only), then Conqueror stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
   for (const side of SIDES) applyConqueror(state, side, actions, bonus[side], mult[other(side)])
-  // Guard Break: a hit stopped by Block still deals half
-  const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : guardBreak[side] ? Math.floor(dmgOf(side, i) / 2) : 0)
+  const dealtOf = (side: Side, i: number) => (isBlocked(side, i) ? 0 : dmgOf(side, i))
 
-  // Styles that boost the chain (e.g. Fury)
-  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!)
+  // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
+  const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }
+  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!, crit[side])
 
   // dmg each side will take from hits this turn is known now (later effects can't change it)
   for (const side of strikers) {
@@ -222,7 +222,8 @@ function resolveStrikes(
       const dealt = dealtOf(side, i)
       if (!blocked) env.hitsTaken[enemy]++
       if (dealt > 0) loseHp(state, enemy, dealt)
-      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (Guard Break ${dealt})` : ''}` : `ตี ${dmg}`}`)
+      const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
+      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${critTag}` : `ตี ${dmg}${critTag}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
       if (ls > 0) {
         heal(state, side, ls)
@@ -234,10 +235,19 @@ function resolveStrikes(
     }
   }
 
-  // Guard Break is used up by this Strike; then signature combos that look at how the hits went
+  // Guard Crush is used up by this Strike: if the opponent Blocked it, they lose their 2 oldest Field cards.
+  // Then signature combos that look at how the hits went
   for (const side of strikers) {
     const p = state.players[side]
-    if (guardBreak[side]) p.statuses = p.statuses.filter((s) => s.kind !== 'guardBreak')
+    if (guardBreak[side]) {
+      p.statuses = p.statuses.filter((s) => s.kind !== 'guardBreak')
+      const enemy = other(side)
+      if (actions[enemy] === 'block') {
+        const lost = state.players[enemy].hand.splice(0, 2)
+        toDeckBottom(state, enemy, lost)
+        if (lost.length) log(state, `${side} Guard Crush: ${enemy} ทิ้ง ${lost.map((c) => c.def.id).join(', ')}`)
+      }
+    }
     checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })), 'after')
   }
 

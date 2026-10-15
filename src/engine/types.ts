@@ -24,7 +24,7 @@ export type CardDef = {
 export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number }
 
 /** trueDmg = your hits ignore dmg cuts (only Block stops them) */
-/** guardBreak = your blocked hits still deal half dmg (used up by your next Strike) */
+/** guardBreak = Guard Crush: if the opponent Blocks your next Strike, they lose their 2 oldest Field cards */
 export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak'
 /** n = size, used by blockPlus (Block stops n more hits; negative = fewer) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
