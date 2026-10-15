@@ -10,14 +10,26 @@ export type HitReport = {
   facing: number // card pairs face to face (opponent's chain vs this side's Field)
 }
 
+/** What this side's Strike chain did this turn. */
+export type ChainReport = {
+  chainLength: number
+  cleanHits: number
+  enemyField: number // cards on the opponent's Field when actions were revealed
+}
+
 export type StyleDef = {
   name: string
   /** once, when the game is created */
   setup?: (p: PlayerState) => void
   /** after all hits land, before Every turn (after) and Charge draws */
   afterHits?: (state: GameState, side: Side, r: HitReport) => void
-  /** Strike chains only: after Before attack effects, before any hit. bonus = dmg per slot of this side's chain */
-  beforeHits?: (state: GameState, side: Side, bonus: number[]) => void
+  /**
+   * Strike chains only: after Before attack effects, before any hit.
+   * bonus = dmg added per slot of this side's chain, mult = dmg multiplier per slot (applied after bonus)
+   */
+  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[]) => void
+  /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
+  afterChain?: (state: GameState, side: Side, r: ChainReport) => number
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
   /** last thing in the turn, before the winner check */
@@ -94,6 +106,39 @@ Object.assign(STYLES, {
   'BR:2': {
     name: 'Tenacity',
     chargeBreakSafe: (state, side) => (below50(state, side) ? 2 : 0),
+  },
+} satisfies Record<string, StyleDef>)
+
+Object.assign(STYLES, {
+  /**
+   * Assassin · Sonic Bliz: 3+ clean hits in one chain → extra hits 6–10, one per card on the
+   * opponent's Field at the start of the turn. Each extra hit deals dmg = cards in your chain (Claude default for "cards in hand").
+   */
+  'AS:1': {
+    name: 'Sonic Bliz',
+    afterChain: (state, side, r) => {
+      if (r.cleanHits < 3 || r.enemyField === 0) return 0
+      const enemy = side === 'p1' ? 'p2' : 'p1'
+      const p = state.players[enemy]
+      p.hp = Math.max(0, p.hp - r.enemyField * r.chainLength)
+      say(state, side, `Sonic Bliz: Extra Hit ${r.enemyField} ครั้ง x ${r.chainLength} dmg`)
+      return r.enemyField
+    },
+  },
+  /** Assassin · Coup de grâce: every 5th attack (counted across turns, blocked ones too) deals 3x dmg. */
+  'AS:2': {
+    name: 'Coup de grâce',
+    beforeHits: (state, side, _bonus, mult) => {
+      const p = state.players[side]
+      const before = p.styleData?.attacks ?? 0
+      mult.forEach((_, i) => {
+        if ((before + i + 1) % 5 === 0) {
+          mult[i] *= 3
+          say(state, side, `Coup de grâce: ช่อง ${i + 1} (ตีครั้งที่ ${before + i + 1}) dmg x3`)
+        }
+      })
+      p.styleData = { ...p.styleData, attacks: before + mult.length }
+    },
   },
 } satisfies Record<string, StyleDef>)
 

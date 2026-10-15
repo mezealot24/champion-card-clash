@@ -181,7 +181,7 @@ function resolveStrikes(
     return Math.max(0, Math.floor(raw * mult[side]![i]))
   }
   // Styles that boost the chain (e.g. Fury)
-  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!)
+  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!)
 
   // dmg each side will take from hits this turn is known now (later effects can't change it)
   for (const side of strikers) {
@@ -191,6 +191,7 @@ function resolveStrikes(
   }
 
   // 2) hits, slot by slot (both chains interleave when Strike meets Strike)
+  const cleanHits: Record<Side, number> = { p1: 0, p2: 0 }
   const longest = Math.max(...strikers.map((s) => chains[s]!.length))
   for (let i = 0; i < longest; i++) {
     for (const side of strikers) {
@@ -207,12 +208,23 @@ function resolveStrikes(
       }
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
       const fx = getEffect(card.def)
+      if (!blocked && dmg > 0) cleanHits[side]++
       const ctx = ctxFor(side, i, blocked, !blocked && dmg > 0)
       fx?.onResolve?.(ctx)
       if (blocked) fx?.onBlocked?.(ctx)
       else if (dmg > 0) fx?.onClean?.(ctx)
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
+  }
+
+  // Styles that add to a finished chain (e.g. Sonic Bliz extra hits)
+  for (const side of strikers) {
+    const extra = getStyle(state.players[side].style)?.afterChain?.(state, side, {
+      chainLength: chains[side]!.length,
+      cleanHits: cleanHits[side],
+      enemyField: handAtStart[other(side)].length,
+    })
+    if (extra) env.hitsTaken[other(side)] += extra
   }
 
   // 3) used cards go under the deck, then draws from effects enter the hand
