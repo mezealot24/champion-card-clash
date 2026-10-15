@@ -1,10 +1,10 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { getEffect } from './effects/registry'
-import { checkCombo } from './combos'
+import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { getStyle } from './styles'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
-import { drawCards, log, loseHp, toDeckBottom } from './state'
+import { drawCards, heal, log, loseHp, toDeckBottom } from './state'
 import type { Action, CardDef, CardInst, CardType, GameState, Side } from './types'
 import { other } from './types'
 
@@ -53,6 +53,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   // Block size and True Damage come from statuses active this turn, read before they tick
   const blockStops = { p1: blockStopsFor(state, 'p1'), p2: blockStopsFor(state, 'p2') }
   const trueDmg = { p1: hasStatus(state, 'p1', 'trueDmg'), p2: hasStatus(state, 'p2', 'trueDmg') }
+  const guardBreak = { p1: hasStatus(state, 'p1', 'guardBreak'), p2: hasStatus(state, 'p2', 'guardBreak') }
 
   // statuses were checked above; they tick down now (new ones from this turn last into the next)
   for (const side of SIDES) {
@@ -61,7 +62,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   }
 
   // runs every turn: Before action fires for held cards too (e.g. "if you played Charge"); After action ends it
-  resolveStrikes(state, actions, env, blockStops, trueDmg)
+  resolveStrikes(state, actions, env, blockStops, trueDmg, guardBreak)
 
   // Styles that react to this turn's hits
   for (const side of SIDES) {
@@ -131,6 +132,7 @@ function resolveStrikes(
   env: TurnEnv,
   blockStops: Record<Side, number>,
   trueDmg: Record<Side, boolean>,
+  guardBreak: Record<Side, boolean>,
 ) {
   const { handAtStart, hitsBlocked, hitDmgTaken } = env
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
@@ -188,13 +190,19 @@ function resolveStrikes(
     const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + b
     return Math.max(0, Math.floor(raw * m))
   }
+  // Before action combos (card types only), then Conqueror stacks
+  for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
+  for (const side of SIDES) applyConqueror(state, side, actions, bonus[side], mult[other(side)])
+  // Guard Break: a hit stopped by Block still deals half
+  const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : guardBreak[side] ? Math.floor(dmgOf(side, i) / 2) : 0)
+
   // Styles that boost the chain (e.g. Fury)
   for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!)
 
   // dmg each side will take from hits this turn is known now (later effects can't change it)
   for (const side of strikers) {
     chains[side]!.forEach((_, i) => {
-      if (!isBlocked(side, i)) hitDmgTaken[other(side)] += dmgOf(side, i)
+      hitDmgTaken[other(side)] += dealtOf(side, i)
     })
   }
 
@@ -211,20 +219,26 @@ function resolveStrikes(
       if (blocked) hitsBlocked[enemy]++
       const usedNext = card.growNext ?? 0
       const dmg = dmgOf(side, i)
-      if (!blocked) {
-        loseHp(state, enemy, dmg)
-        env.hitsTaken[enemy]++
+      const dealt = dealtOf(side, i)
+      if (!blocked) env.hitsTaken[enemy]++
+      if (dealt > 0) loseHp(state, enemy, dealt)
+      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (Guard Break ${dealt})` : ''}` : `ตี ${dmg}`}`)
+      const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
+      if (ls > 0) {
+        heal(state, side, ls)
+        log(state, `${side} Omnivamp ฮีล ${ls}`)
       }
-      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
       if (!blocked && dmg > 0) cleanHits[side]++
       hitResults.set(card.uid, { blocked, clean: !blocked && dmg > 0 })
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
   }
 
-  // Signature combos (3 cards in a row with the right P/K/S types)
+  // Guard Break is used up by this Strike; then signature combos that look at how the hits went
   for (const side of strikers) {
-    checkCombo(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })))
+    const p = state.players[side]
+    if (guardBreak[side]) p.statuses = p.statuses.filter((s) => s.kind !== 'guardBreak')
+    checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })), 'after')
   }
 
   // Styles that add to a finished chain (e.g. Sonic Bliz extra hits)
