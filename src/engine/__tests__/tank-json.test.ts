@@ -127,7 +127,7 @@ describe('Tank cards', () => {
     const chain = () => [plain(5), plain(5), plain(5)]
     expect(resolveTurn(game([card()], chain()), { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(50 - 10)
     expect(resolveTurn(game([card()], [plain(5), plain(5)]), { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(50)
-    expect(describeSpec(spec)).toBe('Every turn (Hold), before attack, if opponent has 3+ cards: Your Block stops −1 hit this turn')
+    expect(describeSpec(spec)).toBe('Every turn (Hold), start of turn, if opponent has 3+ cards: Your Block stops −1 hit this turn')
   })
 
   it('Every turn before attack: Block −1 counts this turn', () => {
@@ -136,14 +136,14 @@ describe('Tank cards', () => {
     const s = resolveTurn(game([card], [plain(5), plain(5), plain(5)]), { p1: 'block', p2: 'strike' })
     expect(s.players.p1.hp).toBe(50 - 10) // only 1 of 3 hits stopped, right away
     expect(s.players.p1.statuses).toEqual([]) // gone after this turn
-    expect(describeSpec(spec)).toBe('Every turn (Hold), before attack, if opponent has 3+ cards: Your Block stops −1 hit this turn')
+    expect(describeSpec(spec)).toBe('Every turn (Hold), start of turn, if opponent has 3+ cards: Your Block stops −1 hit this turn')
   })
 
   it('describes the new pieces in English', () => {
     expect(describeSpec(specs['TK-009'])).toBe('Every turn (Hold), if you play Block and opponent plays Strike: Gain 3 HP per hit you blocked this turn')
-    expect(describeSpec(specs['TK-014'])).toBe('After attack, if your HP ≤ 29: Gain 20 HP (once per game)')
+    expect(describeSpec(specs['TK-014'])).toBe('After action, if your HP ≤ 29: Gain 20 HP (once per game)')
     expect(describeSpec(specs['TK-016'])).toBe('Comes into play: Your Block stops +1 hit next turn')
-    expect(describeSpec(specs['TK-005'])).toBe("Before attack, if you play Charge: All opponent's Kick cards lose 50% dmg")
-    expect(describeSpec(specs['TK-011'])).toBe('After attack, if you play Strike and you take dmg from a hit this turn: Gain 10 HP')
+    expect(describeSpec(specs['TK-005'])).toBe("Before action, if you play Charge: All opponent's Kick cards lose 50% dmg")
+    expect(describeSpec(specs['TK-011'])).toBe('After action, if you play Strike and you take dmg from a hit this turn: Gain 10 HP')
   })
 })

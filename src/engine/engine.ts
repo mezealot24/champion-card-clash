@@ -1,5 +1,6 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { getEffect } from './effects/registry'
+import { checkCombo } from './combos'
 import { getStyle } from './styles'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
@@ -49,8 +50,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   // Every turn (before attack): right after actions are revealed, so its statuses count this turn
   resolveHeld(state, actions, env, 'onHeldBefore')
 
-  // Block size comes from statuses active this turn, read before they tick
+  // Block size and True Damage come from statuses active this turn, read before they tick
   const blockStops = { p1: blockStopsFor(state, 'p1'), p2: blockStopsFor(state, 'p2') }
+  const trueDmg = { p1: hasStatus(state, 'p1', 'trueDmg'), p2: hasStatus(state, 'p2', 'trueDmg') }
 
   // statuses were checked above; they tick down now (new ones from this turn last into the next)
   for (const side of SIDES) {
@@ -58,8 +60,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     p.statuses = p.statuses.map((s) => ({ ...s, turns: s.turns - 1 })).filter((s) => s.turns > 0)
   }
 
-  // runs every turn: Before attack also fires for held cards when nobody Strikes (e.g. "if you played Charge")
-  resolveStrikes(state, actions, env, blockStops)
+  // runs every turn: Before action fires for held cards too (e.g. "if you played Charge"); After action ends it
+  resolveStrikes(state, actions, env, blockStops, trueDmg)
 
   // Styles that react to this turn's hits
   for (const side of SIDES) {
@@ -115,6 +117,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   return state
 }
 
+const hasStatus = (state: GameState, side: Side, kind: string) => state.players[side].statuses.some((s) => s.kind === kind)
+
 /** How many hits this side's Block stops: base rule + every active "Block ±N hit" status (never below 0). */
 function blockStopsFor(state: GameState, side: Side): number {
   const extra = state.players[side].statuses.filter((s) => s.kind === 'blockPlus').reduce((t, s) => t + (s.n ?? 1), 0)
@@ -126,6 +130,7 @@ function resolveStrikes(
   actions: Record<Side, Action>,
   env: TurnEnv,
   blockStops: Record<Side, number>,
+  trueDmg: Record<Side, boolean>,
 ) {
   const { handAtStart, hitsBlocked, hitDmgTaken } = env
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
@@ -167,7 +172,7 @@ function resolveStrikes(
     }
   }
 
-  // 1) Before attack: chain auras, plus held cards of a side that didn't Strike (e.g. "if you played Charge")
+  // 1) Before action: chain auras, plus held cards of a side that didn't Strike (e.g. "if you played Charge")
   for (const side of SIDES) {
     if (actions[side] === 'strike') chains[side]!.forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false)))
     else handAtStart[side].forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false, false, true)))
@@ -177,11 +182,14 @@ function resolveStrikes(
   const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side))
   const dmgOf = (side: Side, i: number) => {
     const card = chains[side]![i]
-    const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + bonus[side]![i]
-    return Math.max(0, Math.floor(raw * mult[side]![i]))
+    // True Damage: dmg cuts (negative bonus, multiplier below 1) don't apply; only Block stops the hit
+    const b = trueDmg[side] ? Math.max(0, bonus[side]![i]) : bonus[side]![i]
+    const m = trueDmg[side] ? Math.max(1, mult[side]![i]) : mult[side]![i]
+    const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + b
+    return Math.max(0, Math.floor(raw * m))
   }
   // Styles that boost the chain (e.g. Fury)
-  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!)
+  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!)
 
   // dmg each side will take from hits this turn is known now (later effects can't change it)
   for (const side of strikers) {
@@ -191,6 +199,8 @@ function resolveStrikes(
   }
 
   // 2) hits, slot by slot (both chains interleave when Strike meets Strike)
+  const cleanHits: Record<Side, number> = { p1: 0, p2: 0 }
+  const hitResults = new Map<string, { blocked: boolean; clean: boolean }>()
   const longest = Math.max(...strikers.map((s) => chains[s]!.length))
   for (let i = 0; i < longest; i++) {
     for (const side of strikers) {
@@ -206,18 +216,48 @@ function resolveStrikes(
         env.hitsTaken[enemy]++
       }
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? 'โดน Block' : `ตี ${dmg}`}`)
-      const fx = getEffect(card.def)
-      const ctx = ctxFor(side, i, blocked, !blocked && dmg > 0)
-      fx?.onResolve?.(ctx)
-      if (blocked) fx?.onBlocked?.(ctx)
-      else if (dmg > 0) fx?.onClean?.(ctx)
+      if (!blocked && dmg > 0) cleanHits[side]++
+      hitResults.set(card.uid, { blocked, clean: !blocked && dmg > 0 })
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
+  }
+
+  // Signature combos (3 cards in a row with the right P/K/S types)
+  for (const side of strikers) {
+    checkCombo(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })))
+  }
+
+  // Styles that add to a finished chain (e.g. Sonic Bliz extra hits)
+  for (const side of strikers) {
+    const foe = state.players[other(side)]
+    const hpBefore = foe.hp
+    const extra = getStyle(state.players[side].style)?.afterChain?.(state, side, {
+      chainLength: chains[side]!.length,
+      cleanHits: cleanHits[side],
+      enemyField: handAtStart[other(side)].length,
+    })
+    if (extra) env.hitsTaken[other(side)] += extra
+    hitDmgTaken[other(side)] += hpBefore - foe.hp // extra hits count as hit dmg (e.g. "you take N+ dmg")
   }
 
   // 3) used cards go under the deck, then draws from effects enter the hand
   for (const side of strikers) toDeckBottom(state, side, chains[side]!)
   for (const side of SIDES) if (pending[side]) drawCards(state, side, pending[side])
+
+  // 4) After action (Q 2026-10-15): end of the turn, every card that was on the Field when actions were
+  //    revealed, whatever action its side picked. Struck cards still know how their hit went.
+  for (const side of SIDES) {
+    const struck = actions[side] === 'strike'
+    handAtStart[side].forEach((card, i) => {
+      const fx = getEffect(card.def)
+      if (!fx?.onResolve && !fx?.onClean && !fx?.onBlocked) return
+      const r = hitResults.get(card.uid) ?? { blocked: false, clean: false }
+      const ctx = { ...ctxFor(side, i, r.blocked, r.clean, !struck), pending: null }
+      fx.onResolve?.(ctx)
+      if (r.blocked) fx.onBlocked?.(ctx)
+      else if (r.clean) fx.onClean?.(ctx)
+    })
+  }
 }
 
 // Every turn: cards on the Field of a side that didn't Strike.

@@ -58,7 +58,7 @@ describe('effect_json', () => {
       expect(resolveTurn(game([card()], []), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(55)
       expect(resolveTurn(game([card()], []), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(50)
     }
-    expect(describeSpec(legacy)).toBe('After attack, if this card hits clean: Gain 5 HP')
+    expect(describeSpec(legacy)).toBe('After action, if this card hits clean: Gain 5 HP')
   })
 
   it('grow: After attack, if opponent played Block, this card gains +30 dmg for good', () => {
