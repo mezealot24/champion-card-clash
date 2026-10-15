@@ -94,7 +94,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
         log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge)`)
       }
     } else {
-      drawCards(state, side, state.rules.chargeDraw)
+      drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))
     }
   }
 
@@ -113,7 +113,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     state.blockStreak = 0
   }
 
-  for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side)
+  for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side, actions[side])
   for (const side of SIDES) {
     const p = state.players[side]
     p.silenced = false
