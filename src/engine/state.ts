@@ -73,7 +73,8 @@ export function effectOf(state: GameState, side: Side, card: CardInst) {
 
 /**
  * Draw from the top of the deck into the hand. Stops at hand max. Fires onDraw.
- * Once a whole deck's worth of cards has been drawn (20 with a full deck), the deck reshuffles (Q 2026-10-15).
+ * Once a whole deck's worth of cards has been drawn (20 with a full deck), the deck reshuffles (Q 2026-10-15),
+ * except the last handMax cards at the bottom: discards always go under the deck and stay there (Q 16:56Z).
  */
 export function drawCards(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
@@ -85,7 +86,9 @@ export function drawCards(state: GameState, side: Side, n: number): number {
     drawn++
     p.drawsSinceShuffle = (p.drawsSinceShuffle ?? 0) + 1
     if (p.drawsSinceShuffle >= p.deck.length + p.hand.length) {
-      p.deck = shuffle(state, p.deck)
+      // the newest cards at the bottom (just left the Field) stay there, so a discard is never drawn right back
+      const keep = Math.min(p.deck.length, state.rules.handMax)
+      p.deck = [...shuffle(state, p.deck.slice(0, p.deck.length - keep)), ...p.deck.slice(p.deck.length - keep)]
       p.drawsSinceShuffle = 0
       log(state, `${side} จั่วครบ deck แล้ว: สับ deck ใหม่`)
     }

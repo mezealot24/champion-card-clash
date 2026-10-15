@@ -100,4 +100,20 @@ describe('Reshuffle', () => {
     expect(s.players.p1.drawsSinceShuffle).toBe(0)
     expect(s.log.some((l) => l.includes('สับ deck ใหม่'))).toBe(true)
   })
+
+  it('keeps the newest discards at the bottom when it reshuffles', () => {
+    const deck = Array.from({ length: 20 }, (_, i): CardDef => ({ id: `XX-${i}`, type: 'P', dmg: 1, effectText: '' }))
+    let s = createGame({ championId: 'A', hpStart: 500, hpMax: 500, deck }, { championId: 'B', hpStart: 500, hpMax: 500, deck }, { seed: 5 })
+    for (let t = 0; t < 60; t++) {
+      const p1 = s.players.p1
+      const reshuffleNext = (p1.drawsSinceShuffle ?? 0) + 1 >= p1.deck.length + p1.hand.length
+      const bottom = p1.deck.slice(-5).map((c) => c.uid)
+      s = turn(s, p1.hand.length >= 5 ? 'strike' : 'charge', 'block')
+      if (reshuffleNext && s.players.p1.drawsSinceShuffle === 0) {
+        expect(s.players.p1.deck.slice(-5).map((c) => c.uid)).toEqual(bottom)
+        return
+      }
+    }
+    throw new Error('never reshuffled')
+  })
 })
