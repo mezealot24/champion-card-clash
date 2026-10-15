@@ -116,7 +116,7 @@ Object.assign(STYLES, {
   /**
    * Assassin · Sonic Bliz: start the game with 3 cards on the Field (Q buff 2026-10-15).
    * 3+ clean hits in one chain → extra hits 6–10, one per card on the
-   * opponent's Field at the start of the turn. Each extra hit deals dmg = cards in your chain (Claude default for "cards in hand").
+   * opponent's Field at the start of the turn. Each extra hit deals dmg = cards in your chain + 1 (Claude default for "cards in hand"; Q buff 2026-10-15: 0–5 → 1–6).
    */
   'AS:1': {
     name: 'Sonic Bliz',
@@ -125,8 +125,9 @@ Object.assign(STYLES, {
       if (r.cleanHits < 3 || r.enemyField === 0) return 0
       const enemy = side === 'p1' ? 'p2' : 'p1'
       const p = state.players[enemy]
-      p.hp = Math.max(0, p.hp - r.enemyField * r.chainLength)
-      say(state, side, `Sonic Bliz: Extra Hit ${r.enemyField} ครั้ง x ${r.chainLength} dmg`)
+      const dmg = r.chainLength + 1
+      p.hp = Math.max(0, p.hp - r.enemyField * dmg)
+      say(state, side, `Sonic Bliz: Extra Hit ${r.enemyField} ครั้ง x ${dmg} dmg`)
       return r.enemyField
     },
   },

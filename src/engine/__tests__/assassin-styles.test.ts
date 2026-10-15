@@ -17,9 +17,9 @@ function game(style: string, mine: CardInst[], theirs: CardInst[] = []): GameSta
 const field = (n: number) => Array.from({ length: n }, () => hit(0))
 
 describe('Sonic Bliz', () => {
-  it('3 clean hits: one extra hit per opponent card, each = chain length', () => {
-    // chain 3 x 2 dmg = 6, then 4 extra hits x 3 dmg = 12
-    expect(resolveTurn(game('AS:1', [hit(2), hit(2), hit(2)], field(4)), { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 6 - 12)
+  it('3 clean hits: one extra hit per opponent card, each = chain length + 1', () => {
+    // chain 3 x 2 dmg = 6, then 4 extra hits x 4 dmg = 16
+    expect(resolveTurn(game('AS:1', [hit(2), hit(2), hit(2)], field(4)), { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 6 - 16)
   })
 
   it('needs 3 clean hits in the chain', () => {
@@ -30,7 +30,7 @@ describe('Sonic Bliz', () => {
   })
 
   it('5 blocked-through chain: hits 3–5 clean → extra hits', () => {
-    expect(resolveTurn(game('AS:1', [hit(1), hit(1), hit(1), hit(1), hit(1)], field(2)), { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100 - 3 - 2 * 5)
+    expect(resolveTurn(game('AS:1', [hit(1), hit(1), hit(1), hit(1), hit(1)], field(2)), { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100 - 3 - 2 * 6)
   })
 })
 
