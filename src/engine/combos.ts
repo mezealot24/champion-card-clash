@@ -65,7 +65,8 @@ export const COMBOS: Record<string, ComboDef[]> = {
   BR: [
     /**
      * Bruiser · S > P > P: Guard Crush for up to 3 turns, used up by your next Strike.
-     * Guard Crush: if the opponent Blocks that Strike, they lose their 2 oldest Field cards (Q 2026-10-15).
+     * Guard Crush: hits stopped by Block still deal half dmg (rounded down), and if the opponent
+     * Blocked that Strike they lose their 2 oldest Field cards (Q 2026-10-15).
      */
     {
       name: 'S > P > P',
