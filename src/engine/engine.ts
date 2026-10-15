@@ -79,8 +79,10 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     const p = state.players[side]
     if (actions[other(side)] === 'strike') {
       // Strike > Charge: charger loses the oldest card if holding more than 1
-      if (p.hand.length > 1) {
-        const lost = p.hand.shift()!
+      // (a Style like Tenacity can keep the first slots safe; the next card goes instead)
+      const safe = getStyle(p.style)?.chargeBreakSafe?.(state, side) ?? 0
+      if (p.hand.length > Math.max(1, safe)) {
+        const lost = p.hand.splice(safe, 1)[0]
         toDeckBottom(state, side, [lost])
         log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge)`)
       }
@@ -178,6 +180,9 @@ function resolveStrikes(
     const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + bonus[side]![i]
     return Math.max(0, Math.floor(raw * mult[side]![i]))
   }
+  // Styles that boost the chain (e.g. Fury)
+  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!)
+
   // dmg each side will take from hits this turn is known now (later effects can't change it)
   for (const side of strikers) {
     chains[side]!.forEach((_, i) => {

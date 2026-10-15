@@ -66,3 +66,35 @@ describe('Overgrowth', () => {
     expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.maxHp).toBe(500)
   })
 })
+
+describe('Bruiser Styles', () => {
+  const br = (style: string, hp: number) =>
+    createGame({ championId: 'BR', hpStart: hp, hpMax: 100, deck, style }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1 })
+
+  it('Fury: slot 1 and 2 +10 while HP < 50%', () => {
+    const s = br('BR:1', 49)
+    s.players.p1.hand = [hit(1), hit(1), hit(1)]
+    expect(resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 23)
+    const ok = br('BR:1', 50)
+    ok.players.p1.hand = [hit(1), hit(1), hit(1)]
+    expect(resolveTurn(ok, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(97)
+  })
+
+  it('Tenacity: charge break skips slot 1 and 2 while HP < 50%', () => {
+    const field = () => [hit(1), hit(2), hit(3)]
+    const s = br('BR:2', 40)
+    s.players.p1.hand = field()
+    s.players.p2.hand = [hit(1)]
+    const kept = resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)
+    expect(kept.slice(0, 2)).toEqual([1, 2]) // slot 3 was lost, then Charge drew nothing (Strike won)
+    expect(kept).toHaveLength(2)
+    const two = br('BR:2', 40)
+    two.players.p1.hand = [hit(1), hit(2)]
+    two.players.p2.hand = [hit(1)]
+    expect(resolveTurn(two, { p1: 'charge', p2: 'strike' }).players.p1.hand).toHaveLength(2)
+    const healthy = br('BR:2', 90)
+    healthy.players.p1.hand = field()
+    healthy.players.p2.hand = [hit(1)]
+    expect(resolveTurn(healthy, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)).toEqual([2, 3])
+  })
+})

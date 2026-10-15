@@ -16,6 +16,10 @@ export type StyleDef = {
   setup?: (p: PlayerState) => void
   /** after all hits land, before Every turn (after) and Charge draws */
   afterHits?: (state: GameState, side: Side, r: HitReport) => void
+  /** Strike chains only: after Before attack effects, before any hit. bonus = dmg per slot of this side's chain */
+  beforeHits?: (state: GameState, side: Side, bonus: number[]) => void
+  /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
+  chargeBreakSafe?: (state: GameState, side: Side) => number
   /** last thing in the turn, before the winner check */
   endTurn?: (state: GameState, side: Side) => void
 }
@@ -70,5 +74,27 @@ export const STYLES: Record<string, StyleDef> = {
     },
   },
 }
+
+const below50 = (state: GameState, side: Side) => pctHp(state.players[side]) < 50
+
+Object.assign(STYLES, {
+  /** Bruiser · Fury: while HP < 50%, cards in slot 1 and 2 of your Strike chain deal +10 dmg. */
+  'BR:1': {
+    name: 'Fury',
+    beforeHits: (state, side, bonus) => {
+      if (!below50(state, side)) return
+      for (const i of [0, 1]) if (i < bonus.length) bonus[i] += 10
+      say(state, side, `Fury: ช่อง 1–2 +10 dmg`)
+    },
+  },
+  /**
+   * Bruiser · Tenacity: while HP < 50%, a charge break can't throw away the cards in slot 1 and 2.
+   * The oldest card after them is lost instead; with 2 cards or fewer nothing is lost.
+   */
+  'BR:2': {
+    name: 'Tenacity',
+    chargeBreakSafe: (state, side) => (below50(state, side) ? 2 : 0),
+  },
+} satisfies Record<string, StyleDef>)
 
 export const getStyle = (key?: string | null) => (key ? STYLES[key] : undefined)
