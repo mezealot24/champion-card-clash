@@ -68,6 +68,7 @@ export function drawCards(state: GameState, side: Side, n: number): number {
   for (let i = 0; i < n && p.hand.length < state.rules.handMax && p.deck.length > 0; i++) {
     const card = p.deck.shift()!
     p.hand.push(card)
+    card.enteredWith = p.hand.length
     drawn++
     getEffect(card.def)?.onDraw?.({ state, self: side, enemy: side === 'p1' ? 'p2' : 'p1', card, pending: null })
   }

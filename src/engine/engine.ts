@@ -8,6 +8,14 @@ import { other } from './types'
 
 const SIDES: Side[] = ['p1', 'p2']
 
+/** Per-turn bookkeeping shared by every effect this turn. */
+type TurnEnv = {
+  handAtStart: Record<Side, CardInst[]>
+  hitsBlocked: Record<Side, number>
+  hitDmgTaken: Record<Side, number>
+  blockNow: Record<Side, number>
+}
+
 export function legalActions(state: GameState, side: Side): Action[] {
   const p = state.players[side]
   const has = (k: string) => p.statuses.some((s) => s.kind === k)
@@ -31,9 +39,11 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
   const hitsBlocked: Record<Side, number> = { p1: 0, p2: 0 }
   const hitDmgTaken: Record<Side, number> = { p1: 0, p2: 0 }
+  const blockNow: Record<Side, number> = { p1: 0, p2: 0 }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow }
 
   // Every turn (before attack): right after actions are revealed, so its statuses count this turn
-  resolveHeld(state, actions, handAtStart, hitsBlocked, hitDmgTaken, 'onHeldBefore')
+  resolveHeld(state, actions, env, 'onHeldBefore')
 
   // Block size comes from statuses active this turn, read before they tick
   const blockStops = { p1: blockStopsFor(state, 'p1'), p2: blockStopsFor(state, 'p2') }
@@ -44,8 +54,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     p.statuses = p.statuses.map((s) => ({ ...s, turns: s.turns - 1 })).filter((s) => s.turns > 0)
   }
 
-  if (actions.p1 === 'strike' || actions.p2 === 'strike') resolveStrikes(state, actions, handAtStart, blockStops, hitsBlocked, hitDmgTaken)
-  resolveHeld(state, actions, handAtStart, hitsBlocked, hitDmgTaken, 'onHeld')
+  // runs every turn: Before attack also fires for held cards when nobody Strikes (e.g. "if you played Charge")
+  resolveStrikes(state, actions, env, blockStops)
+  resolveHeld(state, actions, env, 'onHeld')
 
   for (const side of SIDES) {
     if (actions[side] !== 'charge') continue
@@ -93,11 +104,10 @@ function blockStopsFor(state: GameState, side: Side): number {
 function resolveStrikes(
   state: GameState,
   actions: Record<Side, Action>,
-  handAtStart: Record<Side, CardInst[]>,
+  env: TurnEnv,
   blockStops: Record<Side, number>,
-  hitsBlocked: Record<Side, number>,
-  hitDmgTaken: Record<Side, number>,
 ) {
+  const { handAtStart, hitsBlocked, hitDmgTaken } = env
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
   const pending: Record<Side, number> = { p1: 0, p2: 0 }
   const chains: Partial<Record<Side, CardInst[]>> = {}
@@ -127,6 +137,7 @@ function resolveStrikes(
       handAtStart,
       hitsBlocked,
       hitDmgTaken,
+      blockNow: env.blockNow,
       bonus: held ? [] : bonus[side]!,
       enemyBonus: bonus[enemy] ?? null,
       mult: held ? [] : mult[side]!,
@@ -142,7 +153,8 @@ function resolveStrikes(
     else handAtStart[side].forEach((card, i) => getEffect(card.def)?.modify?.(ctxFor(side, i, false, false, true)))
   }
 
-  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < blockStops[other(side)]
+  const stops = (side: Side) => Math.max(0, blockStops[side] + env.blockNow[side])
+  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side))
   const dmgOf = (side: Side, i: number) => {
     const card = chains[side]![i]
     const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + bonus[side]![i]
@@ -187,11 +199,10 @@ function resolveStrikes(
 function resolveHeld(
   state: GameState,
   actions: Record<Side, Action>,
-  handAtStart: Record<Side, CardInst[]>,
-  hitsBlocked: Record<Side, number>,
-  hitDmgTaken: Record<Side, number>,
+  env: TurnEnv,
   hook: 'onHeld' | 'onHeldBefore',
 ) {
+  const { handAtStart, hitsBlocked, hitDmgTaken, blockNow } = env
   for (const side of SIDES) {
     if (actions[side] === 'strike') continue
     handAtStart[side].forEach((card, slot) => {
@@ -209,6 +220,7 @@ function resolveHeld(
         handAtStart,
         hitsBlocked,
         hitDmgTaken,
+        blockNow,
         bonus: [],
         enemyBonus: null,
         mult: [],
