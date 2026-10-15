@@ -46,9 +46,10 @@ export function createGame(
   }
   for (const side of ['p1', 'p2'] as const) {
     const p = state.players[side]
-    getStyle(p.style)?.setup?.(p)
+    const style = getStyle(p.style)
+    style?.setup?.(p)
     p.deck = shuffle(state, p.deck) // shuffle once; afterwards order is learnable
-    drawCards(state, side, state.rules.startHand)
+    drawCards(state, side, state.rules.startHand + (style?.startDraw ?? 0))
   }
   return state
 }

@@ -35,18 +35,28 @@ describe('Sonic Bliz', () => {
 })
 
 describe('Coup de grâce', () => {
-  it('the 5th attack deals 3x', () => {
-    expect(resolveTurn(game('AS:2', [hit(2), hit(2), hit(2), hit(2), hit(4)]), { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 8 - 12)
+  it('the 4th attack is a Critical: 3x dmg, shown with its total dmg in the log', () => {
+    const s = resolveTurn(game('AS:2', [hit(2), hit(2), hit(2), hit(4), hit(2)]), { p1: 'strike', p2: 'charge' })
+    expect(s.players.p2.hp).toBe(100 - 8 - 12)
+    expect(s.log.some((l) => l.includes('ช่อง 4') && l.includes('ตี 12') && l.includes('Critical'))).toBe(true)
   })
 
   it('counts across turns, blocked attacks included', () => {
     let s = game('AS:2', [hit(2), hit(2), hit(2)])
     s = resolveTurn(s, { p1: 'strike', p2: 'block' }) // attacks 1–3, first 2 blocked
     expect(s.players.p2.hp).toBe(98)
-    s.players.p1.hand = [hit(2), hit(5), hit(2)]
-    s = resolveTurn(s, { p1: 'strike', p2: 'charge' }) // attacks 4, 5 (x3), 6
-    expect(s.players.p2.hp).toBe(98 - 2 - 15 - 2)
-    expect(s.players.p1.styleData?.attacks).toBe(6)
+    s.players.p1.hand = [hit(5), hit(2), hit(2), hit(2), hit(2)]
+    s = resolveTurn(s, { p1: 'strike', p2: 'charge' }) // attacks 4 (x3), 5, 6, 7, 8 (x3)
+    expect(s.players.p2.hp).toBe(98 - 15 - 2 - 2 - 2 - 6)
+    expect(s.players.p1.styleData?.attacks).toBe(8)
+  })
+})
+
+describe('Sonic Bliz start', () => {
+  it('starts the game with 3 cards on the Field; other Styles start empty', () => {
+    const mk = (style: string) => createGame({ championId: 'AS', hpStart: 100, hpMax: 100, deck, style }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1 })
+    expect(mk('AS:1').players.p1.hand).toHaveLength(3)
+    expect(mk('AS:2').players.p1.hand).toHaveLength(0)
   })
 })
 
