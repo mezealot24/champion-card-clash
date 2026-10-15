@@ -235,13 +235,14 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
             value={value.kind}
             onChange={(e) => {
               const kind = e.target.value as typeof value.kind
-              onChange(kind === 'blockPlus' || kind === 'shield' || kind === 'parry' ? { ...value, kind, n: value.n ?? (kind === 'shield' ? 10 : 1) } : { a: 'status', who: value.who, kind, turns: value.turns })
+              onChange(kind === 'blockPlus' || kind === 'shield' || kind === 'parry' || kind === 'vulnerable' ? { ...value, kind, n: value.n ?? (kind === 'shield' ? 10 : kind === 'vulnerable' ? 50 : 1) } : { a: 'status', who: value.who, kind, turns: value.turns })
             }}
           >
             <option value="noStrike">can't Strike</option><option value="noBlock">can't Block</option><option value="noCharge">can't Charge</option><option value="silence">Silenced (card effects off)</option>
-            <option value="blockPlus">Block stops ±N hits</option><option value="shield">Shield N</option><option value="parry">Parry N hits</option>
+            <option value="blockPlus">Block stops ±N hits</option><option value="shield">Shield N</option><option value="parry">Parry N hits</option><option value="vulnerable">Vulnerable N% (takes more dmg)</option>
           </select>
           {(value.kind === 'shield' || value.kind === 'parry') && <><Num value={value.n ?? 1} min={1} onChange={(n) => onChange({ ...value, n })} /> {value.kind === 'shield' ? 'points' : 'hit(s)'},</>}
+          {value.kind === 'vulnerable' && <><Num value={value.n ?? 50} min={1} onChange={(n) => onChange({ ...value, n })} /> % more dmg,</>}
           {value.kind === 'blockPlus' && <><Num value={value.n ?? 1} onChange={(n) => onChange({ ...value, n })} /> hit(s) (negative = fewer),</>}
           <Num value={value.turns} min={1} onChange={(turns) => onChange({ ...value, turns })} /> turn(s)
         </>

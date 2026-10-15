@@ -263,4 +263,4 @@ export const resAtLeast = (who: 'self' | 'enemy', n: number): Cond => (ctx) => {
 }
 
 /** Status kinds that carry a size n */
-export const SIZED: StatusKind[] = ['blockPlus', 'shield', 'parry']
+export const SIZED: StatusKind[] = ['blockPlus', 'shield', 'parry', 'vulnerable']
