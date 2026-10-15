@@ -25,6 +25,7 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   hp: { c: 'hp', who: 'self', op: '<', n: 30, pct: true },
   enteredWith: { c: 'enteredWith', n: 2 },
   silenced: { c: 'silenced', who: 'enemy' },
+  hasStatus: { c: 'hasStatus', who: 'self', kind: 'shield' },
 }
 const COND_LABEL: Record<CondSpec['c'], string> = {
   hitResult: 'Hit result is…',
@@ -45,6 +46,7 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   hp: 'HP compare (you / opponent, number or %)',
   enteredWith: 'You had N+ cards when this came into play',
   silenced: 'You / opponent is Silenced',
+  hasStatus: 'You / opponent has Shield / Parry / …',
 }
 const ACT_DEFAULTS: Record<string, ActSpec> = {
   draw: { a: 'draw', who: 'self', n: 1 },
@@ -168,6 +170,17 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
           <option value="strike">Strike</option><option value="block">Block</option><option value="charge">Charge</option>
         </select>
       )}
+      {value.c === 'hasStatus' && (
+        <>
+          <select value={value.who} onChange={(e) => onChange({ ...value, who: e.target.value as 'self' | 'enemy' })}>
+            <option value="self">you</option><option value="enemy">opponent</option>
+          </select>
+          <select value={value.kind} onChange={(e) => onChange({ ...value, kind: e.target.value as typeof value.kind })}>
+            <option value="shield">Shield</option><option value="parry">Parry</option><option value="silence">Silenced</option>
+            <option value="trueDmg">True Damage</option><option value="guardBreak">Guard Crush</option>
+          </select>
+        </>
+      )}
       {value.c === 'silenced' && (
         <select value={value.who} onChange={(e) => onChange({ ...value, who: e.target.value as 'self' | 'enemy' })}>
           <option value="enemy">opponent</option><option value="self">you</option>
@@ -211,12 +224,13 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
             value={value.kind}
             onChange={(e) => {
               const kind = e.target.value as typeof value.kind
-              onChange(kind === 'blockPlus' ? { ...value, kind, n: value.n ?? 1 } : { a: 'status', who: value.who, kind, turns: value.turns })
+              onChange(kind === 'blockPlus' || kind === 'shield' || kind === 'parry' ? { ...value, kind, n: value.n ?? (kind === 'shield' ? 10 : 1) } : { a: 'status', who: value.who, kind, turns: value.turns })
             }}
           >
             <option value="noStrike">can't Strike</option><option value="noBlock">can't Block</option><option value="noCharge">can't Charge</option><option value="silence">Silenced (card effects off)</option>
-            <option value="blockPlus">Block stops ±N hits</option>
+            <option value="blockPlus">Block stops ±N hits</option><option value="shield">Shield N</option><option value="parry">Parry N hits</option>
           </select>
+          {(value.kind === 'shield' || value.kind === 'parry') && <><Num value={value.n ?? 1} min={1} onChange={(n) => onChange({ ...value, n })} /> {value.kind === 'shield' ? 'points' : 'hit(s)'},</>}
           {value.kind === 'blockPlus' && <><Num value={value.n ?? 1} onChange={(n) => onChange({ ...value, n })} /> hit(s) (negative = fewer),</>}
           <Num value={value.turns} min={1} onChange={(turns) => onChange({ ...value, turns })} /> turn(s)
         </>

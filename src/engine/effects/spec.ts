@@ -31,6 +31,7 @@ export type CondSpec =
   | { c: 'hp'; who: 'self' | 'enemy'; op: P.HpOp; n: number; pct?: boolean }
   | { c: 'enteredWith'; n: number }
   | { c: 'silenced'; who: 'self' | 'enemy' }
+  | { c: 'hasStatus'; who: 'self' | 'enemy'; kind: StatusKind }
 
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
@@ -70,6 +71,7 @@ function cond(s: CondSpec): Cond {
     case 'hp': return P.hp(s.who, s.op, s.n, s.pct)
     case 'enteredWith': return P.enteredWith(s.n)
     case 'silenced': return P.silenced(s.who)
+    case 'hasStatus': return P.hasStatus(s.who, s.kind)
   }
 }
 
@@ -79,7 +81,7 @@ function act(s: ActSpec): Act {
     case 'heal': return P.heal(s.who, s.n, s.per)
     case 'loseHp': return P.loseHp(s.who, s.n, s.per)
     case 'maxHp': return P.maxHp(s.who, s.n)
-    case 'status': return P.status(s.who, s.kind, s.turns, s.kind === 'blockPlus' ? (s.n ?? 1) : undefined)
+    case 'status': return P.status(s.who, s.kind, s.turns, P.SIZED.includes(s.kind) ? (s.n ?? 1) : undefined)
     case 'grow': return P.grow(s.n, s.dur ?? 'game', s.stack)
     case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType)
     case 'mulDmg': return P.mulDmg(s.target, s.pct, s.onlyType)
