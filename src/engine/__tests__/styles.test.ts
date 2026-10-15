@@ -53,7 +53,8 @@ describe('Overgrowth', () => {
     s.players.p1.hand = [hit(1), hit(1)]
     s.players.p2.hand = [hit(1), hit(1), hit(1)]
     // Block stops 2 (+4), 1 hit lands (+1), 2 facing pairs (+6)
-    expect(resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1.maxHp).toBe(171)
+    const after = resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1
+    expect([after.maxHp, after.hp]).toEqual([171, 160 - 1 + 11])
     const quiet = game('TK:2', 160, 250)
     expect(resolveTurn(quiet, { p1: 'charge', p2: 'charge' }).players.p1.maxHp).toBe(160)
   })
