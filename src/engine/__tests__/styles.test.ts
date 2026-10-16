@@ -113,3 +113,25 @@ describe('Bruiser Styles', () => {
     expect(resolveTurn(resolveTurn(t, { p1: 'charge', p2: 'block' }), { p1: 'block', p2: 'block' }).players.p1.comboData?.conqueror).toBe(0)
   })
 })
+
+describe('Overgrowth dmg (Q buff 2026-10-16)', () => {
+  it('every 20 Max HP grown = +1 dmg on every card you strike with', () => {
+    const s = game('TK:2', 210, 300)
+    s.players.p1.styleData = { grown: 45 } // +2
+    s.players.p1.hand = [hit(5), hit(5)]
+    const after = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(100 - after.players.p2.hp).toBe(14)
+  })
+  it('no bonus below 20 grown', () => {
+    const s = game('TK:2', 210, 300)
+    s.players.p1.styleData = { grown: 19 }
+    s.players.p1.hand = [hit(5)]
+    expect(100 - resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(5)
+  })
+  it('counts what it grew', () => {
+    const s = game('TK:2', 210, 300)
+    s.players.p1.hand = [hit(1), hit(1)]
+    s.players.p2.hand = [hit(1), hit(1), hit(1)]
+    expect(resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1.styleData?.grown).toBe(11)
+  })
+})

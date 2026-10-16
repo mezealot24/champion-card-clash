@@ -13,7 +13,7 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
 }
 
 /** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
-export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10'
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'maxHpPct' | 'missingHpPct'
 
 export function perCount(ctx: BaseCtx, per?: Per): number {
   if (!per) return 1
@@ -32,6 +32,12 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
       const p = ctx.state.players[ctx.self]
       return Math.max(0, Math.floor((p.maxHp - p.hp) / 10))
     }
+    // 1% of your Max HP / missing HP (fractional; the action rounds down), e.g. "heal 5 per maxHpPct" = 5% of Max HP
+    case 'maxHpPct': return ctx.state.players[ctx.self].maxHp / 100
+    case 'missingHpPct': {
+      const p = ctx.state.players[ctx.self]
+      return Math.max(0, p.maxHp - p.hp) / 100
+    }
     // a "per" this build doesn't know counts 0 (old builds reading newer DB rows)
     default: return 0
   }
@@ -43,7 +49,7 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
 export const draw =
   (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
-    const n = base * perCount(ctx, per)
+    const n = Math.floor(base * perCount(ctx, per))
     if (n <= 0) return
     for (const s of sides(ctx, who)) {
       if (ctx.pending) ctx.pending[s] += n
@@ -56,7 +62,7 @@ export const draw =
 export const heal =
   (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
-    const n = base * perCount(ctx, per)
+    const n = Math.floor(base * perCount(ctx, per))
     if (n <= 0) return
     for (const s of sides(ctx, who)) healHp(ctx.state, s, n)
     log(ctx.state, `${ctx.card.def.id}: ${who} ฮีล ${n}`)
@@ -66,7 +72,7 @@ export const heal =
 export const loseHp =
   (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
-    const n = base * perCount(ctx, per)
+    const n = Math.floor(base * perCount(ctx, per))
     if (n <= 0) return
     for (const s of sides(ctx, who)) loseHpRaw(ctx.state, s, n, s === ctx.self ? 'self' : 'foe')
     log(ctx.state, `${ctx.card.def.id}: ${who} เสีย ${n} HP`)
@@ -88,7 +94,7 @@ export const maxHp =
 export const status =
   (who: Who, kind: StatusKind, turns = 1, base?: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
-    const n = base === undefined ? undefined : base * perCount(ctx, per)
+    const n = base === undefined ? undefined : Math.floor(base * perCount(ctx, per))
     if (n !== undefined && per && n <= 0) return
     for (const s of sides(ctx, who)) ctx.state.players[s].statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
     log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind}${n === undefined ? '' : ` ${n}`} ${turns} เทิร์น`)
@@ -141,7 +147,7 @@ function eachTarget(ctx: ChainCtx, target: DmgTarget, onlyType: CardType | undef
 export const addDmg =
   (target: DmgTarget, base: number, onlyType?: CardType, per?: Per): Act =>
   (ctx) => {
-    const n = base * perCount(ctx, per)
+    const n = Math.floor(base * perCount(ctx, per))
     eachTarget(ctx, target, onlyType, ctx.bonus, ctx.enemyBonus, (arr, i) => (arr[i] += n))
   }
 
@@ -208,7 +214,7 @@ export const cut =
 export const gainRes =
   (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
-    const n = base * perCount(ctx, per)
+    const n = Math.floor(base * perCount(ctx, per))
     if (per && n === 0) return
     for (const s of sides(ctx, who)) addRes(ctx.state, s, n)
     log(ctx.state, `${ctx.card.def.id}: ${who} resource ${n >= 0 ? '+' : ''}${n}`)

@@ -24,6 +24,8 @@ export const PER_LABEL: Record<Per, string> = {
   chainK: 'Kick in your chain',
   chainS: 'Skill in your chain',
   missingHp10: '10 HP you are missing',
+  maxHpPct: '1% of your Max HP',
+  missingHpPct: '1% of your missing HP',
 }
 
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
@@ -68,7 +70,10 @@ function describeTarget(t: DmgTarget): string {
 export function describeAct(a: ActSpec, now = false): string {
   switch (a.a) {
     case 'draw': return (a.who === 'self' ? `draw ${a.n}` : `${WHO[a.who]} draw ${a.n}`) + per(a.per)
-    case 'heal': return (a.who === 'self' ? `gain ${a.n} HP` : `${WHO[a.who]} gain ${a.n} HP`) + per(a.per)
+    case 'heal': {
+      const amt = a.per && PCT_OF[a.per] ? `${a.n}% of ${PCT_OF[a.per]} as HP` : `${a.n} HP`
+      return (a.who === 'self' ? `gain ${amt}` : `${WHO[a.who]} gain ${amt}`) + (a.per && PCT_OF[a.per] ? '' : per(a.per))
+    }
     case 'loseHp': return (a.who === 'self' ? `lose ${a.n} HP` : `${WHO[a.who]} lose ${a.n} HP`) + per(a.per)
     case 'maxHp': return `${a.who === 'self' ? '' : `${WHO[a.who]} `}Max HP ${signed(a.n)}`
     case 'status': {
@@ -109,6 +114,8 @@ export function describeAct(a: ActSpec, now = false): string {
 }
 
 const per = (p?: Per) => (p ? ` per ${PER_LABEL[p]}` : '')
+/** heal / Shield as a % of HP read better as "5% of your Max HP" than "5 HP per 1% of your Max HP" */
+const PCT_OF: Partial<Record<Per, string>> = { maxHpPct: 'your Max HP', missingHpPct: 'your missing HP' }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
