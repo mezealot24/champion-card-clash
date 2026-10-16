@@ -1,6 +1,6 @@
 // Champion Styles (passives). Code registry keyed by "CHAMP:slot" (champion_styles.slot).
 // Kept free of state.ts imports so createGame can call setup without an import cycle.
-import type { GameState, PlayerState, Side } from './types'
+import type { Action, GameState, PlayerState, Side } from './types'
 
 /** What a side went through in this turn's Strike phase. */
 export type HitReport = {
@@ -35,8 +35,10 @@ export type StyleDef = {
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
-  /** last thing in the turn, before the winner check */
-  endTurn?: (state: GameState, side: Side) => void
+  /** extra cards a Charge that isn't broken draws */
+  chargeDraw?: number
+  /** last thing in the turn, before the winner check (action = what this side played) */
+  endTurn?: (state: GameState, side: Side, action: Action) => void
 }
 
 const say = (state: GameState, side: Side, line: string) => state.log.push(`T${state.turn} ${side} ${line}`)
@@ -145,6 +147,33 @@ Object.assign(STYLES, {
         }
       })
       p.styleData = { ...p.styleData, attacks: before + mult.length }
+    },
+  },
+} satisfies Record<string, StyleDef>)
+
+Object.assign(STYLES, {
+  /** Mage · Mana Flow: a Charge that isn't broken draws 1 more card (2 in total). */
+  'MG:1': {
+    name: 'Mana Flow',
+    chargeDraw: 1,
+  },
+  /**
+   * Mage · Mana Barrier: start the game with Shield 30 (lasts until used up).
+   * Each turn you play Block, your Shield is topped up to 8 if lower; that top-up lasts 2 turns.
+   */
+  'MG:2': {
+    name: 'Mana Barrier',
+    setup: (p) => {
+      p.statuses.push({ kind: 'shield', turns: 9999, n: 30 })
+    },
+    endTurn: (state, side, action) => {
+      if (action !== 'block') return
+      const p = state.players[side]
+      const now = p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
+      if (now >= 8) return
+      p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
+      p.statuses.push({ kind: 'shield', turns: 2, n: 8 })
+      say(state, side, 'Mana Barrier: Shield 8')
     },
   },
 } satisfies Record<string, StyleDef>)

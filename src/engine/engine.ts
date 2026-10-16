@@ -17,6 +17,8 @@ type TurnEnv = {
   blockNow: Record<Side, number>
   /** Hits each side took that Block didn't stop. */
   hitsTaken: Record<Side, number>
+  /** Extra % dmg each side takes from hits this turn (Vulnerable statuses, read before they tick). */
+  vulnPct: Record<Side, number>
 }
 
 export function legalActions(state: GameState, side: Side): Action[] {
@@ -44,7 +46,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const hitDmgTaken: Record<Side, number> = { p1: 0, p2: 0 }
   const blockNow: Record<Side, number> = { p1: 0, p2: 0 }
   const hitsTaken: Record<Side, number> = { p1: 0, p2: 0 }
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken }
+  const vulnPct: Record<Side, number> = { p1: 0, p2: 0 }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct }
 
   // Silence: a side Silenced at the start of the turn has no card effects all turn
   for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
@@ -56,6 +59,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const blockStops = { p1: blockStopsFor(state, 'p1'), p2: blockStopsFor(state, 'p2') }
   const trueDmg = { p1: hasStatus(state, 'p1', 'trueDmg'), p2: hasStatus(state, 'p2', 'trueDmg') }
   const guardBreak = { p1: hasStatus(state, 'p1', 'guardBreak'), p2: hasStatus(state, 'p2', 'guardBreak') }
+  for (const side of SIDES) vulnPct[side] = state.players[side].statuses.filter((s) => s.kind === 'vulnerable').reduce((t, s) => t + (s.n ?? 0), 0)
 
   // statuses were checked above; they tick down now (new ones from this turn last into the next).
   // Shields tick at the end of the turn instead, so a Shield still guards this turn's hits.
@@ -94,7 +98,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
         log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge)`)
       }
     } else {
-      drawCards(state, side, state.rules.chargeDraw)
+      drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))
     }
   }
 
@@ -113,7 +117,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     state.blockStreak = 0
   }
 
-  for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side)
+  for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side, actions[side])
   for (const side of SIDES) {
     const p = state.players[side]
     p.silenced = false
@@ -199,7 +203,8 @@ function resolveStrikes(
     const b = trueDmg[side] ? Math.max(0, bonus[side]![i]) : bonus[side]![i]
     const m = trueDmg[side] ? Math.max(1, mult[side]![i]) : mult[side]![i]
     const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + b
-    return Math.max(0, Math.floor(raw * m))
+    // Vulnerable: the side being hit takes N% more dmg from every hit
+    return Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)])) / 100))
   }
   // Before action combos (card types only), then Conqueror stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')

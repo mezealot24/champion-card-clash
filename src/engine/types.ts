@@ -30,7 +30,7 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  * shield = absorbs n dmg from hits before HP; lasts until used up or its turns run out
  * parry = the next n hits that get past your Block deal 0 and their dmg goes back to the attacker (this turn)
  */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry'
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
 

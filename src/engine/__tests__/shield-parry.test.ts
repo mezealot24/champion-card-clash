@@ -62,3 +62,45 @@ describe('Parry', () => {
 it('TK-019 costs the opponent 3 HP per hit you blocked', () => {
   expect(hp(turn(game([tk('TK-019', 'K', 10)], [plain(5), plain(5), plain(5)]), 'block', 'strike'))).toEqual([95, 94])
 })
+
+const vdeck = Array.from({ length: 10 }, (_, i): CardDef => ({ id: `XX-${i}`, type: 'P', dmg: 1, effectText: '' }))
+const vhit = (dmg: number) => plain(dmg)
+
+describe('Vulnerable', () => {
+  it('the side with Vulnerable 50 takes 50% more dmg from each hit, then it wears off', () => {
+    let s = createGame({ championId: 'XX', hpStart: 100, hpMax: 100, deck: vdeck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck: vdeck }, { seed: 1 })
+    s.players.p1.statuses.push({ kind: 'vulnerable', turns: 1, n: 50 })
+    s.players.p2.hand = [vhit(10), vhit(10)]
+    s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(70)
+    s.players.p2.hand = [vhit(10)]
+    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(60)
+  })
+})
+
+describe('Bruiser drawbacks (migration 20261015000008)', () => {
+  const sql8 = readFileSync(new URL('../../../supabase/migrations/20261015000008_bruiser_drawbacks.sql', import.meta.url), 'utf8')
+  const rules = [...sql8.matchAll(/'(\[.*?\])'::jsonb/g)].map((m) => JSON.parse(m[1]) as EffectSpec) // Exhaust, Recoil, Scar
+  const rule = (name: 'Exhaust' | 'Recoil' | 'Scar') => rules[{ Exhaust: 0, Recoil: 1, Scar: 2 }[name]]
+  const br = (spec: EffectSpec, dmg = 10): CardInst => ({ uid: `b${uid++}`, def: { id: 'BR-T', type: 'S', dmg, effectText: '', effectSpec: spec } })
+  const g = () => createGame({ championId: 'BR', hpStart: 190, hpMax: 190, deck: vdeck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck: vdeck }, { seed: 1 })
+
+  it('Exhaust: next turn no Block and +50% dmg taken', () => {
+    let s = g()
+    s.players.p1.hand = [br(rule('Exhaust'))]
+    s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(s.players.p1.statuses.map((x) => x.kind).sort()).toEqual(['noBlock', 'vulnerable'])
+    s.players.p2.hand = [vhit(10)]
+    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(175)
+  })
+  it('Recoil: lose 30 HP when blocked', () => {
+    const s = g()
+    s.players.p1.hand = [br(rule('Recoil'))]
+    expect(resolveTurn(s, { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(160)
+  })
+  it('Scar: Max HP -20 after Strike', () => {
+    const s = g()
+    s.players.p1.hand = [br(rule('Scar'))]
+    expect(resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p1.maxHp).toBe(170)
+  })
+})
