@@ -91,14 +91,16 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (actions[side] !== 'charge') continue
     const p = state.players[side]
     if (actions[other(side)] === 'strike') {
-      // Strike > Charge: charger loses the oldest card if holding more than 1
-      // (a Style like Tenacity can keep the first slots safe; the next card goes instead)
+      // Strike > Charge: Charge break (Q 2026-10-16). The oldest card goes to the bottom of the deck and a new one is
+      // drawn in its place, even if it was the only card. A Style like Tenacity can keep the first slots safe:
+      // the next card goes instead, and with no card beyond the safe slots nothing is lost.
       const safe = getStyle(p.style)?.chargeBreakSafe?.(state, side) ?? 0
-      if (p.hand.length > Math.max(1, safe)) {
+      if (p.hand.length > safe) {
         const lost = p.hand.splice(safe, 1)[0]
         p.discarded!.push({ card: lost, slot: safe + 1, reason: 'Charge break' })
         toDeckBottom(state, side, [lost])
-        log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge)`)
+        log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge) → ลงใต้กอง จั่วใบใหม่แทน`)
+        drawCards(state, side, 1)
       }
     } else {
       drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))

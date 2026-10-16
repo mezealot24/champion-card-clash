@@ -86,15 +86,17 @@ describe('Bruiser Styles', () => {
     s.players.p1.hand = field()
     s.players.p2.hand = [hit(1)]
     const kept = resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)
-    expect(kept.slice(0, 2)).toEqual([1, 2]) // slot 3 was lost, then Charge drew nothing (Strike won)
-    expect(kept).toHaveLength(2)
+    expect(kept.slice(0, 2)).toEqual([1, 2]) // slot 3 went to the bottom and a new card replaced it
+    expect(kept).toHaveLength(3)
     const two = br('BR:2', 40)
     two.players.p1.hand = [hit(1), hit(2)]
     two.players.p2.hand = [hit(1)]
-    expect(resolveTurn(two, { p1: 'charge', p2: 'strike' }).players.p1.hand).toHaveLength(2)
+    expect(resolveTurn(two, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)).toEqual([1, 2]) // nothing beyond the safe slots: nothing lost, no replacement
     const healthy = br('BR:2', 90)
     healthy.players.p1.hand = field()
     healthy.players.p2.hand = [hit(1)]
-    expect(resolveTurn(healthy, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)).toEqual([2, 3])
+    const h = resolveTurn(healthy, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)
+    expect(h.slice(0, 2)).toEqual([2, 3]) // oldest lost, replacement drawn at the end
+    expect(h).toHaveLength(3)
   })
 })

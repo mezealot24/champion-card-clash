@@ -4,7 +4,7 @@ import {
   createGame,
   isEffectMissing,
   legalActions,
-  pickAiAction,
+  pickSmartAction,
   costOf,
   resourceOf,
   STYLES,
@@ -61,7 +61,7 @@ export function Battle({ data }: { data: BattleData }) {
 
   function play(action: Action) {
     if (!game) return
-    const next = resolveTurn(game, { p1: action, p2: pickAiAction(game, 'p2') })
+    const next = resolveTurn(game, { p1: action, p2: pickSmartAction(game, 'p2') })
     setLastLog(next.log.slice(game.log.length))
     setGame(next)
   }
