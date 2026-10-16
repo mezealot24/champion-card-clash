@@ -4,7 +4,7 @@ import { getStyle } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
-import { drawCards, effectOf, heal, log, loseHp, toDeckBottom } from './state'
+import { drawCards, effectOf, emit, heal, log, loseHp, markDiscarded, toDeckBottom } from './state'
 import type { Action, CardDef, CardInst, CardType, GameState, Side } from './types'
 import { other } from './types'
 
@@ -44,6 +44,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     state.players[side].discarded = []
     state.players[side].cutTaken = 0
   }
+  state.events = []
   log(state, `p1 ${actions.p1} / p2 ${actions.p2}`)
 
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
@@ -100,10 +101,15 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       const safe = getStyle(p.style)?.chargeBreakSafe?.(state, side) ?? 0
       if (p.hand.length > safe) {
         const lost = p.hand.splice(safe, 1)[0]
-        p.discarded!.push({ card: lost, slot: safe + 1, reason: 'Charge break' })
+        markDiscarded(state, side, [{ card: lost, slot: safe + 1, reason: 'Charge break' }])
         toDeckBottom(state, side, [lost])
         log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge) → ลงใต้กอง จั่วใบใหม่แทน`)
-        drawCards(state, side, 1)
+        // the replacement takes the lost card's slot (Q 2026-10-16), not the end of the Field
+        if (drawCards(state, side, 1)) {
+          p.hand.splice(safe, 0, p.hand.pop()!)
+          const ev = state.events?.findLast((e) => e.k === 'draw' && e.side === side)
+          if (ev?.k === 'draw') ev.slot = safe
+        }
       }
     } else {
       drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))
@@ -115,7 +121,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (state.blockStreak >= state.rules.blockStreakDiscard) {
       for (const side of SIDES) {
         const p = state.players[side]
-        p.discarded!.push(...p.hand.map((card, i) => ({ card, slot: i + 1, reason: 'Block streak' })))
+        markDiscarded(state, side, p.hand.map((card, i) => ({ card, slot: i + 1, reason: 'Block streak' })))
         toDeckBottom(state, side, p.hand)
         p.hand = []
       }
@@ -296,6 +302,7 @@ function resolveStrikes(
       const dmg = dmgOf(side, i)
       const { dealt, parried, absorbed } = outcome.get(card.uid)!
       if (!blocked && !parried) env.hitsTaken[enemy]++
+      emit(state, { k: 'hit', side, slot: i, uid: card.uid, type: card.def.type, dmg, dealt, blocked, parried, absorbed, crit: crit[side].has(i) })
       if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
       if (parried && dmg > 0) loseHp(state, side, dmg)
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
@@ -336,7 +343,7 @@ function resolveStrikes(
       const enemy = other(side)
       if (actions[enemy] === 'block') {
         const lost = state.players[enemy].hand.splice(0, 2)
-        state.players[enemy].discarded!.push(...lost.map((card, i) => ({ card, slot: i + 1, reason: 'Guard Crush' })))
+        markDiscarded(state, enemy, lost.map((card, i) => ({ card, slot: i + 1, reason: 'Guard Crush' })))
         toDeckBottom(state, enemy, lost)
         if (lost.length) log(state, `${side} Guard Crush: ${enemy} ทิ้ง ${lost.map((c) => c.def.id).join(', ')}`)
       }
@@ -358,7 +365,10 @@ function resolveStrikes(
   }
 
   // 3) used cards go under the deck, then draws from effects enter the hand
-  for (const side of strikers) toDeckBottom(state, side, chains[side]!)
+  for (const side of strikers) {
+    toDeckBottom(state, side, chains[side]!)
+    emit(state, { k: 'sweep', side, uids: chains[side]!.map((c) => c.uid) })
+  }
   for (const side of SIDES) if (pending[side]) drawCards(state, side, pending[side])
 
   // 4) After action (Q 2026-10-15): end of the turn, every card that was on the Field when actions were

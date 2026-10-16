@@ -38,7 +38,9 @@ export const COMBOS: Record<string, ComboDef[]> = {
       fire: (state, side) => {
         const p = state.players[side]
         const n = Math.floor(p.hp / 10)
+        const before = p.hp
         p.hp = Math.min(p.maxHp, p.hp + n)
+        if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
         say(state, side, `Combo P > K > P: ฮีล ${n} (10% ของ HP ที่เหลือ)`)
       },
     },
@@ -113,7 +115,10 @@ export function checkCombos(state: GameState, side: Side, hits: ComboHit[], when
           const three = [hits[i], hits[j], hits[k]]
           if (sameTypes(three, combo.pattern) && ok(combo, three)) found = true
         }
-    if (found) combo.fire(state, side)
+    if (found) {
+      combo.fire(state, side)
+      ;(state.events ??= []).push({ k: 'combo', side, name: combo.name })
+    }
   }
 }
 

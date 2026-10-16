@@ -70,7 +70,9 @@ export const STYLES: Record<string, StyleDef> = {
       const p = state.players[side]
       if (p.styleData?.spent || r.hitsTaken === 0 || p.hp <= 0 || pctHp(p) >= 60) return
       const n = Math.floor(((p.maxHp - p.hp) * 4 * r.hitsTaken) / 100)
+      const before = p.hp
       p.hp = Math.min(p.maxHp, p.hp + n)
+      if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
       p.styleData = { ...p.styleData, below: 1 }
       say(state, side, `Second Wind: ฮีล ${n} (4% ของ HP ที่หายไป x ${r.hitsTaken} hit)`)
     },

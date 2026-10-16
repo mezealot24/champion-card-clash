@@ -96,7 +96,10 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
     const cost = costOf(p.championId, card)
     if (cost <= 0) continue
     if (def.payWithHp ? p.hp > cost : (p.res ?? 0) >= cost) {
-      if (def.payWithHp) p.hp -= cost
+      if (def.payWithHp) {
+        p.hp -= cost
+        ;(state.events ??= []).push({ k: 'hp', side, delta: -cost })
+      }
       else p.res = (p.res ?? 0) - cost
       log(state, `${side} จ่าย ${cost} ${def.name} ให้ ${card.def.id}`)
     } else {
