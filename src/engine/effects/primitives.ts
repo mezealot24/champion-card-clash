@@ -1,7 +1,7 @@
 // ตัวต่อ (building blocks) สำหรับเขียน effect การ์ด
 // รวมกันเป็น effect ใน registry.ts เช่น when(enemyHandAtLeast(2), heal('self', 10))
 import { addRes, resourceOf } from '../resources'
-import { drawCards, heal as healHp, log, loseHp as loseHpRaw } from '../state'
+import { drawCards, heal as healHp, log, loseHp as loseHpRaw, toDeckBottom } from '../state'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond } from './types'
 
@@ -160,6 +160,35 @@ export const steal: Act = (ctx) => {
   me.hand.push(taken)
   log(ctx.state, `${ctx.card.def.id}: ${ctx.self} ขโมย ${taken.def.id} มาไว้บน Field`)
 }
+
+/** Which opponent Field card a Cut takes: oldest (slot 1), newest (last slot), or the one in this card's slot. */
+export type CutWhich = 'oldest' | 'newest' | 'facing'
+/** A side loses at most this many Field cards to Cut effects per turn (Claude default 2026-10-16). Charge break doesn't count. */
+export const CUT_CAP = 2
+
+/**
+ * Cut (Assassin, Q 2026-10-16): the opponent discards n cards from their Field, as the Field is now.
+ * They go to the bottom of their owner's deck, no replacement draw.
+ */
+export const cut =
+  (which: CutWhich, n: number): Act =>
+  (ctx) => {
+    const foe = ctx.state.players[ctx.enemy]
+    for (let k = 0; k < n; k++) {
+      if ((foe.cutTaken ?? 0) >= CUT_CAP) {
+        log(ctx.state, `${ctx.card.def.id}: Cut ครบ ${CUT_CAP} ใบในเทิร์นนี้แล้ว`)
+        return
+      }
+      const i = which === 'oldest' ? 0 : which === 'newest' ? foe.hand.length - 1 : ctx.slot
+      const lost = foe.hand[i]
+      if (!lost) return
+      foe.hand.splice(i, 1)
+      foe.cutTaken = (foe.cutTaken ?? 0) + 1
+      ;(foe.discarded ??= []).push({ card: lost, slot: i + 1, reason: 'Cut' })
+      toDeckBottom(ctx.state, ctx.enemy, [lost])
+      log(ctx.state, `${ctx.card.def.id}: Cut → ${ctx.enemy} ทิ้ง ${lost.def.id} ลงใต้กอง`)
+    }
+  }
 
 /** Gain (or lose, negative) class resource: Mana / Rage / Energy. Nothing for Tank. */
 export const gainRes =

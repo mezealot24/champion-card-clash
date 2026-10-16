@@ -1,7 +1,7 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { getStyle } from './styles'
-import { baseDmgOf, gainRes, payChain } from './resources'
+import { addRes, baseDmgOf, gainRes, payChain, resourceOf } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, effectOf, heal, log, loseHp, toDeckBottom } from './state'
@@ -40,7 +40,10 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     }
   }
   const state = structuredClone(prev)
-  for (const side of SIDES) state.players[side].discarded = []
+  for (const side of SIDES) {
+    state.players[side].discarded = []
+    state.players[side].cutTaken = 0
+  }
   log(state, `p1 ${actions.p1} / p2 ${actions.p2}`)
 
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
@@ -126,6 +129,17 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   // class resources fill at the end of the turn, so what you earn now is spent next turn
   for (const side of SIDES) {
     gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side] })
+  }
+  // Dual Strike Styles (Sonic Bliz Acceleration): after resources fill, so a full bar stays full
+  if (actions.p1 === 'strike' && actions.p2 === 'strike') {
+    for (const side of SIDES) {
+      const ds = getStyle(state.players[side].style)?.dualStrike
+      if (!ds) continue
+      const cap = resourceOf(state.players[side].championId)?.cap ?? 0
+      if (ds.fillRes && state.rules.resources) addRes(state, side, cap)
+      const n = ds.draw ? drawCards(state, side, ds.draw) : 0
+      log(state, `${side} Acceleration (Dual Strike): ${ds.fillRes ? 'Energy เต็ม, ' : ''}จั่ว ${n}`)
+    }
   }
   for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side, actions[side])
   for (const side of SIDES) {
@@ -232,7 +246,7 @@ function resolveStrikes(
 
   // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
   const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }
-  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!, crit[side])
+  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!, crit[side], chains[side]!)
 
   // Every hit's outcome is worked out now, in hit order: Block, then Parry, then Shield, then HP.
   // So dmg each side will take from hits this turn is known before any hit lands.

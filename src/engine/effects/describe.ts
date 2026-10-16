@@ -81,6 +81,10 @@ export function describeAct(a: ActSpec, now = false): string {
     }
     case 'pierce': return `${{ this: 'this card', next: 'next card', following: 'all following cards', chain: 'your whole chain' }[a.target]} ignore${a.target === 'this' || a.target === 'next' ? 's' : ''} Block`
     case 'steal': return "steal the opponent's card in this slot onto your Field"
+    case 'cut': {
+      const what = a.which === 'facing' ? 'card in this slot' : a.n === 1 ? `${a.which} card` : `${a.n} ${a.which} cards`
+      return `opponent discards their ${what} from the Field to the bottom of their deck (Cut)`
+    }
     case 'gainRes': return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gain`} ${a.n} resource`
     case 'mulDmg': {
       const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`

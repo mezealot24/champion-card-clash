@@ -44,6 +44,7 @@ export type ActSpec =
   | { a: 'blockNow'; who: P.Who; n: number }
   | { a: 'pierce'; target: 'this' | 'next' | 'following' | 'chain' }
   | { a: 'steal' }
+  | { a: 'cut'; which: P.CutWhich; n: number }
   | { a: 'gainRes'; who: P.Who; n: number }
 
 /**
@@ -93,6 +94,7 @@ function act(s: ActSpec): Act {
     case 'blockNow': return P.blockNow(s.who, s.n)
     case 'pierce': return P.pierce(s.target)
     case 'steal': return P.steal
+    case 'cut': return P.cut(s.which, s.n)
     case 'gainRes': return P.gainRes(s.who, s.n)
   }
 }

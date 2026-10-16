@@ -62,11 +62,12 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
   blockNow: { a: 'blockNow', who: 'enemy', n: -1 },
   pierce: { a: 'pierce', target: 'this' },
   steal: { a: 'steal' },
+  cut: { a: 'cut', which: 'oldest', n: 1 },
   gainRes: { a: 'gainRes', who: 'self', n: 1 },
 }
 const ACT_LABEL: Record<string, string> = {
   draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', mulDmg: 'Dmg × % (this chain)', grow: 'Gain dmg (later attacks)', blockNow: 'Block ±N hits (this turn)',
-  pierce: 'Pierce: ignore Block (Before action)', steal: "Steal opponent's card in this slot", gainRes: 'Gain resource',
+  pierce: 'Pierce: ignore Block (Before action)', steal: "Steal opponent's card in this slot", cut: 'Cut: opponent discards Field cards', gainRes: 'Gain resource',
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -280,8 +281,13 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
           <option value="this">this card</option><option value="next">next card</option><option value="following">all following</option><option value="chain">whole chain</option>
         </select>
       )}
+      {value.a === 'cut' && (
+        <select value={value.which} onChange={(e) => onChange({ ...value, which: e.target.value as typeof value.which })}>
+          <option value="oldest">oldest</option><option value="newest">newest</option><option value="facing">card in this slot</option>
+        </select>
+      )}
       {value.a === 'mulDmg' && <><Num value={value.pct} min={0} onChange={(pct) => onChange({ ...value, pct })} />%</>}
-      {'n' in value && value.a !== 'status' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' || value.a === 'blockNow' || value.a === 'gainRes' ? undefined : 0} onChange={(n) => onChange({ ...value, n })} />}
+      {'n' in value && value.a !== 'status' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' || value.a === 'blockNow' || value.a === 'gainRes' ? undefined : value.a === 'cut' ? 1 : 0} onChange={(n) => onChange({ ...value, n })} />}
       {(value.a === 'draw' || value.a === 'heal' || value.a === 'loseHp') && (
         <select value={value.per ?? ''} onChange={(e) => onChange({ ...value, per: (e.target.value || undefined) as typeof value.per })} title="Multiply by a count">
           <option value="">(flat)</option>
