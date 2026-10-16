@@ -103,19 +103,10 @@ describe('Bruiser S > P > P (Guard Crush)', () => {
   })
 })
 
-describe('Bruiser S > K > K (Conqueror)', () => {
-  it('+1 stack per combo, applied to this chain too; +1 dmg per stack on every card', () => {
+describe('Conqueror stacks (Bruiser Juggernaut Style)', () => {
+  it('S + K + K is no longer a combo (Q 2026-10-16)', () => {
     const s = resolveTurn(game('BR', [c('S', 10), c('K', 10), c('K', 10)]), { p1: 'strike', p2: 'charge' })
-    expect(s.players.p1.comboData?.conqueror).toBe(1)
-    expect(100 - s.players.p2.hp).toBe(33)
-    s.players.p1.hand = [c('P', 10)]
-    const hp = s.players.p2.hp
-    expect(hp - resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(11)
-  })
-  it('caps at 6 stacks', () => {
-    const s = game('BR', [c('S'), c('K'), c('K')])
-    s.players.p1.comboData = { conqueror: 6 }
-    expect(resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p1.comboData?.conqueror).toBe(6)
+    expect(s.players.p1.comboData?.conqueror).toBeUndefined()
   })
   it('at 6 stacks: Omnivamp heals 10% of each hit (rounded down)', () => {
     const s = game('BR', [c('P', 14), c('P', 14)], [], 50)

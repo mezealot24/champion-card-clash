@@ -1,5 +1,6 @@
 // Champion Styles (passives). Code registry keyed by "CHAMP:slot" (champion_styles.slot).
 // Kept free of state.ts imports so createGame can call setup without an import cycle.
+import { CONQUEROR_MAX } from './combos'
 import { RED_HP_PCT } from './resources'
 import type { Action, CardInst, GameState, PlayerState, Side } from './types'
 
@@ -41,6 +42,8 @@ export type StyleDef = {
   beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[]) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
+  /** Strike chains only: right after Before action combos, before Conqueror and any hit (e.g. Juggernaut stacks) */
+  strikeStart?: (state: GameState, side: Side, chain: CardInst[]) => void
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
   /** Dual Strike (both sides Strike this turn): at the end of the turn, after resources fill, draw n and/or fill the bar to its cap */
@@ -102,6 +105,9 @@ export const STYLES: Record<string, StyleDef> = {
   },
 }
 
+/** Juggernaut: how many turns Tenacity lasts after the Conqueror stacks fill up. */
+export const TENACITY_TURNS = 2
+
 const below50 = (state: GameState, side: Side) => pctHp(state.players[side]) < 50
 
 Object.assign(STYLES, {
@@ -115,12 +121,36 @@ Object.assign(STYLES, {
     },
   },
   /**
-   * Bruiser · Tenacity: while HP < 50%, a charge break can't throw away the cards in slot 1 and 2.
-   * The oldest card after them is lost instead; with 2 cards or fewer nothing is lost.
+   * Bruiser · Juggernaut (Q 2026-10-16, Conqueror + Tenacity merged; name by Claude).
+   * Every Strike: +1 Conqueror stack per card in the chain, before it hits (max 6; see applyConqueror in combos.ts).
+   * When the stacks reach max: Tenacity for the next 2 turns (a charge break can't throw away the slot 1 card).
+   * Every turn you don't Strike: −1 stack.
    */
   'BR:2': {
-    name: 'Tenacity',
-    chargeBreakSafe: (state, side) => (below50(state, side) ? 2 : 0),
+    name: 'Juggernaut',
+    strikeStart: (state, side, chain) => {
+      const p = state.players[side]
+      const was = p.comboData?.conqueror ?? 0
+      const n = Math.min(CONQUEROR_MAX, was + chain.length)
+      if (n === was) return
+      p.comboData = { ...p.comboData, conqueror: n }
+      say(state, side, `Juggernaut: Conqueror ${n}/${CONQUEROR_MAX}${n === CONQUEROR_MAX ? ' (Omnivamp)' : ''}`)
+      if (n === CONQUEROR_MAX) {
+        p.styleData = { ...p.styleData, tenacityFrom: state.turn }
+        say(state, side, `Juggernaut: Tenacity ${TENACITY_TURNS} เทิร์น (ช่อง 1 ไม่โดนทิ้งจาก charge break)`)
+      }
+    },
+    chargeBreakSafe: (state, side) => {
+      const from = state.players[side].styleData?.tenacityFrom
+      return from != null && state.turn > from && state.turn <= from + TENACITY_TURNS ? 1 : 0
+    },
+    endTurn: (state, side, action) => {
+      const p = state.players[side]
+      const n = p.comboData?.conqueror ?? 0
+      if (action === 'strike' || !n) return
+      p.comboData = { ...p.comboData, conqueror: n - 1 }
+      say(state, side, `Juggernaut: ไม่ได้ Strike, Conqueror ${n - 1}/${CONQUEROR_MAX}`)
+    },
   },
 } satisfies Record<string, StyleDef>)
 
