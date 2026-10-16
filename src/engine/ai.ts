@@ -1,6 +1,7 @@
 // v0 AI: weighted random by situation (see vault "AI Opponent"). Always keeps some randomness.
 import { legalActions, resolveTurn } from './engine'
-import type { Action, GameState, Side } from './types'
+import { COMBOS } from './combos'
+import type { Action, CardType, GameState, Side, StatusKind } from './types'
 import { other } from './types'
 
 export function pickAiAction(state: GameState, side: Side, rand: () => number = Math.random): Action {
@@ -28,28 +29,96 @@ export function pickAiAction(state: GameState, side: Side, rand: () => number = 
 // out and scores the result, so Styles, Field cards, effects, resources and statuses are all "understood"
 // without hand-written rules per Champion. The 3x3 payoff table is then solved as a zero-sum game (mixed
 // strategy), so the AI stays unpredictable but leans towards what the Field actually favours.
+//
+// v2 (2026-10-16): looks 2 turns ahead (this turn, then the best mix for the reply turn), so Charging now to
+// Strike a bigger chain or a combo next turn has value. The score also counts statuses (combo payoffs, Shield,
+// Silence...), values Field cards closer to their real worth, and adds a small hint for how close the Field is
+// to each signature combo (read from COMBOS, so it follows rule changes). A big combo hint backfires: the AI
+// starts guarding its Field with Block, so it stays small and the lookahead does the real work.
 // ---------------------------------------------------------------------------------------------
 
-/** How good a position is for `side`, in "% of a life bar" units. Zero-sum: score(a) = -score(b). */
-function score(state: GameState, side: Side): number {
-  if (state.winner) return state.winner === side ? 1000 : state.winner === 'draw' ? 0 : -1000
-  const foeSide = other(side)
-  const me = state.players[side]
-  const foe = state.players[foeSide]
-  const hpPct = (p: typeof me) => (100 * p.hp) / Math.max(1, p.maxHp)
-  // cards on the Field are loaded dmg: worth a fraction of their dmg as % of the opponent's life bar
-  const handValue = (p: typeof me, victim: typeof me) => (0.35 * 100 * p.hand.reduce((t, c) => t + c.def.dmg, 0)) / Math.max(1, victim.maxHp)
-  const res = (p: typeof me) => (p.res ?? 0) * 1.5
-  return hpPct(me) - hpPct(foe) + handValue(me, foe) - handValue(foe, me) + res(me) - res(foe)
+export type AiWeights = {
+  /** Field card dmg, as a share of the same dmg actually landed */
+  fieldValue: number
+  /** extra multiplier on Field value while the Field is full (can't grow) */
+  fullField: number
+  /** % of a life bar a combo on the Field is worth when it is complete; partial combos get a share of it */
+  combo: number
+  /** % of a life bar per status-turn (see STATUS_VALUE) */
+  status: number
+  /** % of a life bar per resource point */
+  res: number
+  /** turns looked ahead (1 = this turn only; 2 = also the reply turn, about 9x slower) */
+  depth: number
 }
 
-/** Solve a zero-sum matrix game for the row player by regret matching; returns the row mix. */
-function solve(m: number[][], iters = 300): number[] {
+export const AI_WEIGHTS: AiWeights = { fieldValue: 0.5, fullField: 1, combo: 5, status: 1, res: 1.5, depth: 2 }
+
+/** Rough worth of a status to whoever has it, per remaining turn (shield is counted as HP instead). */
+const STATUS_VALUE: Partial<Record<StatusKind, number>> = {
+  trueDmg: 2,
+  guardBreak: 3,
+  blockPlus: 2,
+  parry: 3,
+  noBlock: -6,
+  noStrike: -4,
+  noCharge: -3,
+  silence: -3,
+  vulnerable: -5,
+}
+
+/**
+ * How close this Field is to each of the Champion's signature combos, 0..1 summed over combos.
+ * A combo already on the Field counts 1; a missing card counts the chance of drawing its type into a free slot.
+ */
+export function comboPotential(state: GameState, side: Side): number {
+  const p = state.players[side]
+  const combos = COMBOS[p.championId] ?? []
+  if (!combos.length) return 0
+  const free = state.rules.handMax - p.hand.length
+  const deckShare = (t: CardType) => (p.deck.length ? p.deck.filter((c) => c.def.type === t).length / p.deck.length : 0)
+  let total = 0
+  for (const combo of combos) {
+    const missing: CardType[] = [...combo.pattern]
+    for (const c of p.hand) {
+      const i = missing.indexOf(c.def.type)
+      if (i >= 0) missing.splice(i, 1)
+    }
+    if (missing.length > free) continue
+    // chance each missing type shows up within the free draws (ignores overlap; it's a hint, not a proof)
+    let q = 1
+    for (const t of missing) q *= 1 - (1 - deckShare(t)) ** free
+    total += q
+  }
+  return total
+}
+
+/** How good a position is for `side`, in "% of a life bar" units. Zero-sum: score(a) = -score(b). */
+function score(state: GameState, side: Side, w: AiWeights): number {
+  if (state.winner) return state.winner === side ? 1000 : state.winner === 'draw' ? 0 : -1000
+  const half = (s: Side) => {
+    const p = state.players[s]
+    const victim = state.players[other(s)]
+    const shield = p.statuses.reduce((t, x) => t + (x.kind === 'shield' ? (x.n ?? 0) : 0), 0)
+    const hp = (100 * (p.hp + shield)) / Math.max(1, p.maxHp)
+    const full = p.hand.length >= state.rules.handMax ? w.fullField : 1
+    // cards on the Field are loaded dmg: worth a share of their dmg as % of the opponent's life bar
+    const field = (w.fieldValue * full * 100 * p.hand.reduce((t, c) => t + c.def.dmg, 0)) / Math.max(1, victim.maxHp)
+    const status = p.statuses.reduce((t, x) => t + (STATUS_VALUE[x.kind] ?? 0) * Math.max(1, x.turns), 0)
+    const stacks = Object.values(p.comboData ?? {}).reduce((t, n) => t + n, 0)
+    return hp + field + w.combo * comboPotential(state, s) + w.status * (status + 2 * stacks) + w.res * (p.res ?? 0)
+  }
+  return half(side) - half(other(side))
+}
+
+/** Solve a zero-sum matrix game for the row player by regret matching; returns the row mix and the game value. */
+function solve(m: number[][], iters = 300): { mix: number[]; value: number } {
   const rows = m.length
   const cols = m[0].length
   const rr = new Array(rows).fill(0)
   const rc = new Array(cols).fill(0)
   const sumR = new Array(rows).fill(0)
+  const sumC = new Array(cols).fill(0)
   const mix = (reg: number[]) => {
     const pos = reg.map((x) => Math.max(0, x))
     const t = pos.reduce((a, b) => a + b, 0)
@@ -59,6 +128,7 @@ function solve(m: number[][], iters = 300): number[] {
     const pr = mix(rr)
     const pc = mix(rc)
     for (let i = 0; i < rows; i++) sumR[i] += pr[i]
+    for (let j = 0; j < cols; j++) sumC[j] += pc[j]
     const rowU = m.map((row) => row.reduce((t, v, j) => t + v * pc[j], 0))
     const colU = Array.from({ length: cols }, (_, j) => m.reduce((t, row, i) => t + -row[j] * pr[i], 0))
     const vr = rowU.reduce((t, u, i) => t + u * pr[i], 0)
@@ -66,22 +136,37 @@ function solve(m: number[][], iters = 300): number[] {
     for (let i = 0; i < rows; i++) rr[i] += rowU[i] - vr
     for (let j = 0; j < cols; j++) rc[j] += colU[j] - vc
   }
-  const t = sumR.reduce((a, b) => a + b, 0)
-  return sumR.map((x) => x / t)
+  const row = sumR.map((x) => x / iters)
+  const col = sumC.map((x) => x / iters)
+  const value = m.reduce((t, r, i) => t + row[i] * r.reduce((u, v, j) => u + v * col[j], 0), 0)
+  return { mix: row, value }
 }
 
-export function pickSmartAction(state: GameState, side: Side, rand: () => number = Math.random): Action {
-  const foeSide = other(side)
+/** Payoff table for `side`: every (my action, their action) pair played out, scored `depth` turns ahead. */
+function payoff(state: GameState, side: Side, w: AiWeights, depth: number): { mine: Action[]; table: number[][] } {
   const mine = legalActions(state, side)
-  const theirs = legalActions(state, foeSide)
-  if (mine.length === 1) return mine[0]
+  const theirs = legalActions(state, other(side))
   const table = mine.map((a) =>
     theirs.map((b) => {
       const next = resolveTurn(state, side === 'p1' ? { p1: a, p2: b } : { p1: b, p2: a })
-      return score(next, side)
+      if (depth <= 1 || next.winner) return score(next, side, w)
+      // both sides then play the best mix for the turn after; that turn's value is this pair's worth
+      return solve(payoff(next, side, w, depth - 1).table, 120).value
     }),
   )
-  const mixed = solve(table)
+  return { mine, table }
+}
+
+export function pickSmartAction(
+  state: GameState,
+  side: Side,
+  rand: () => number = Math.random,
+  weights: Partial<AiWeights> = {},
+): Action {
+  const w = { ...AI_WEIGHTS, ...weights }
+  if (legalActions(state, side).length === 1) return legalActions(state, side)[0]
+  const { mine, table } = payoff(state, side, w, w.depth)
+  const mixed = solve(table).mix
   // a little noise so the AI never becomes a pure function of the board
   const probs = mixed.map((p) => 0.92 * p + 0.08 / mine.length)
   let r = rand()
