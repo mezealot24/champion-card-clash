@@ -1,4 +1,4 @@
-// Signature combos: Tank S>S>S, Assassin P>K>S, Mage S+S+S.
+// Signature combos: Tank P>K>P, Assassin P>K>S, Mage S+S+S.
 import { describe, expect, it } from 'vitest'
 import { createGame, legalActions, resolveTurn } from '../index'
 import type { CardDef, CardInst, CardType, EffectSpec, GameState } from '../index'
@@ -14,16 +14,17 @@ function game(champ: string, mine: CardInst[], theirs: CardInst[] = [], hp = 100
   return s
 }
 
-describe('Tank S > S > S', () => {
+describe('Tank P > K > P', () => {
   it('heals 10% of current HP when the opponent blocks one of them', () => {
-    expect(resolveTurn(game('TK', [c('S'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
+    expect(resolveTurn(game('TK', [c('P'), c('K'), c('P')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
   })
-  it('no heal when nothing is blocked or there are fewer than 3 S cards', () => {
-    expect(resolveTurn(game('TK', [c('S'), c('S'), c('S')]), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(100)
-    expect(resolveTurn(game('TK', [c('S'), c('P'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(100)
+  it('no heal when nothing is blocked or the types do not match', () => {
+    expect(resolveTurn(game('TK', [c('P'), c('K'), c('P')]), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(100)
+    expect(resolveTurn(game('TK', [c('S'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(100)
+    expect(resolveTurn(game('TK', [c('P'), c('K'), c('K')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(100)
   })
-  it('the 3 S cards do not need to be in a row (Q 2026-10-16)', () => {
-    expect(resolveTurn(game('TK', [c('S'), c('P'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
+  it('any order, not in a row (Q 2026-10-16)', () => {
+    expect(resolveTurn(game('TK', [c('K'), c('S'), c('P'), c('P')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
   })
 })
 
