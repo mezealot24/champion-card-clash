@@ -1,4 +1,4 @@
-// Signature combos: Tank S>S>S, Assassin P>K>S, Mage S+S+S.
+// Signature combos: Tank P>K>P, Assassin P>K>S, Mage S+S+S.
 import { describe, expect, it } from 'vitest'
 import { createGame, legalActions, resolveTurn } from '../index'
 import type { CardDef, CardInst, CardType, EffectSpec, GameState } from '../index'
@@ -14,16 +14,17 @@ function game(champ: string, mine: CardInst[], theirs: CardInst[] = [], hp = 100
   return s
 }
 
-describe('Tank S > S > S', () => {
+describe('Tank P > K > P', () => {
   it('heals 10% of current HP when the opponent blocks one of them', () => {
-    expect(resolveTurn(game('TK', [c('S'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
+    expect(resolveTurn(game('TK', [c('P'), c('K'), c('P')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
   })
-  it('no heal when nothing is blocked or there are fewer than 3 S cards', () => {
-    expect(resolveTurn(game('TK', [c('S'), c('S'), c('S')]), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(100)
-    expect(resolveTurn(game('TK', [c('S'), c('P'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(100)
+  it('no heal when nothing is blocked or the types do not match', () => {
+    expect(resolveTurn(game('TK', [c('P'), c('K'), c('P')]), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(100)
+    expect(resolveTurn(game('TK', [c('S'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(100)
+    expect(resolveTurn(game('TK', [c('P'), c('K'), c('K')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(100)
   })
-  it('the 3 S cards do not need to be in a row (Q 2026-10-16)', () => {
-    expect(resolveTurn(game('TK', [c('S'), c('P'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
+  it('any order, not in a row (Q 2026-10-16)', () => {
+    expect(resolveTurn(game('TK', [c('K'), c('S'), c('P'), c('P')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
   })
 })
 
@@ -129,5 +130,22 @@ describe('Bruiser S > K > K (Conqueror)', () => {
     const t = game('BR', [], [c('P', 10)])
     t.players.p1.comboData = { conqueror: 5 }
     expect(100 - resolveTurn(t, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(10)
+  })
+})
+
+describe('per 10 missing HP (Tank Meditation)', () => {
+  const secondSkin: EffectSpec = [{ hook: 'modify', if: [{ c: 'selfAction', a: 'strike' }], do: [
+    // "per missing HP" reads HP at that moment, so the scaled parts go before the heals
+    { a: 'status', who: 'self', kind: 'shield', turns: 0, n: 2, per: 'missingHp10' }, { a: 'heal', who: 'self', n: 2, per: 'missingHp10' },
+    { a: 'status', who: 'self', kind: 'shield', turns: 0, n: 1 }, { a: 'heal', who: 'self', n: 1 },
+  ] }]
+  it('heals and shields 1 + 20% of missing HP before the hits land', () => {
+    // 100 / 200 HP → missing 100 → heal 21 (to 121), Shield 21 soaks 21 of the 30 incoming
+    const s = resolveTurn(game('XX', [c('P', 0, secondSkin)], [c('P', 30)]), { p1: 'strike', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(112)
+  })
+  it('Shield with turns 0 is gone at the end of the turn', () => {
+    const s = resolveTurn(game('XX', [c('P', 0, secondSkin)], [c('P', 30)]), { p1: 'strike', p2: 'strike' })
+    expect(s.players.p1.statuses.filter((x) => x.kind === 'shield')).toHaveLength(0)
   })
 })
