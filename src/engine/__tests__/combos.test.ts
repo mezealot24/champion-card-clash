@@ -18,13 +18,20 @@ describe('Tank S > S > S', () => {
   it('heals 10% of current HP when the opponent blocks one of them', () => {
     expect(resolveTurn(game('TK', [c('S'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
   })
-  it('no heal when nothing is blocked, or the S cards are not in a row', () => {
+  it('no heal when nothing is blocked or there are fewer than 3 S cards', () => {
     expect(resolveTurn(game('TK', [c('S'), c('S'), c('S')]), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(100)
-    expect(resolveTurn(game('TK', [c('S'), c('P'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(100)
+    expect(resolveTurn(game('TK', [c('S'), c('P'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(100)
+  })
+  it('the 3 S cards do not need to be in a row (Q 2026-10-16)', () => {
+    expect(resolveTurn(game('TK', [c('S'), c('P'), c('S'), c('S')]), { p1: 'strike', p2: 'block' }).players.p1.hp).toBe(110)
   })
 })
 
 describe('Assassin P > K > S', () => {
+  it('works in any order', () => {
+    const s = resolveTurn(game('AS', [c('S'), c('P'), c('K')]), { p1: 'strike', p2: 'charge' })
+    expect(s.players.p1.statuses).toContainEqual({ kind: 'trueDmg', turns: 3 })
+  })
   const halve: EffectSpec = [{ hook: 'modify', do: [{ a: 'mulDmg', target: 'enemyAll', pct: 50 }] }]
   it('all clean → True Damage for the next 3 turns: dmg cuts no longer apply', () => {
     let s = resolveTurn(game('AS', [c('P'), c('K'), c('S')]), { p1: 'strike', p2: 'charge' })

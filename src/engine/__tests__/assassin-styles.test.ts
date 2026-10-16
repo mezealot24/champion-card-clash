@@ -22,11 +22,13 @@ describe('Sonic Bliz', () => {
     expect(resolveTurn(game('AS:1', [hit(2), hit(2), hit(2)], field(4)), { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 6 - 16)
   })
 
-  it('needs 3 clean hits in the chain', () => {
-    // Block stops the first 2, only 2 of 4 land clean
-    expect(resolveTurn(game('AS:1', [hit(2), hit(2), hit(2), hit(2)], field(3)), { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(96)
+  it('needs at least 1 clean hit in the chain (Q 2026-10-16)', () => {
+    // Block stops both hits: nothing lands clean, no extra hits
+    expect(resolveTurn(game('AS:1', [hit(2), hit(2)], field(3)), { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100)
     // 0-dmg hits are not clean
-    expect(resolveTurn(game('AS:1', [hit(2), hit(2), hit(0)], field(3)), { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(96)
+    expect(resolveTurn(game('AS:1', [hit(0)], field(3)), { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100)
+    // 1 of 3 lands clean: 2 dmg + 3 extra hits x (3 cards + 1)
+    expect(resolveTurn(game('AS:1', [hit(2), hit(2), hit(2)], field(3)), { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100 - 2 - 3 * 4)
   })
 
   it('5 blocked-through chain: hits 3–5 clean → extra hits', () => {
