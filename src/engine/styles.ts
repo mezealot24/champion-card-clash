@@ -61,14 +61,14 @@ export const overgrowthDmg = (p: PlayerState) => Math.floor((p.styleData?.grown 
 
 export const STYLES: Record<string, StyleDef> = {
   /**
-   * Tank · Second Wind: when hit while HP < 60%, heal 4% of missing HP per hit landed this turn.
-   * Works only during the first stretch below 60%: once HP climbs back above 60%, it's off for the game.
+   * Tank · Second Wind: when hit while HP is red (below RED_HP_PCT = 30%), heal 4% of missing HP per hit landed this turn.
+   * Works only during the first stretch in the red: once HP is back in the green (30%+), it's off for the game (Q nerf 2026-10-16, was 60%).
    */
   'TK:1': {
     name: 'Second Wind',
     afterHits: (state, side, r) => {
       const p = state.players[side]
-      if (p.styleData?.spent || r.hitsTaken === 0 || p.hp <= 0 || pctHp(p) >= 60) return
+      if (p.styleData?.spent || r.hitsTaken === 0 || p.hp <= 0 || pctHp(p) >= RED_HP_PCT) return
       const n = Math.floor(((p.maxHp - p.hp) * 4 * r.hitsTaken) / 100)
       const before = p.hp
       p.hp = Math.min(p.maxHp, p.hp + n)
@@ -79,26 +79,22 @@ export const STYLES: Record<string, StyleDef> = {
     endTurn: (state, side) => {
       const p = state.players[side]
       if (p.styleData?.spent) return
-      if (pctHp(p) < 60) p.styleData = { ...p.styleData, below: 1 }
-      else if (p.styleData?.below && pctHp(p) > 60) {
+      if (pctHp(p) < RED_HP_PCT) p.styleData = { ...p.styleData, below: 1 }
+      else if (p.styleData?.below) {
         p.styleData = { ...p.styleData, spent: 1 }
-        say(state, side, 'Second Wind: HP กลับมาเกิน 60% ปิดถาวร')
+        say(state, side, `Second Wind: HP กลับมาหลอดเขียว (${RED_HP_PCT}%+) ปิดถาวร`)
       }
     },
   },
 
   /**
-   * Tank · Overgrowth: Max HP starts at 210 (160 + 50, Q 2026-10-15). Each time attacked: +1 per hit taken,
+   * Tank · Overgrowth: starts with the Tank's normal HP / Max HP, same as Second Wind (Q 2026-10-16; was Max HP 210). Each time attacked: +1 per hit taken,
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
    * Q buff 2026-10-16: every 20 Max HP grown this way = +1 dmg on every card you strike with (Max HP lost later doesn't undo it).
    */
   'TK:2': {
     name: 'Overgrowth',
-    setup: (p) => {
-      p.maxHp = 210
-      p.hp = Math.min(p.hp, p.maxHp)
-    },
     afterHits: (state, side, r) => {
       if (!r.attacked) return
       const p = state.players[side]

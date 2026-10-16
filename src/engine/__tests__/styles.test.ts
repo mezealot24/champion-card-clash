@@ -13,39 +13,39 @@ function game(style: string, hp: number, maxHp = 100): GameState {
 }
 
 describe('Second Wind', () => {
-  it('heals 4% of missing HP per hit taken while below 60%', () => {
-    const s = game('TK:1', 50)
+  it('heals 4% of missing HP per hit taken while HP is red (below 30%)', () => {
+    const s = game('TK:1', 30)
     s.players.p2.hand = [hit(10), hit(10)]
-    // 50 - 20 = 30 → missing 70 → 4% x 2 hits = 5.6 → 5
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(35)
+    // 30 - 20 = 10 → missing 90 → 4% x 2 hits = 7.2 → 7
+    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(17)
   })
 
-  it('does nothing at 60%+ or when no hit lands', () => {
-    const s = game('TK:1', 100)
-    s.players.p2.hand = [hit(10)]
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(90)
-    const b = game('TK:1', 30)
-    b.players.p2.hand = [hit(10)]
-    expect(resolveTurn(b, { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(30)
-  })
-
-  it('switches off for good once HP gets back above 60%', () => {
-    let s = game('TK:1', 50)
-    s.players.p2.hand = [hit(1)]
-    s = resolveTurn(s, { p1: 'block', p2: 'charge' }) // below 60%, no hit
-    s.players.p1.hp = 70
-    s = resolveTurn(s, { p1: 'block', p2: 'block' })
-    expect(s.players.p1.styleData?.spent).toBe(1)
-    s.players.p1.hp = 40
+  it('does nothing in the green (30%+) or when no hit lands', () => {
+    const s = game('TK:1', 40)
     s.players.p2.hand = [hit(10)]
     expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(30)
+    const b = game('TK:1', 20)
+    b.players.p2.hand = [hit(10)]
+    expect(resolveTurn(b, { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(20)
+  })
+
+  it('switches off for good once HP is back in the green', () => {
+    let s = game('TK:1', 25)
+    s.players.p2.hand = [hit(1)]
+    s = resolveTurn(s, { p1: 'block', p2: 'charge' }) // red, no hit
+    s.players.p1.hp = 30
+    s = resolveTurn(s, { p1: 'block', p2: 'block' })
+    expect(s.players.p1.styleData?.spent).toBe(1)
+    s.players.p1.hp = 20
+    s.players.p2.hand = [hit(10)]
+    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(10)
   })
 })
 
 describe('Overgrowth', () => {
-  it('starts at Max HP 210', () => {
+  it("starts at the Tank's normal HP / Max HP, same as Second Wind", () => {
     const s = game('TK:2', 210, 300)
-    expect([s.players.p1.hp, s.players.p1.maxHp]).toEqual([210, 210])
+    expect([s.players.p1.hp, s.players.p1.maxHp]).toEqual([210, 300])
   })
 
   it('+1 per hit, +2 per hit blocked, +3 per facing card when attacked (Max HP only)', () => {
@@ -54,9 +54,9 @@ describe('Overgrowth', () => {
     s.players.p2.hand = [hit(1), hit(1), hit(1)]
     // Block stops 2 (+4), 1 hit lands (+1), 2 facing pairs (+6)
     const after = resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1
-    expect([after.maxHp, after.hp]).toEqual([221, 210 - 1]) // Max HP grows, current HP does not heal
+    expect([after.maxHp, after.hp]).toEqual([311, 210 - 1]) // Max HP grows, current HP does not heal
     const quiet = game('TK:2', 210, 300)
-    expect(resolveTurn(quiet, { p1: 'charge', p2: 'charge' }).players.p1.maxHp).toBe(210)
+    expect(resolveTurn(quiet, { p1: 'charge', p2: 'charge' }).players.p1.maxHp).toBe(300)
   })
 
   it('caps at 500', () => {
