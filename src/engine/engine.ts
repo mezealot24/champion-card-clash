@@ -326,7 +326,7 @@ function resolveStrikes(
     checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })), 'after')
   }
 
-  // Styles that add to a finished chain (e.g. Sonic Bliz extra hits)
+  // Styles that add to a finished chain (extra hits; none use it now)
   for (const side of strikers) {
     const foe = state.players[other(side)]
     const hpBefore = foe.hp
