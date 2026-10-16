@@ -55,25 +55,30 @@
 
 /* Card */
 .arena .card { position: absolute; inset: 0; border-radius: 12px; border: 3px solid var(--ink); background: var(--paper); color: var(--paper-ink); box-shadow: 0 4px 0 var(--ink); display: flex; flex-direction: column; overflow: hidden; cursor: pointer; padding: 0; text-align: left; font: inherit; }
-.arena .card .top { height: 26px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 5px 0 3px; border-bottom: 3px solid var(--ink); color: var(--ink); }
+.arena .card .top { height: 24px; flex: none; display: flex; align-items: center; gap: 4px; padding: 0 34px 0 3px; border-bottom: 3px solid var(--ink); color: var(--ink); }
 .arena .t-P .top { background: var(--tP); } .arena .t-K .top { background: var(--tK); } .arena .t-S .top { background: var(--tS); }
-.arena .card .type { width: 21px; height: 21px; flex: none; border-radius: 50%; background: var(--paper); border: 2.5px solid var(--ink); display: grid; place-items: center; font: 13px var(--display); line-height: 1; }
-.arena .card .cid { font: 700 8px var(--mono); letter-spacing: -.2px; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
-.arena .card .art { flex: 1; display: grid; place-items: center; position: relative; min-height: 0; }
-.arena .card .art svg { width: 40px; height: 40px; opacity: .2; }
-.arena .card .cost { flex: none; font: 800 8.5px var(--body); background: var(--ink); color: var(--gold); border-radius: 999px; padding: 1px 3px; white-space: nowrap; }
-.arena .card .dmg { position: absolute; font: 38px var(--display); line-height: 1; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; text-shadow: 0 3px 0 var(--ink); }
+.arena .card .type { width: 19px; height: 19px; flex: none; border-radius: 50%; background: var(--paper); border: 2.5px solid var(--ink); display: grid; place-items: center; font: 12px var(--display); line-height: 1; }
+.arena .card .cost { flex: none; font: 800 8.5px var(--body); background: var(--ink); color: var(--gold); border-radius: 999px; padding: 1px 4px; white-space: nowrap; }
+/* damage lives in the top-right corner badge; the rest of the card is effect text */
+.arena .card .dmg { position: absolute; right: -3px; top: -3px; width: 36px; height: 34px; display: grid; place-items: center; background: var(--paper); border: 3px solid var(--ink); border-radius: 0 12px 0 12px; font: 21px var(--display); line-height: 1; -webkit-text-stroke: 2.5px var(--ink); paint-order: stroke fill; z-index: 1; }
 .arena .t-P .dmg { color: var(--tP); } .arena .t-K .dmg { color: var(--tK); } .arena .t-S .dmg { color: var(--tS); }
-.arena .card .dmg s { font-size: 16px; -webkit-text-stroke: 2px var(--ink); color: var(--paper); margin-left: 2px; }
-.arena .card .mod { position: absolute; right: 4px; top: 4px; font: 800 9.5px var(--body); background: var(--hp); color: var(--ink); border: 2px solid var(--ink); border-radius: 6px; padding: 0 4px; }
+.arena .card .mod { position: absolute; right: 2px; top: 33px; font: 800 8.5px var(--body); background: var(--hp); color: var(--ink); border: 2px solid var(--ink); border-radius: 6px; padding: 0 3px; z-index: 1; }
 .arena .card .mod.down { background: var(--danger); color: #fff; }
-.arena .card .fx { font-size: 9.5px; line-height: 1.2; padding: 3px 5px 5px; min-height: 31px; font-weight: 800; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; border-top: 2px dashed rgba(34,22,61,.25); }
+.arena .card .fx { flex: 1; min-height: 0; position: relative; font-size: 9.5px; line-height: 1.2; padding: 4px 5px 2px; font-weight: 700; overflow: hidden; display: flex; flex-direction: column; gap: 3px; }
+.arena .card .fx .rule { display: block; }
+.arena .card .fx .tim { font: 900 7.5px var(--body); letter-spacing: .5px; background: var(--paper-ink); color: var(--paper); border-radius: 4px; padding: 0 3px; vertical-align: 1px; }
+.arena .card .fx .when { color: #6a5a92; font-weight: 700; font-size: 8.5px; }
+.arena .card .fx .do { display: block; font-weight: 900; font-size: 10px; line-height: 1.15; color: var(--paper-ink); margin-top: 1px; }
+.arena .sheet .big .card .fx .tim { font-size: 9.5px; } .arena .sheet .big .card .fx .when { font-size: 11px; } .arena .sheet .big .card .fx .do { font-size: 13px; }
+.arena .card .fx .mark { position: absolute; right: 2px; bottom: 0; width: 30px; height: 30px; opacity: .1; pointer-events: none; }
+.arena .card .fx .mark svg { width: 100%; height: 100%; }
+.arena .card .cid { flex: none; font: 700 7.5px var(--mono); padding: 0 5px 3px; color: #6a5a92; white-space: nowrap; overflow: hidden; }
 .arena .card .fx.none { opacity: .45; }
 .arena .card.back { background: repeating-linear-gradient(45deg, #5a3fb0 0 8px, #4a3296 8px 16px); }
 .arena .card.back > * { visibility: hidden; }
 .arena .card.spent { filter: saturate(.25) brightness(.7); }
 .arena .card.gone { outline: 3px dashed var(--danger); outline-offset: 2px; }
-.arena .card .tag { position: absolute; left: -3px; right: -3px; bottom: 34px; background: var(--danger); color: #fff; font: 800 9px var(--body); text-align: center; padding: 2px 0; border-block: 2px solid var(--ink); text-transform: uppercase; letter-spacing: .4px; }
+.arena .card .tag { position: absolute; left: -3px; right: -3px; bottom: 40px; background: var(--danger); color: #fff; font: 800 9px var(--body); text-align: center; padding: 2px 0; border-block: 2px solid var(--ink); text-transform: uppercase; letter-spacing: .4px; }
 .arena .card.glow-P { box-shadow: 0 4px 0 var(--ink), 0 0 0 4px var(--tP), 0 0 22px 6px var(--tP); }
 .arena .card.glow-K { box-shadow: 0 4px 0 var(--ink), 0 0 0 4px var(--tK), 0 0 22px 6px var(--tK); }
 .arena .card.glow-S { box-shadow: 0 4px 0 var(--ink), 0 0 0 4px var(--tS), 0 0 22px 6px var(--tS); }
@@ -140,9 +145,11 @@
 .arena .sheet { position: absolute; inset: 0; z-index: 30; background: rgba(12,7,24,.8); display: flex; align-items: center; justify-content: center; gap: 18px; padding: 16px; }
 .arena .sheet .big { position: relative; width: 150px; height: 210px; flex: none; }
 .arena .sheet .big .card { cursor: default; }
-.arena .sheet .big .card .dmg { font-size: 64px; }
-.arena .sheet .big .card .fx { font-size: 12.5px; -webkit-line-clamp: 7; min-height: 60px; }
-.arena .sheet .big .card .top { height: 34px; } .arena .sheet .big .card .cid { font-size: 12px; }
+.arena .sheet .big { width: 180px; height: 250px; }
+.arena .sheet .big .card .dmg { width: 52px; height: 48px; font-size: 30px; }
+.arena .sheet .big .card .fx { font-size: 12.5px; padding: 6px 8px; overflow-y: auto; }
+.arena .sheet .big .card .top { height: 34px; padding-right: 52px; } .arena .sheet .big .card .type { width: 26px; height: 26px; font-size: 16px; } .arena .sheet .big .card .cid { font-size: 10px; }
+.arena .sheet .big .card .mod { top: 46px; }
 .arena .sheet .info { max-width: 330px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text); }
 .arena .sheet .info b { font: 22px var(--display); font-weight: 400; }
 .arena .sheet .info p { color: var(--muted); font-size: 12.5px; margin: 0; line-height: 1.45; }

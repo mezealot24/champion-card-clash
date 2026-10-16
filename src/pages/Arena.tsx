@@ -678,6 +678,40 @@ function Hud({ game, side, hp, name, style }: { game: GameState; side: Side; hp:
   return <aside className={`hud ${side} ${side === 'p1' ? 'me' : 'enemy'}`}>{side === 'p2' ? [who, bar, meta] : [meta, bar, who]}</aside>
 }
 
+const TIMING: [string, string][] = [
+  ['Before action', 'BEFORE'],
+  ['After action', 'AFTER'],
+  ['Every turn (Hold)', 'HOLD'],
+  ['Comes into play', 'ON DRAW'],
+]
+const SHORT: [RegExp, string][] = [
+  [/you play (Strike|Block|Charge)/g, 'you $1'],
+  [/opponent plays /g, 'opp. '],
+  [/this card hits clean/g, 'clean hit'],
+  [/this card is blocked/g, 'blocked'],
+  [/ from the Field to the bottom of their deck \(Cut\)/g, ' (Cut)'],
+  [/the opponent's card in this slot onto your Field/g, 'the facing card'],
+  [/Opponent discards their /g, 'Opp. discards '],
+  [/opponent's/g, "opp.'s"],
+  [/Opponent/g, 'Opp.'],
+  [/opponent/g, 'opp.'],
+]
+const shorten = (t: string) => SHORT.reduce((s, [re, to]) => s.replace(re, to), t)
+/** Card-face version of one rule of effect text: timing tag, short condition, the effect itself. Full text stays in the card sheet. */
+function cardRule(rule: string): { timing: string; cond: string; act: string } {
+  let rest = rule
+  let timing = ''
+  for (const [long, tag] of TIMING) {
+    if (!rest.startsWith(long)) continue
+    timing = tag
+    rest = rest.slice(long.length).replace(/^,\s*/, '')
+  }
+  const cut = rest.indexOf(': ')
+  const cond = cut >= 0 ? rest.slice(0, cut) : ''
+  const act = cut >= 0 ? rest.slice(cut + 2) : rest.replace(/^:\s*/, '')
+  return { timing, cond: shorten(cond).replace(/ and /g, ' + '), act: shorten(act.charAt(0).toUpperCase() + act.slice(1)) }
+}
+
 function cardFacts(game: GameState, side: Side, card: CardInst) {
   const p = game.players[side]
   const { id, type, dmg, effectText, effectSpec } = card.def
@@ -698,24 +732,34 @@ function CardView({ vc, game, side, glow, onOpen }: { vc: VCard; game: GameState
     <button type="button" className={cls} data-uid={vc.card.uid} aria-label={`${f.id}, ${f.type}, ${f.total} damage`} onClick={(e) => (e.stopPropagation(), onOpen())}>
       <div className="top">
         <span className="type">{f.type}</span>
-        <span className="cid">{f.id}</span>
         {f.cost > 0 && (
           <span className="cost" title={`Costs ${f.cost} ${f.costName}`}>
-            {f.cost}
-            {f.costName === 'HP' ? ' HP' : f.costName.slice(0, 1)}
+            {f.cost} {f.costName === 'HP' ? 'HP' : f.costName.slice(0, 1)}
           </span>
         )}
       </div>
-      <div className="art" style={{ color: `var(--t${f.type})` }}>
-        <span dangerouslySetInnerHTML={{ __html: ICON[f.type] }} />
-        <span className="dmg">{f.total}</span>
-        {f.short != null ? <span className="mod down">{f.short}%</span> : f.grow ? <span className={`mod${f.grow < 0 ? ' down' : ''}`}>{f.grow > 0 ? `+${f.grow}` : f.grow}</span> : null}
-        {vc.card.owner && <span className="mod down" style={{ top: 'auto', bottom: 4 }}>stolen</span>}
+      <span className="dmg">{f.total}</span>
+      {f.short != null ? <span className="mod down">{f.short}%</span> : f.grow ? <span className={`mod${f.grow < 0 ? ' down' : ''}`}>{f.grow > 0 ? `+${f.grow}` : f.grow}</span> : null}
+      {vc.card.owner && <span className="mod down" style={{ top: 'auto', bottom: 16 }}>stolen</span>}
+      <div className="fx">
+        {f.missing && <span className="rule">⚠ no code yet</span>}
+        {f.text ? (
+          f.text.split(' / ').map((rule, i) => {
+            const r = cardRule(rule)
+            return (
+              <span className="rule" key={i}>
+                {r.timing && <span className="tim">{r.timing}</span>}
+                {r.cond && <span className="when"> {r.cond}</span>}
+                <span className="do">{r.act}</span>
+              </span>
+            )
+          })
+        ) : (
+          <span className="rule when">No effect</span>
+        )}
+        <span className="mark" style={{ color: `var(--t${f.type})` }} dangerouslySetInnerHTML={{ __html: ICON[f.type] }} />
       </div>
-      <div className={`fx${f.text ? '' : ' none'}`}>
-        {f.missing && '⚠ '}
-        {f.text || 'No effect'}
-      </div>
+      <div className="cid">{f.id}</div>
       {vc.gone && <div className="tag">Discarded · {vc.gone}</div>}
     </button>
   )
