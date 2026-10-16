@@ -177,7 +177,7 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
         {!!p.comboData?.conqueror && <span className="warn">Conqueror {p.comboData.conqueror}/6</span>}
         {p.statuses.map((s, i) => (
           <span key={i} className="warn">
-            {s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Damage' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind} ({s.turns})
+            {s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Damage' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'deathMark' ? '💀 Death Mark' : s.kind}{s.kind === 'deathMark' ? '' : ` (${s.turns})`}
           </span>
         ))}
       </div>

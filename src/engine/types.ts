@@ -27,13 +27,14 @@ export type CardDef = {
 export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number; owner?: Side }
 
 /** trueDmg = your hits ignore dmg cuts (only Block stops them) */
+/** deathMark = on the side that carries it: every Strike against it bursts for 50% of that chain's total dmg (Assassin combo, rest of game) */
 /** guardBreak = Guard Crush: on your next Strike, blocked hits deal half and a Blocking opponent loses their 2 oldest Field cards */
 /**
  * silence = your cards' effects don't fire this turn (Styles and combos still work)
  * shield = absorbs n dmg from hits before HP; lasts until used up or its turns run out
  * parry = the next n hits that get past your Block deal 0 and their dmg goes back to the attacker (this turn)
  */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable'
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
 

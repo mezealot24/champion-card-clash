@@ -1,5 +1,5 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
-import { applyConqueror, checkCombos, lifestealPct } from './combos'
+import { applyConqueror, checkCombos, DEATH_MARK_PCT, lifestealPct } from './combos'
 import { getStyle } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf } from './resources'
 import type { EffectSpec } from './effects/spec'
@@ -175,6 +175,7 @@ function resolveStrikes(
   guardBreak: Record<Side, boolean>,
 ): Record<Side, number> {
   const { handAtStart, hitsBlocked, hitDmgTaken } = env
+  const deathMarked = { p1: hasStatus(state, 'p1', 'deathMark'), p2: hasStatus(state, 'p2', 'deathMark') }
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
   const pending: Record<Side, number> = { p1: 0, p2: 0 }
   const chains: Partial<Record<Side, CardInst[]>> = {}
@@ -307,6 +308,19 @@ function resolveStrikes(
       hitResults.set(card.uid, { blocked, clean })
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
+  }
+
+  // Death Mark (Assassin combo): a Strike against a marked opponent bursts for 50% of the chain's total dmg,
+  // whatever Block / Shield let through (Claude reading of Q 2026-10-16: total = every card's dmg in the chain).
+  // Lost straight from HP. A mark placed by this turn's combo only counts from the next Strike.
+  for (const side of strikers) {
+    if (!deathMarked[other(side)]) continue
+    const total = chains[side]!.reduce((t, _, i) => t + dmgOf(side, i), 0)
+    const burst = Math.floor((total * DEATH_MARK_PCT) / 100)
+    if (burst <= 0) continue
+    loseHp(state, other(side), burst)
+    hitDmgTaken[other(side)] += burst
+    log(state, `${side} 💀 Death Mark ระเบิด ${burst} (50% ของ dmg รวม ${total} ในสาย)`)
   }
 
   // Guard Crush is used up by this Strike: if the opponent Blocked it, they lose their 2 oldest Field cards.

@@ -4,6 +4,8 @@ import type { Action, CardInst, GameState, PlayerState, Side } from './types'
 
 /** Sonic Bliz Overdrive: dmg added to every chain card per Energy spent (Claude default 2026-10-16). */
 export const SONIC_DMG_PER_ENERGY = 2
+/** Sonic Bliz Overdrive: fewest cards in the chain that set it off (Q 2026-10-16: 3, was a full Field of 5). */
+export const OVERDRIVE_MIN_CHAIN = 3
 
 /** What a side went through in this turn's Strike phase. */
 export type HitReport = {
@@ -128,14 +130,14 @@ Object.assign(STYLES, {
     name: 'Sonic Bliz',
     startDraw: 3,
     /**
-     * Overdrive (Q 2026-10-16): Strike with a full Field (5 cards) and no S card in the chain → all Energy
+     * Overdrive (Q 2026-10-16): Strike with 3+ cards (was a full Field of 5) and no S card in the chain → all Energy
      * left is spent, every card in the chain gets +SONIC_DMG_PER_ENERGY dmg per Energy spent (Claude default).
      * A Style, so Silence doesn't stop it.
      */
     beforeHits: (state, side, bonus, _mult, _crit, chain) => {
       const p = state.players[side]
       const energy = p.res ?? 0
-      if (!state.rules.resources || energy <= 0 || bonus.length < state.rules.handMax) return
+      if (!state.rules.resources || energy <= 0 || bonus.length < OVERDRIVE_MIN_CHAIN) return
       if (chain?.some((c) => c.def.type === 'S')) return
       const add = energy * SONIC_DMG_PER_ENERGY
       for (let i = 0; i < bonus.length; i++) bonus[i] += add

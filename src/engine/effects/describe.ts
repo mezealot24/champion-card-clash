@@ -14,7 +14,7 @@ export const HOOK_LABEL: Record<Hook, string> = {
 const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable' }
+const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Death Mark' }
 export const PER_LABEL: Record<Per, string> = {
   hitBlocked: 'hit you blocked this turn',
   chainCard: 'card in your chain',
