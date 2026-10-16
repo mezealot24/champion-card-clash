@@ -116,12 +116,14 @@ export function heal(state: GameState, side: Side, n: number) {
   p.hp = Math.min(p.maxHp, p.hp + n)
 }
 
-/** hit = dmg from a Strike chain card; anything else counts as "other dmg" (Bruiser Rage, Q 2026-10-16). */
-export function loseHp(state: GameState, side: Side, n: number, hit = false) {
+/** from: 'hit' = a Strike chain card's hit; 'foe' / 'self' = any other HP loss, counted for Bruiser Rage (Q 2026-10-16). */
+export function loseHp(state: GameState, side: Side, n: number, from: 'hit' | 'foe' | 'self' = 'foe') {
   const p = state.players[side]
   const before = p.hp
   p.hp = Math.max(0, p.hp - n)
-  if (!hit && p.hp < before) p.otherDmg = (p.otherDmg ?? 0) + 1
+  if (from === 'hit' || p.hp >= before) return
+  p.otherDmg ??= { foe: 0, self: 0 }
+  p.otherDmg[from]++
 }
 
 export function log(state: GameState, line: string) {
