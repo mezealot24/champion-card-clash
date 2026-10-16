@@ -119,11 +119,15 @@ export function heal(state: GameState, side: Side, n: number) {
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
 }
 
-export function loseHp(state: GameState, side: Side, n: number) {
+/** from: 'hit' = a Strike chain card's hit; 'foe' / 'self' = any other HP loss, counted for Bruiser Rage (Q 2026-10-16). */
+export function loseHp(state: GameState, side: Side, n: number, from: 'hit' | 'foe' | 'self' = 'foe') {
   const p = state.players[side]
   const before = p.hp
   p.hp = Math.max(0, p.hp - n)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
+  if (from === 'hit' || p.hp >= before) return
+  p.otherDmg ??= { foe: 0, self: 0 }
+  p.otherDmg[from]++
 }
 
 /** Record a turn event for the battle screen (see TurnEvent). */

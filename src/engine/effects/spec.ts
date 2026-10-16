@@ -42,7 +42,7 @@ export type CondSpec =
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
   | { a: 'maxHp'; who: P.Who; n: number }
-  | { a: 'status'; who: P.Who; kind: StatusKind; turns: number; n?: number }
+  | { a: 'status'; who: P.Who; kind: StatusKind; turns: number; n?: number; per?: P.Per }
   | { a: 'grow'; n: number; dur: 'next' | 'game'; stack?: boolean }
   | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType; per?: P.Per }
   | { a: 'mulDmg'; target: P.DmgTarget; pct: number; onlyType?: CardType }
@@ -98,7 +98,7 @@ function act(s: ActSpec): Act {
     case 'heal': return P.heal(s.who, s.n, s.per)
     case 'loseHp': return P.loseHp(s.who, s.n, s.per)
     case 'maxHp': return P.maxHp(s.who, s.n)
-    case 'status': return P.status(s.who, s.kind, s.turns, P.SIZED.includes(s.kind) ? (s.n ?? 1) : undefined)
+    case 'status': return P.status(s.who, s.kind, s.turns, P.SIZED.includes(s.kind) ? (s.n ?? 1) : undefined, P.SIZED.includes(s.kind) ? s.per : undefined)
     case 'grow': return P.grow(s.n, s.dur ?? 'game', s.stack)
     case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType, s.per)
     case 'mulDmg': return P.mulDmg(s.target, s.pct, s.onlyType)

@@ -32,11 +32,10 @@ const ACTIONS: { action: Action; label: string; beats: string }[] = [
 const SPEEDS = [1, 1.5, 2]
 /** Banner text per signature combo (champion · pattern). */
 const COMBO_TEXT: Record<string, [string, string]> = {
-  'TK:S > S > S': ['SECOND HELPING', 'Heal 10% of your HP'],
-  'AS:P > K > S': ['TRUE DAMAGE', 'Dmg cuts are off for 3 turns'],
+  'TK:P > K > P': ['SECOND HELPING', 'Heal 10% of your HP'],
+  'AS:P > K > S': ['DEATH MARK', 'Every later Strike bursts +50%'],
   'MG:S + S + S': ['SEALED', "Enemy can't Block next turn"],
   'BR:S > P > P': ['GUARD CRUSH', 'Next Strike breaks through Block'],
-  'BR:S > K > K': ['CONQUEROR', '+1 stack'],
 }
 const ICON: Record<string, string> = {
   P: '<svg viewBox="0 0 40 40"><rect x="6" y="12" width="26" height="20" rx="6" fill="currentColor"/><rect x="9" y="6" width="6" height="10" rx="3" fill="currentColor"/><rect x="16" y="5" width="6" height="10" rx="3" fill="currentColor"/><rect x="23" y="6" width="6" height="10" rx="3" fill="currentColor"/></svg>',
@@ -645,7 +644,7 @@ function Hud({ game, side, hp, name, style }: { game: GameState; side: Side; hp:
   )
   const chips = [
     ...p.statuses.map((s) =>
-      s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? 'No Strike' : s.kind === 'noCharge' ? 'No Charge' : s.kind,
+      s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? 'No Strike' : s.kind === 'noCharge' ? 'No Charge' : s.kind === 'deathMark' ? '💀 Death Mark' : s.kind,
     ),
     ...(p.comboData?.conqueror ? [`Conqueror ${p.comboData.conqueror}/6`] : []),
   ]

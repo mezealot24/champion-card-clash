@@ -1,5 +1,5 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
-import { applyConqueror, checkCombos, lifestealPct } from './combos'
+import { applyConqueror, checkCombos, DEATH_MARK_PCT, lifestealPct } from './combos'
 import { getStyle } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf } from './resources'
 import type { EffectSpec } from './effects/spec'
@@ -134,7 +134,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
 
   // class resources fill at the end of the turn, so what you earn now is spent next turn
   for (const side of SIDES) {
-    gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side] })
+    const p = state.players[side]
+    gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side], foeDmg: p.otherDmg?.foe ?? 0, selfDmg: p.otherDmg?.self ?? 0, hpPct: (100 * p.hp) / Math.max(1, p.maxHp) })
+    p.otherDmg = undefined
   }
   // Dual Strike Styles (Sonic Bliz Acceleration): after resources fill, so a full bar stays full
   if (actions.p1 === 'strike' && actions.p2 === 'strike') {
@@ -181,6 +183,7 @@ function resolveStrikes(
   guardBreak: Record<Side, boolean>,
 ): Record<Side, number> {
   const { handAtStart, hitsBlocked, hitDmgTaken } = env
+  const deathMarked = { p1: hasStatus(state, 'p1', 'deathMark'), p2: hasStatus(state, 'p2', 'deathMark') }
   const strikers = SIDES.filter((s) => actions[s] === 'strike')
   const pending: Record<Side, number> = { p1: 0, p2: 0 }
   const chains: Partial<Record<Side, CardInst[]>> = {}
@@ -246,6 +249,7 @@ function resolveStrikes(
   }
   // Before action combos (card types only), then Conqueror stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
+  for (const side of strikers) getStyle(state.players[side].style)?.strikeStart?.(state, side, chains[side]!)
   for (const side of SIDES) applyConqueror(state, side, actions, bonus[side], mult[other(side)])
   // Guard Crush: a hit stopped by Block still deals half (rounded down)
   const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : guardBreak[side] ? Math.floor(dmgOf(side, i) / 2) : 0)
@@ -298,7 +302,7 @@ function resolveStrikes(
       const { dealt, parried, absorbed } = outcome.get(card.uid)!
       if (!blocked && !parried) env.hitsTaken[enemy]++
       emit(state, { k: 'hit', side, slot: i, uid: card.uid, type: card.def.type, dmg, dealt, blocked, parried, absorbed, crit: crit[side].has(i) })
-      if (dealt > 0) loseHp(state, enemy, dealt)
+      if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
       if (parried && dmg > 0) loseHp(state, side, dmg)
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
       const guard = parried ? ` (${enemy} Parry: สะท้อน ${dmg} กลับ)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
@@ -314,6 +318,19 @@ function resolveStrikes(
       hitResults.set(card.uid, { blocked, clean })
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
+  }
+
+  // Death Mark (Assassin combo): a Strike against a marked opponent bursts for 50% of the chain's total dmg,
+  // whatever Block / Shield let through (Claude reading of Q 2026-10-16: total = every card's dmg in the chain).
+  // Lost straight from HP. A mark placed by this turn's combo only counts from the next Strike.
+  for (const side of strikers) {
+    if (!deathMarked[other(side)]) continue
+    const total = chains[side]!.reduce((t, _, i) => t + dmgOf(side, i), 0)
+    const burst = Math.floor((total * DEATH_MARK_PCT) / 100)
+    if (burst <= 0) continue
+    loseHp(state, other(side), burst)
+    hitDmgTaken[other(side)] += burst
+    log(state, `${side} 💀 Death Mark ระเบิด ${burst} (50% ของ dmg รวม ${total} ในสาย)`)
   }
 
   // Guard Crush is used up by this Strike: if the opponent Blocked it, they lose their 2 oldest Field cards.
@@ -333,7 +350,7 @@ function resolveStrikes(
     checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })), 'after')
   }
 
-  // Styles that add to a finished chain (e.g. Sonic Bliz extra hits)
+  // Styles that add to a finished chain (extra hits; none use it now)
   for (const side of strikers) {
     const foe = state.players[other(side)]
     const hpBefore = foe.hp

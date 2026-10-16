@@ -70,12 +70,18 @@ describe('Sonic Bliz Overdrive', () => {
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 5 * 5)
   })
 
-  it('not with an S card in the chain, not with fewer than 5 cards, not for Coup de grâce', () => {
+  it('from 3 cards (Q 2026-10-16): 3 cards with 3 Energy → +6 each', () => {
+    const g = game(five().slice(0, 3), [], 'AS:1')
+    g.players.p1.res = 3
+    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 3 * 7)
+  })
+
+  it('not with an S card in the chain, not with fewer than 3 cards, not for Coup de grâce', () => {
     const withS = [...five().slice(0, 4), card(1, 'S')]
     let g = game(withS, [], 'AS:1')
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(95)
-    g = game(five().slice(0, 4), [], 'AS:1')
-    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(96)
+    g = game(five().slice(0, 2), [], 'AS:1')
+    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(98)
     g = game(five(), [], 'AS:2')
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 4 - 3)
   })
