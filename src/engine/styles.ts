@@ -191,7 +191,8 @@ Object.assign(STYLES, {
     dualStrike: { draw: 2, fillRes: true },
   },
   /** Assassin · Coup de grâce: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg,
-   *  4x while the enemy's HP is in the red (below 30% of Max HP at the start of the Strike, like the HP bar). */
+   *  4x while the enemy's HP is in the red (below 30% of Max HP at the start of the Strike, like the HP bar).
+   *  A blocked Critical still deals 50% (engine dealtOf). */
   'AS:2': {
     name: 'Coup de grâce',
     beforeHits: (state, side, _bonus, mult, crit) => {
