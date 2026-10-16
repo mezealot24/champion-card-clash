@@ -1,5 +1,6 @@
 // Signature combos, keyed by champion id (champions.signature_combo). A Champion can have more than one.
-// A combo = 3 cards in a row in your Strike chain with the right P/K/S types; each combo fires once per chain.
+// A combo = 3 cards in your Strike chain with the right P/K/S types, in any order and any position (Q 2026-10-16);
+// each combo fires once per chain.
 // Kept free of state.ts imports (like styles.ts).
 import type { Action, CardType, GameState, Side } from './types'
 
@@ -8,6 +9,7 @@ export type ComboHit = { type: CardType; blocked: boolean; clean: boolean }
 
 export type ComboDef = {
   name: string
+  /** The 3 card types needed; order doesn't matter. */
   pattern: [CardType, CardType, CardType]
   /** 'before' = checked on card types right after actions are revealed; 'after' (default) = after the chain hit */
   when?: 'before' | 'after'
@@ -96,17 +98,30 @@ export const COMBOS: Record<string, ComboDef[]> = {
   ],
 }
 
-/** Fire this side's combos for one timing if its chain has the pattern (first match only, once each). */
+/** Does a trio of hits hold exactly the card types of the pattern (any order)? */
+const sameTypes = (three: ComboHit[], pattern: CardType[]) => {
+  const left = [...pattern]
+  for (const h of three) {
+    const i = left.indexOf(h.type)
+    if (i < 0) return false
+    left.splice(i, 1)
+  }
+  return true
+}
+
+/** Fire this side's combos for one timing if any 3 cards of its chain match the pattern (once each). */
 export function checkCombos(state: GameState, side: Side, hits: ComboHit[], when: 'before' | 'after') {
+  const ok = (c: ComboDef, three: ComboHit[]) => (c.ok ?? (() => true))(three)
   for (const combo of COMBOS[state.players[side].championId] ?? []) {
     if ((combo.when ?? 'after') !== when) continue
-    for (let i = 0; i + 3 <= hits.length; i++) {
-      const three = hits.slice(i, i + 3)
-      if (three.every((h, j) => h.type === combo.pattern[j]) && (combo.ok ?? (() => true))(three)) {
-        combo.fire(state, side)
-        break
-      }
-    }
+    let found = false
+    for (let i = 0; i < hits.length && !found; i++)
+      for (let j = i + 1; j < hits.length && !found; j++)
+        for (let k = j + 1; k < hits.length && !found; k++) {
+          const three = [hits[i], hits[j], hits[k]]
+          if (sameTypes(three, combo.pattern) && ok(combo, three)) found = true
+        }
+    if (found) combo.fire(state, side)
   }
 }
 
