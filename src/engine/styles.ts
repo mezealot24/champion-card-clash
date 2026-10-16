@@ -134,7 +134,7 @@ Object.assign(STYLES, {
    * Bruiser · Juggernaut (Q 2026-10-16, Conqueror + Tenacity merged; name by Claude).
    * Every Strike: +1 Conqueror stack per card in the chain, before it hits (max 6; see applyConqueror in combos.ts).
    * When the stacks reach max: Tenacity for the next 2 turns (a charge break can't throw away the slot 1 card).
-   * Every turn you don't Strike: −1 stack.
+   * Every turn you Block: −1 stack. Charge keeps the stacks (no gain, no loss; Q 2026-10-16 22:03Z).
    */
   'BR:2': {
     name: 'Juggernaut',
@@ -157,9 +157,9 @@ Object.assign(STYLES, {
     endTurn: (state, side, action) => {
       const p = state.players[side]
       const n = p.comboData?.conqueror ?? 0
-      if (action === 'strike' || !n) return
+      if (action !== 'block' || !n) return
       p.comboData = { ...p.comboData, conqueror: n - 1 }
-      say(state, side, `Juggernaut: ไม่ได้ Strike, Conqueror ${n - 1}/${CONQUEROR_MAX}`)
+      say(state, side, `Juggernaut: Block, Conqueror ${n - 1}/${CONQUEROR_MAX}`)
     },
   },
 } satisfies Record<string, StyleDef>)

@@ -105,12 +105,14 @@ describe('Bruiser Styles', () => {
     expect(resolveTurn(t, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)).not.toContain(7) // Tenacity over
   })
 
-  it('Juggernaut: −1 stack each turn you do not Strike', () => {
+  it('Juggernaut: Block costs 1 stack, Charge keeps them', () => {
     const s = br('BR:2', 90)
     s.players.p1.comboData = { conqueror: 2 }
     const t = resolveTurn(s, { p1: 'block', p2: 'block' })
     expect(t.players.p1.comboData?.conqueror).toBe(1)
-    expect(resolveTurn(resolveTurn(t, { p1: 'charge', p2: 'block' }), { p1: 'block', p2: 'block' }).players.p1.comboData?.conqueror).toBe(0)
+    const c = resolveTurn(t, { p1: 'charge', p2: 'block' })
+    expect(c.players.p1.comboData?.conqueror).toBe(1)
+    expect(resolveTurn(c, { p1: 'block', p2: 'block' }).players.p1.comboData?.conqueror).toBe(0)
   })
 })
 
