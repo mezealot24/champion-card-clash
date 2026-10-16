@@ -1,0 +1,16 @@
+-- Assassin Cut S cards (Q 2026-10-16): 5 new S cards that make the opponent discard Field cards,
+-- 5 P/K slots out to keep the deck at 20, Sonic Bliz text gets Overdrive. Backup: /mnt/project-files/backups/as-cards-before-cut-2026-10-16.md
+-- trim first so the deck never goes over 20
+update cards set in_deck = false where id in ('AS-003','AS-007','AS-008','AS-013');
+update cards set copies = 1 where id = 'AS-002';
+insert into cards (id, champion_id, name, source, line, type, dmg, dmg_tct, dmg_tentative, effect, copies, sort_order, in_deck, tags, effect_json, cost) values
+('AS-020', 'AS', 'Sever', 'Claude', 'Technique', 'S', 9, null, false, 'After action, if you play Strike and this card hits clean: Opponent discards their oldest card from the Field to the bottom of their deck (Cut).', 1, 20, true, array['Attack','Control']::public.card_tag[], '[{"hook": "onResolve", "if": [{"c": "selfAction", "a": "strike"}, {"c": "hitResult", "r": "clean"}], "do": [{"a": "cut", "which": "oldest", "n": 1}]}]'::jsonb, 1),
+('AS-021', 'AS', 'Pickpocket', 'Claude', 'Technique', 'S', 8, null, false, 'After action, if you play Strike and this card hits clean: Steal the opponent''s card in this slot onto your Field.', 1, 21, true, array['Attack','Control']::public.card_tag[], '[{"hook": "onResolve", "if": [{"c": "selfAction", "a": "strike"}, {"c": "hitResult", "r": "clean"}], "do": [{"a": "steal"}]}]'::jsonb, 1),
+('AS-022', 'AS', 'Ambush Cut', 'Claude', 'Technique', 'S', 10, null, false, 'After action, if you play Strike and opponent plays Charge: Opponent discards their oldest card from the Field to the bottom of their deck (Cut).', 1, 22, true, array['Attack','Control']::public.card_tag[], '[{"hook": "onResolve", "if": [{"c": "selfAction", "a": "strike"}, {"c": "enemyAction", "a": "charge"}], "do": [{"a": "cut", "which": "oldest", "n": 1}]}]'::jsonb, 1),
+('AS-023', 'AS', 'Guard Slicer', 'Claude', 'Technique', 'S', 8, null, false, 'After action, if you play Strike and opponent plays Block: Opponent discards their newest card from the Field to the bottom of their deck (Cut).', 1, 23, true, array['Attack','Control']::public.card_tag[], '[{"hook": "onResolve", "if": [{"c": "selfAction", "a": "strike"}, {"c": "enemyAction", "a": "block"}], "do": [{"a": "cut", "which": "newest", "n": 1}]}]'::jsonb, 1),
+('AS-024', 'AS', 'Thousand Cuts', 'Claude', 'Technique', 'S', 7, null, false, 'After action, if you play Strike and your chain has 4+ cards: Opponent discards their 2 oldest cards from the Field to the bottom of their deck (Cut).', 1, 24, true, array['Attack','Control']::public.card_tag[], '[{"hook": "onResolve", "if": [{"c": "selfAction", "a": "strike"}, {"c": "chainLength", "op": ">=", "n": 4}], "do": [{"a": "cut", "which": "oldest", "n": 2}]}]'::jsonb, 2)
+on conflict (id) do update set dmg = excluded.dmg, effect = excluded.effect, effect_json = excluded.effect_json, cost = excluded.cost, in_deck = true;
+update champion_styles set effect = 'เริ่มเกมพร้อมการ์ด 3 ใบบน Field
+clean hit อย่างน้อย 1 ครั้งในสายเดียวกัน → ได้ Extra Hits ที่ 6 - 10 ตามจำนวนการ์ดบนมือศัตรู ในเทิร์นนั้น 
+*Extra Hits จะสร้างความเสียหาย ตามจำนวนการ์ดบนมือเรา
+Overdrive: Strike ตอน Field เต็ม 5 ใบ และไม่มีการ์ด S ในสาย → ใช้ Energy ที่เหลือทั้งหมด การ์ดทุกใบในสาย +2 dmg ต่อ Energy 1 (Silence ไม่หยุด)' where champion_id = 'AS' and slot = 1;
