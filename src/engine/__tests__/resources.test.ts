@@ -39,6 +39,15 @@ describe('resources', () => {
     expect(resolveTurn(game('BR', [], [], 3), { p1: 'block', p2: 'charge' }).players.p1.res).toBe(2)
   })
 
+  it('Bruiser gains 1 Rage each time it loses HP outside a hit, own drawbacks included (Q 2026-10-16)', () => {
+    const pain: EffectSpec = [{ hook: 'onResolve', do: [{ a: 'loseHp', who: 'self', n: 3 }] }]
+    // lands 2 clean P hits, one of them costs 3 HP: 2 clean + 1 other dmg
+    expect(resolveTurn(game('BR', [c('P'), c('P', 10, pain)]), { p1: 'strike', p2: 'charge' }).players.p1.res).toBe(3)
+    // quiet turn but an enemy Hold effect burns 4 HP: +1, no −1
+    const burn: EffectSpec = [{ hook: 'onHeld', do: [{ a: 'loseHp', who: 'enemy', n: 4 }] }]
+    expect(resolveTurn(game('BR', [], [c('K', 5, burn)], 3), { p1: 'block', p2: 'charge' }).players.p1.res).toBe(4)
+  })
+
   it('Bruiser: Rage cap 20; an S card costs 20 by default, or 10 / 20 per card (Q 2026-10-16)', () => {
     expect(resolveTurn(game('BR', [c('P')], [c('P')], 20), { p1: 'strike', p2: 'strike' }).players.p1.res).toBe(20)
     // short of the cost: the S still strikes at half base dmg, effect off; the P is unaffected

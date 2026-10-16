@@ -59,6 +59,8 @@ export type PlayerState = {
   res?: number
   /** Chain cards whose cost couldn't be paid this turn: they hit, but their effects are off. */
   unpaid?: string[]
+  /** Times this side lost HP outside a hit this turn (card effects, self-damage, Parry, Death Mark). Feeds Rage. */
+  otherDmg?: number
   /** Cards this side lost to a discard effect this turn (Charge break, Block streak, Guard Crush), for the UI. */
   discarded?: { card: CardInst; slot: number; reason: string }[]
   /** Field cards this side lost to Cut effects this turn (capped by CUT_CAP). */

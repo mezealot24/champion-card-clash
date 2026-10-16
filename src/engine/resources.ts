@@ -12,6 +12,8 @@ export type TurnSummary = {
   hitsTaken: number
   /** Your hits that dealt dmg past Block / Parry / Shield. */
   cleanHits: number
+  /** Times you lost HP outside a hit (card effects, self-damage, Parry, Death Mark). */
+  otherDmg: number
 }
 
 export type ResourceDef = {
@@ -33,14 +35,19 @@ export type ResourceDef = {
 export const RESOURCES: Record<string, ResourceDef> = {
   // Mana: +1 when you Charge, +1 when you Block. Keeps between turns.
   MG: { name: 'Mana', cap: 5, start: 0, defaultCost: 2, gain: (t) => (t.action === 'strike' ? 0 : 1) },
-  // Rage: +1 per hit you take, +1 per clean hit you land; −1 on a quiet turn (nobody Strikes you and you don't Strike).
+  // Rage: +1 per hit you take, +1 per clean hit you land, +1 each time you lose HP any other way (card effects,
+  // your own drawbacks, Parry, Death Mark; Q 2026-10-16). −1 on a quiet turn: nobody Strikes and you lost no HP.
   BR: {
     name: 'Rage',
     cap: 20, // Q 17:59Z: nerf, cap 5 → 20
     start: 0,
     defaultCost: 20, // default 20; cards.cost can set 10 or 20 per card (Q 2026-10-16)
     unpaidDmgPct: 50, // Rage short of the cost: S still strikes at half base dmg, effects off, drawbacks fire
-    gain: (t) => (t.action !== 'strike' && t.enemyAction !== 'strike' ? -1 : t.hitsTaken + t.cleanHits),
+    gain: (t) => {
+      const quiet = t.action !== 'strike' && t.enemyAction !== 'strike'
+      if (quiet) return t.otherDmg || -1
+      return t.hitsTaken + t.cleanHits + t.otherDmg
+    },
   },
   // Energy: starts full, +1 every turn, small cap.
   AS: { name: 'Energy', cap: 3, start: 3, defaultCost: 1, gain: () => 1 },
