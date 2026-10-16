@@ -243,6 +243,7 @@ function resolveStrikes(
   }
   // Before action combos (card types only), then Conqueror stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
+  for (const side of strikers) getStyle(state.players[side].style)?.strikeStart?.(state, side, chains[side]!)
   for (const side of SIDES) applyConqueror(state, side, actions, bonus[side], mult[other(side)])
   // Guard Crush: a hit stopped by Block still deals half (rounded down)
   const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : guardBreak[side] ? Math.floor(dmgOf(side, i) / 2) : 0)
