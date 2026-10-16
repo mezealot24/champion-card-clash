@@ -190,14 +190,14 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
           <CardTile key={`x-${d.card.uid}`} card={d.card} slot={d.slot} cost={0} costName="" discard={d.reason} />
         ))}
         {p.hand.map((card, i) => (
-          <CardTile key={card.uid} card={card} slot={i + 1} cost={res ? costOf(p.championId, card) : 0} costName={res?.name ?? ''} />
+          <CardTile key={card.uid} card={card} slot={i + 1} cost={res ? costOf(p.championId, card) : 0} costName={res?.name ?? ''} short={!!res && !res.payWithHp && res.unpaidDmgPct != null && costOf(p.championId, card) > (p.res ?? 0) ? res.unpaidDmgPct : undefined} />
         ))}
       </div>
     </div>
   )
 }
 
-function CardTile({ card, slot, cost, costName, discard }: { card: CardInst; slot: number; cost: number; costName: string; discard?: string }) {
+function CardTile({ card, slot, cost, costName, discard, short }: { card: CardInst; slot: number; cost: number; costName: string; discard?: string; short?: number }) {
   const { id, type, dmg, effectText, effectSpec } = card.def
   const missing = isEffectMissing(id, effectText, effectSpec)
   // show what the engine actually runs when the card has effect_json
@@ -210,8 +210,9 @@ function CardTile({ card, slot, cost, costName, discard }: { card: CardInst; slo
         {cost > 0 && <span className="cost" title={`Costs ${cost} ${costName} when it strikes; can't pay = hits without its effect`}> · {cost} {costName}</span>}
         {card.owner && <span className="warn"> · stolen</span>}
       </div>
+      {short != null && <div className="warn" title={`${costName} is below the cost: base dmg ${short}%, effect off, drawbacks still fire`}>⚠ {costName} short: dmg {short}%, no effect</div>}
       <div className="dmg">
-        {dmg + (card.grow ?? 0) + (card.growNext ?? 0)}
+        {short != null ? <>{Math.floor((dmg * short) / 100) + (card.grow ?? 0) + (card.growNext ?? 0)} <s className="muted">{dmg}</s></> : dmg + (card.grow ?? 0) + (card.growNext ?? 0)}
         {card.grow || card.growNext ? <span className="muted"> ({dmg}{card.grow ? ` ${card.grow > 0 ? '+' : ''}${card.grow}` : ''}{card.growNext ? ` ${card.growNext > 0 ? '+' : ''}${card.growNext} next` : ''})</span> : null}
       </div>
       {text && (
