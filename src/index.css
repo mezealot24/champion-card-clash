@@ -1,20 +1,29 @@
+/* Theme tokens. Dark mode follows the device, unless data-theme pins it (artifact host forces color-scheme:light + black text). */
 :root {
-  --bg: #f6f7fb; --panel: #fff; --text: #1d2130; --muted: #6b7185; --border: #dde1ea;
-  --accent: #4f5dff; --danger: #d6455d; --ok: #1f9d63; --warn: #c27c0e; --dirty: #fff7e0;
+  --bg: #f6f7fb; --panel: #fff; --text: #1d2130; --muted: #5f6578; --border: #dde1ea;
+  --accent: #4f5dff; --danger: #d6455d; --ok: #1f9d63; --warn: #a86a08; --dirty: #fff7e0; --on-accent: #fff;
+  color-scheme: light dark;
   font-family: system-ui, 'Noto Sans Thai', sans-serif; color: var(--text); background: var(--bg);
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #14161d; --panel: #1d2029; --text: #e6e8ef; --muted: #9298ab; --border: #30344a; --dirty: #3a3220; }
+  :root:not([data-theme="light"]) {
+    --bg: #14161d; --panel: #1d2029; --text: #e6e8ef; --muted: #a3a9bc; --border: #30344a;
+    --accent: #8f99ff; --danger: #ff7b8f; --ok: #4fd194; --warn: #f0b44c; --dirty: #3a3220; --on-accent: #10122a;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14161d; --panel: #1d2029; --text: #e6e8ef; --muted: #a3a9bc; --border: #30344a;
+  --accent: #8f99ff; --danger: #ff7b8f; --ok: #4fd194; --warn: #f0b44c; --dirty: #3a3220; --on-accent: #10122a;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--text); }
 header { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
 header nav { display: flex; gap: 12px; }
 header nav a { color: var(--muted); text-decoration: none; }
 header nav a.active { color: var(--accent); font-weight: 600; }
 .who { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 14px; }
 main { max-width: 1280px; margin: 0 auto; padding: 16px; }
-.panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+.panel { color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
 .narrow { max-width: 360px; margin: 48px auto; }
 h2 { margin-top: 0; }
 label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
@@ -24,7 +33,7 @@ textarea { resize: vertical; }
 input.num { width: 64px; } input.short { width: 110px; } input.invalid { border-color: var(--danger); }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .style-row { grid-template-columns: 1fr 3fr; }
-button { font: inherit; background: var(--accent); color: #fff; border: 0; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
+button { font: inherit; background: var(--accent); color: var(--on-accent); border: 0; border-radius: 6px; padding: 7px 14px; cursor: pointer; }
 button:disabled { opacity: .5; cursor: default; }
 button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
 button.danger { background: transparent; color: var(--danger); padding: 4px 8px; }
@@ -44,7 +53,7 @@ code { font-size: 13px; }
 .filters input { width: 220px; } .filters select { width: auto; } .spacer { flex: 1; }
 .tags { display: flex; flex-wrap: wrap; gap: 4px; min-width: 220px; }
 button.tag { padding: 2px 8px; font-size: 12px; background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; }
-button.tag.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.tag.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 
 /* Battle */
 .narrow-wide { max-width: 520px; margin: 32px auto; }
@@ -53,7 +62,7 @@ button.tag.on { background: var(--accent); color: #fff; border-color: var(--acce
 .hp-bar > div { height: 100%; background: var(--ok); transition: width .3s; }
 .hp-bar > div.low { background: var(--danger); }
 .hand { display: flex; gap: 10px; flex-wrap: wrap; min-height: 40px; }
-.card-tile { width: 150px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); font-size: 13px; }
+.card-tile { color: var(--text); width: 150px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); font-size: 13px; }
 .card-tile .dmg { font-size: 26px; font-weight: 700; margin: 4px 0; }
 .card-tile .effect { line-height: 1.35; }
 .turn-log { margin: 10px 0 0; padding-left: 18px; font-size: 14px; }
