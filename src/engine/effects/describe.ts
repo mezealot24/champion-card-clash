@@ -72,12 +72,13 @@ export function describeAct(a: ActSpec, now = false): string {
     case 'loseHp': return (a.who === 'self' ? `lose ${a.n} HP` : `${WHO[a.who]} lose ${a.n} HP`) + per(a.per)
     case 'maxHp': return `${a.who === 'self' ? '' : `${WHO[a.who]} `}Max HP ${signed(a.n)}`
     case 'status': {
-      const turns = a.turns === 1 ? (now ? 'this turn' : 'next turn') : `for ${a.turns} turns`
+      // turns 0 = this turn only (Shield gained before the attack, gone at end of turn)
+      const turns = a.turns === 0 ? 'this turn only' : a.turns === 1 ? (now ? 'this turn' : 'next turn') : `for ${a.turns} turns`
       if (a.kind === 'blockPlus') {
         const n = a.n ?? 1
         return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops ${signed(n)} hit${Math.abs(n) === 1 ? '' : 's'} ${turns}`
       }
-      if (a.kind === 'shield') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Shield ${a.n ?? 1}${per(a.per)} (absorbs hit dmg, lasts ${turns === 'this turn' ? 'this turn' : turns === 'next turn' ? 'through next turn' : turns})`
+      if (a.kind === 'shield') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Shield ${a.n ?? 1}${per(a.per)} (absorbs hit dmg, lasts ${turns === 'this turn' || turns === 'this turn only' ? turns : turns === 'next turn' ? 'through next turn' : turns})`
       if (a.kind === 'parry') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Parry ${a.n ?? 1} ${turns} (the first ${a.n ?? 1} hit${(a.n ?? 1) === 1 ? '' : 's'} past Block deal 0 and go back to the attacker)`
       if (a.kind === 'vulnerable') return `${a.who === 'self' ? 'you take' : `${WHO[a.who]} takes`} ${a.n ?? 1}% more dmg from hits ${turns}`
       return `${WHO[a.who]} ${STATUS[a.kind]} ${turns}`

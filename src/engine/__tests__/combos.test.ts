@@ -133,15 +133,19 @@ describe('Bruiser S > K > K (Conqueror)', () => {
   })
 })
 
-describe('per 10 missing HP (Tank Second Skin)', () => {
+describe('per 10 missing HP (Tank Meditation)', () => {
   const secondSkin: EffectSpec = [{ hook: 'modify', if: [{ c: 'selfAction', a: 'strike' }], do: [
     // "per missing HP" reads HP at that moment, so the scaled parts go before the heals
-    { a: 'status', who: 'self', kind: 'shield', turns: 1, n: 2, per: 'missingHp10' }, { a: 'heal', who: 'self', n: 2, per: 'missingHp10' },
-    { a: 'status', who: 'self', kind: 'shield', turns: 1, n: 1 }, { a: 'heal', who: 'self', n: 1 },
+    { a: 'status', who: 'self', kind: 'shield', turns: 0, n: 2, per: 'missingHp10' }, { a: 'heal', who: 'self', n: 2, per: 'missingHp10' },
+    { a: 'status', who: 'self', kind: 'shield', turns: 0, n: 1 }, { a: 'heal', who: 'self', n: 1 },
   ] }]
   it('heals and shields 1 + 20% of missing HP before the hits land', () => {
     // 100 / 200 HP → missing 100 → heal 21 (to 121), Shield 21 soaks 21 of the 30 incoming
     const s = resolveTurn(game('XX', [c('P', 0, secondSkin)], [c('P', 30)]), { p1: 'strike', p2: 'strike' })
     expect(s.players.p1.hp).toBe(112)
+  })
+  it('Shield with turns 0 is gone at the end of the turn', () => {
+    const s = resolveTurn(game('XX', [c('P', 0, secondSkin)], [c('P', 30)]), { p1: 'strike', p2: 'strike' })
+    expect(s.players.p1.statuses.filter((x) => x.kind === 'shield')).toHaveLength(0)
   })
 })

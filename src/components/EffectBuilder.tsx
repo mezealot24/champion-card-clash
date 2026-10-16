@@ -266,7 +266,7 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
           )}
           {value.kind === 'vulnerable' && <><Num value={value.n ?? 50} min={1} onChange={(n) => onChange({ ...value, n })} /> % more dmg,</>}
           {value.kind === 'blockPlus' && <><Num value={value.n ?? 1} onChange={(n) => onChange({ ...value, n })} /> hit(s) (negative = fewer),</>}
-          <Num value={value.turns} min={1} onChange={(turns) => onChange({ ...value, turns })} /> turn(s)
+          <Num value={value.turns} min={value.kind === 'shield' ? 0 : 1} onChange={(turns) => onChange({ ...value, turns })} /> turn(s)
         </>
       )}
       {(value.a === 'addDmg' || value.a === 'mulDmg') && (
