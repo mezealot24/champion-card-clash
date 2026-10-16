@@ -128,7 +128,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
 
   // class resources fill at the end of the turn, so what you earn now is spent next turn
   for (const side of SIDES) {
-    gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side] })
+    const p = state.players[side]
+    gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side], foeDmg: p.otherDmg?.foe ?? 0, selfDmg: p.otherDmg?.self ?? 0, hpPct: (100 * p.hp) / Math.max(1, p.maxHp) })
+    p.otherDmg = undefined
   }
   // Dual Strike Styles (Sonic Bliz Acceleration): after resources fill, so a full bar stays full
   if (actions.p1 === 'strike' && actions.p2 === 'strike') {
@@ -241,6 +243,7 @@ function resolveStrikes(
   }
   // Before action combos (card types only), then Conqueror stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
+  for (const side of strikers) getStyle(state.players[side].style)?.strikeStart?.(state, side, chains[side]!)
   for (const side of SIDES) applyConqueror(state, side, actions, bonus[side], mult[other(side)])
   // Guard Crush: a hit stopped by Block still deals half (rounded down)
   // a blocked hit deals half under Guard Crush, or when a Style marked it Critical (Coup de grâce, Q 2026-10-16)
@@ -293,7 +296,7 @@ function resolveStrikes(
       const dmg = dmgOf(side, i)
       const { dealt, parried, absorbed } = outcome.get(card.uid)!
       if (!blocked && !parried) env.hitsTaken[enemy]++
-      if (dealt > 0) loseHp(state, enemy, dealt)
+      if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
       if (parried && dmg > 0) loseHp(state, side, dmg)
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
       const guard = parried ? ` (${enemy} Parry: สะท้อน ${dmg} กลับ)` : absorbed ? ` (Shield กัน ${absorbed})` : ''

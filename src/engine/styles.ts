@@ -1,5 +1,7 @@
 // Champion Styles (passives). Code registry keyed by "CHAMP:slot" (champion_styles.slot).
 // Kept free of state.ts imports so createGame can call setup without an import cycle.
+import { CONQUEROR_MAX } from './combos'
+import { RED_HP_PCT } from './resources'
 import type { Action, CardInst, GameState, PlayerState, Side } from './types'
 
 /** Sonic Bliz Overdrive: dmg added to every chain card per Energy spent (Claude default 2026-10-16). */
@@ -7,7 +9,7 @@ export const SONIC_DMG_PER_ENERGY = 2
 /** Sonic Bliz Overdrive: fewest cards in the chain that set it off (Q 2026-10-16: 3, was a full Field of 5). */
 export const OVERDRIVE_MIN_CHAIN = 3
 /** Coup de grâce: enemy HP below this % of Max HP (the red HP bar) → Critical x4 instead of x3. */
-export const COUP_RED_HP_PCT = 30
+export const COUP_RED_HP_PCT = RED_HP_PCT
 
 /** What a side went through in this turn's Strike phase. */
 export type HitReport = {
@@ -40,6 +42,8 @@ export type StyleDef = {
   beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[]) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
+  /** Strike chains only: right after Before action combos, before Conqueror and any hit (e.g. Juggernaut stacks) */
+  strikeStart?: (state: GameState, side: Side, chain: CardInst[]) => void
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
   /** Dual Strike (both sides Strike this turn): at the end of the turn, after resources fill, draw n and/or fill the bar to its cap */
@@ -52,6 +56,8 @@ export type StyleDef = {
 
 const say = (state: GameState, side: Side, line: string) => state.log.push(`T${state.turn} ${side} ${line}`)
 const pctHp = (p: PlayerState) => (p.hp * 100) / p.maxHp
+/** Overgrowth: +1 dmg per 20 Max HP grown */
+export const overgrowthDmg = (p: PlayerState) => Math.floor((p.styleData?.grown ?? 0) / 20)
 
 export const STYLES: Record<string, StyleDef> = {
   /**
@@ -83,6 +89,7 @@ export const STYLES: Record<string, StyleDef> = {
    * Tank · Overgrowth: Max HP starts at 210 (160 + 50, Q 2026-10-15). Each time attacked: +1 per hit taken,
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
+   * Q buff 2026-10-16: every 20 Max HP grown this way = +1 dmg on every card you strike with (Max HP lost later doesn't undo it).
    */
   'TK:2': {
     name: 'Overgrowth',
@@ -96,10 +103,20 @@ export const STYLES: Record<string, StyleDef> = {
       const gain = Math.min(500 - p.maxHp, r.hitsTaken + r.hitsBlocked * 2 + r.facing * 3)
       if (gain <= 0) return
       p.maxHp += gain
+      p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
       say(state, side, `Overgrowth: Max HP +${gain} → ${p.maxHp}`)
+    },
+    beforeHits: (state, side, bonus) => {
+      const n = overgrowthDmg(state.players[side])
+      if (!n) return
+      for (let i = 0; i < bonus.length; i++) bonus[i] += n
+      say(state, side, `Overgrowth: ทุกใบ +${n} dmg`)
     },
   },
 }
+
+/** Juggernaut: how many turns Tenacity lasts after the Conqueror stacks fill up. */
+export const TENACITY_TURNS = 2
 
 const below50 = (state: GameState, side: Side) => pctHp(state.players[side]) < 50
 
@@ -114,12 +131,36 @@ Object.assign(STYLES, {
     },
   },
   /**
-   * Bruiser · Tenacity: while HP < 50%, a charge break can't throw away the cards in slot 1 and 2.
-   * The oldest card after them is lost instead; with 2 cards or fewer nothing is lost.
+   * Bruiser · Juggernaut (Q 2026-10-16, Conqueror + Tenacity merged; name by Claude).
+   * Every Strike: +1 Conqueror stack per card in the chain, before it hits (max 6; see applyConqueror in combos.ts).
+   * When the stacks reach max: Tenacity for the next 2 turns (a charge break can't throw away the slot 1 card).
+   * Every turn you Block: −1 stack. Charge keeps the stacks (no gain, no loss; Q 2026-10-16 22:03Z).
    */
   'BR:2': {
-    name: 'Tenacity',
-    chargeBreakSafe: (state, side) => (below50(state, side) ? 2 : 0),
+    name: 'Juggernaut',
+    strikeStart: (state, side, chain) => {
+      const p = state.players[side]
+      const was = p.comboData?.conqueror ?? 0
+      const n = Math.min(CONQUEROR_MAX, was + chain.length)
+      if (n === was) return
+      p.comboData = { ...p.comboData, conqueror: n }
+      say(state, side, `Juggernaut: Conqueror ${n}/${CONQUEROR_MAX}${n === CONQUEROR_MAX ? ' (Omnivamp)' : ''}`)
+      if (n === CONQUEROR_MAX) {
+        p.styleData = { ...p.styleData, tenacityFrom: state.turn }
+        say(state, side, `Juggernaut: Tenacity ${TENACITY_TURNS} เทิร์น (ช่อง 1 ไม่โดนทิ้งจาก charge break)`)
+      }
+    },
+    chargeBreakSafe: (state, side) => {
+      const from = state.players[side].styleData?.tenacityFrom
+      return from != null && state.turn > from && state.turn <= from + TENACITY_TURNS ? 1 : 0
+    },
+    endTurn: (state, side, action) => {
+      const p = state.players[side]
+      const n = p.comboData?.conqueror ?? 0
+      if (action !== 'block' || !n) return
+      p.comboData = { ...p.comboData, conqueror: n - 1 }
+      say(state, side, `Juggernaut: Block, Conqueror ${n - 1}/${CONQUEROR_MAX}`)
+    },
   },
 } satisfies Record<string, StyleDef>)
 

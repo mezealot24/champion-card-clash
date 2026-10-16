@@ -12,6 +12,12 @@ export type TurnSummary = {
   hitsTaken: number
   /** Your hits that dealt dmg past Block / Parry / Shield. */
   cleanHits: number
+  /** Times you lost HP outside a hit, caused by the opponent (their effects, Parry, Death Mark). */
+  foeDmg: number
+  /** Times you lost HP to your own cards' drawbacks. */
+  selfDmg: number
+  /** Your HP as % of Max HP at the end of the turn. */
+  hpPct: number
 }
 
 export type ResourceDef = {
@@ -30,17 +36,28 @@ export type ResourceDef = {
   gain?: (t: TurnSummary) => number
 }
 
+/** HP below this % of Max HP = the red HP bar (same line as Coup de grâce). */
+export const RED_HP_PCT = 30
+
 export const RESOURCES: Record<string, ResourceDef> = {
   // Mana: +1 when you Charge, +1 when you Block. Keeps between turns.
   MG: { name: 'Mana', cap: 5, start: 0, defaultCost: 2, gain: (t) => (t.action === 'strike' ? 0 : 1) },
-  // Rage: +1 per hit you take, +1 per clean hit you land; −1 on a quiet turn (nobody Strikes you and you don't Strike).
+  // Rage (Q 2026-10-16): +2 per hit you take and +2 each other time the opponent makes you lose HP (their effects,
+  // Parry, Death Mark); +1 each time your own drawbacks cost HP; +1 per clean hit you land.
+  // −1 on a quiet turn (nobody Strikes, you lost no HP), but not while your HP is red (below RED_HP_PCT).
   BR: {
     name: 'Rage',
     cap: 20, // Q 17:59Z: nerf, cap 5 → 20
     start: 0,
-    defaultCost: 20, // default 20; cards.cost can set 10 or 20 per card (Q 2026-10-16)
+    defaultCost: 10, // Q 2026-10-16 21:50Z: every Bruiser S costs 10 (was 20); cards.cost can still set it per card
     unpaidDmgPct: 50, // Rage short of the cost: S still strikes at half base dmg, effects off, drawbacks fire
-    gain: (t) => (t.action !== 'strike' && t.enemyAction !== 'strike' ? -1 : t.hitsTaken + t.cleanHits),
+    gain: (t) => {
+      const fromFoe = 2 * (t.hitsTaken + t.foeDmg)
+      const n = fromFoe + t.selfDmg + t.cleanHits
+      const quiet = t.action !== 'strike' && t.enemyAction !== 'strike'
+      if (quiet && !n) return t.hpPct < RED_HP_PCT ? 0 : -1
+      return n
+    },
   },
   // Energy: starts full, +1 every turn, small cap.
   AS: { name: 'Energy', cap: 3, start: 3, defaultCost: 1, gain: () => 1 },

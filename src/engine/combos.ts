@@ -29,17 +29,17 @@ export const DEATH_MARK_TURNS = 9999
 export const DEATH_MARK_PCT = 50
 
 export const COMBOS: Record<string, ComboDef[]> = {
-  /** Tank · S > S > S: if the opponent Blocks one of them, heal 10% of your current HP. */
+  /** Tank · P > K > P (two P + one K, any order; Q 2026-10-16): if the opponent Blocks one of them, heal 10% of your current HP. */
   TK: [
     {
-      name: 'S > S > S',
-      pattern: ['S', 'S', 'S'],
+      name: 'P > K > P',
+      pattern: ['P', 'K', 'P'],
       ok: (h) => h.some((x) => x.blocked),
       fire: (state, side) => {
         const p = state.players[side]
         const n = Math.floor(p.hp / 10)
         p.hp = Math.min(p.maxHp, p.hp + n)
-        say(state, side, `Combo S > S > S: ฮีล ${n} (10% ของ HP ที่เหลือ)`)
+        say(state, side, `Combo P > K > P: ฮีล ${n} (10% ของ HP ที่เหลือ)`)
       },
     },
   ],
@@ -87,22 +87,6 @@ export const COMBOS: Record<string, ComboDef[]> = {
         say(state, side, 'Combo S > P > P: Guard Crush (ใช้กับ Strike ครั้งถัดไป ภายใน 3 เทิร์น)')
       },
     },
-    /**
-     * Bruiser · S > K > K (Before action): Conqueror +1 stack, max 6. Each stack = +1 dmg on every card
-     * you attack with for the rest of the game. At 6 stacks: Omnivamp (heal 10% of each hit's dmg),
-     * but a charge break makes the opponent's hits deal 30% more.
-     */
-    {
-      name: 'S > K > K',
-      pattern: ['S', 'K', 'K'],
-      when: 'before',
-      fire: (state, side) => {
-        const p = state.players[side]
-        const n = Math.min(CONQUEROR_MAX, (p.comboData?.conqueror ?? 0) + 1)
-        p.comboData = { ...p.comboData, conqueror: n }
-        say(state, side, `Combo S > K > K: Conqueror ${n}/${CONQUEROR_MAX}${n === CONQUEROR_MAX ? ' (Omnivamp)' : ''}`)
-      },
-    },
   ],
 }
 
@@ -136,7 +120,8 @@ export function checkCombos(state: GameState, side: Side, hits: ComboHit[], when
 export const conquerorOf = (state: GameState, side: Side) => state.players[side].comboData?.conqueror ?? 0
 
 /**
- * Conqueror after Before action combos: +stack dmg on every slot of this side's chain;
+ * Conqueror stacks (Bruiser · Juggernaut Style, styles.ts; was the S > K > K combo until Q 2026-10-16):
+ * +stack dmg on every slot of this side's chain;
  * at max stack, a charge break makes the opponent's hits deal 30% more.
  */
 export function applyConqueror(

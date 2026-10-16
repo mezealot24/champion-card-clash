@@ -80,23 +80,60 @@ describe('Bruiser Styles', () => {
     expect(resolveTurn(ok, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(97)
   })
 
-  it('Tenacity: charge break skips slot 1 and 2 while HP < 50%', () => {
-    const field = () => [hit(1), hit(2), hit(3)]
-    const s = br('BR:2', 40)
-    s.players.p1.hand = field()
-    s.players.p2.hand = [hit(1)]
-    const kept = resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)
-    expect(kept.slice(0, 2)).toEqual([1, 2]) // slot 3 went to the bottom and a new card replaced it
-    expect(kept).toHaveLength(3)
-    const two = br('BR:2', 40)
-    two.players.p1.hand = [hit(1), hit(2)]
-    two.players.p2.hand = [hit(1)]
-    expect(resolveTurn(two, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)).toEqual([1, 2]) // nothing beyond the safe slots: nothing lost, no replacement
-    const healthy = br('BR:2', 90)
-    healthy.players.p1.hand = field()
-    healthy.players.p2.hand = [hit(1)]
-    const h = resolveTurn(healthy, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)
-    expect(h.slice(0, 2)).toEqual([2, 3]) // oldest lost, replacement drawn at the end
-    expect(h).toHaveLength(3)
+  it('Juggernaut: +1 Conqueror per chain card before it hits; +1 dmg per stack', () => {
+    const s = br('BR:2', 90)
+    s.players.p1.hand = [hit(10), hit(10)]
+    const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(t.players.p1.comboData?.conqueror).toBe(2)
+    expect(t.players.p2.hp).toBe(100 - 24) // each hit 10 + 2 stacks
+  })
+
+  it('Juggernaut: caps at 6, then Tenacity keeps slot 1 safe from charge break for 2 turns', () => {
+    const s = br('BR:2', 90)
+    s.players.p1.comboData = { conqueror: 4 }
+    s.players.p1.hand = [hit(1), hit(1), hit(1)]
+    let t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(t.players.p1.comboData?.conqueror).toBe(6)
+    for (let turn = 0; turn < 2; turn++) {
+      t.players.p1.hand = [hit(7), hit(8)]
+      t.players.p2.hand = [hit(1)]
+      t = resolveTurn(t, { p1: 'charge', p2: 'strike' })
+      expect(t.players.p1.hand[0].def.dmg).toBe(7) // slot 1 kept
+    }
+    t.players.p1.hand = [hit(7), hit(8)]
+    t.players.p2.hand = [hit(1)]
+    expect(resolveTurn(t, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)).not.toContain(7) // Tenacity over
+  })
+
+  it('Juggernaut: Block costs 1 stack, Charge keeps them', () => {
+    const s = br('BR:2', 90)
+    s.players.p1.comboData = { conqueror: 2 }
+    const t = resolveTurn(s, { p1: 'block', p2: 'block' })
+    expect(t.players.p1.comboData?.conqueror).toBe(1)
+    const c = resolveTurn(t, { p1: 'charge', p2: 'block' })
+    expect(c.players.p1.comboData?.conqueror).toBe(1)
+    expect(resolveTurn(c, { p1: 'block', p2: 'block' }).players.p1.comboData?.conqueror).toBe(0)
+  })
+})
+
+describe('Overgrowth dmg (Q buff 2026-10-16)', () => {
+  it('every 20 Max HP grown = +1 dmg on every card you strike with', () => {
+    const s = game('TK:2', 210, 300)
+    s.players.p1.styleData = { grown: 45 } // +2
+    s.players.p1.hand = [hit(5), hit(5)]
+    const after = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(100 - after.players.p2.hp).toBe(14)
+  })
+  it('no bonus below 20 grown', () => {
+    const s = game('TK:2', 210, 300)
+    s.players.p1.styleData = { grown: 19 }
+    s.players.p1.hand = [hit(5)]
+    expect(100 - resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(5)
+  })
+  it('counts what it grew', () => {
+    const s = game('TK:2', 210, 300)
+    s.players.p1.hand = [hit(1), hit(1)]
+    s.players.p2.hand = [hit(1), hit(1), hit(1)]
+    expect(resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1.styleData?.grown).toBe(11)
   })
 })

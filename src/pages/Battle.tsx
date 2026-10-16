@@ -160,8 +160,9 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
   const p = game.players[side]
   const pct = Math.max(0, Math.round((p.hp / p.maxHp) * 100))
   const res = game.rules.resources ? resourceOf(p.championId) : undefined
+  const conqMax = (p.comboData?.conqueror ?? 0) >= 6
   return (
-    <div className="panel">
+    <div className={`panel${conqMax ? ' conq-max' : ''}`}>
       <div className="summary">
         <span>{title}</span>
         <span>
@@ -174,7 +175,7 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
         )}
         {res?.payWithHp && <span className="muted">S cards cost HP</span>}
         <span className="muted">มือ {p.hand.length} · กอง {p.deck.length}</span>
-        {!!p.comboData?.conqueror && <span className="warn">Conqueror {p.comboData.conqueror}/6</span>}
+        {!!p.comboData?.conqueror && <span className={conqMax ? 'conq-tag' : 'warn'}>{conqMax ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/6`}</span>}
         {p.statuses.map((s, i) => (
           <span key={i} className="warn">
             {s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Damage' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'deathMark' ? '💀 Death Mark' : s.kind}{s.kind === 'deathMark' ? '' : ` (${s.turns})`}
