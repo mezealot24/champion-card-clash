@@ -13,7 +13,7 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
 }
 
 /** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
-export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS'
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10'
 
 export function perCount(ctx: BaseCtx, per?: Per): number {
   if (!per) return 1
@@ -27,6 +27,13 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
     case 'chainP':
     case 'chainK':
     case 'chainS': return (c.chain ?? []).filter((x) => x.def.type === per.slice(5)).length
+    // every full 10 HP you are below your Max HP, e.g. "2 per 10 missing HP" = 20% of missing HP
+    case 'missingHp10': {
+      const p = ctx.state.players[ctx.self]
+      return Math.max(0, Math.floor((p.maxHp - p.hp) / 10))
+    }
+    // a "per" this build doesn't know counts 0 (old builds reading newer DB rows)
+    default: return 0
   }
 }
 
@@ -79,8 +86,10 @@ export const maxHp =
 
 /** ติดสถานะ เช่น ห้าม Strike n เทิร์น (นับเทิร์นถัดไป). blockPlus: Block กันเพิ่ม n hit */
 export const status =
-  (who: Who, kind: StatusKind, turns = 1, n?: number): Act<BaseCtx> =>
+  (who: Who, kind: StatusKind, turns = 1, base?: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
+    const n = base === undefined ? undefined : base * perCount(ctx, per)
+    if (n !== undefined && per && n <= 0) return
     for (const s of sides(ctx, who)) ctx.state.players[s].statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
     log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind}${n === undefined ? '' : ` ${n}`} ${turns} เทิร์น`)
   }
