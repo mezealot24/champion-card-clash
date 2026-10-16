@@ -149,3 +149,15 @@ describe('per 10 missing HP (Tank Meditation)', () => {
     expect(s.players.p1.statuses.filter((x) => x.kind === 'shield')).toHaveLength(0)
   })
 })
+
+describe('% of Max HP / missing HP heals', () => {
+  it('heal 2 + 3% of Max HP (rounded down)', () => {
+    const spec: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'selfAction', a: 'strike' }], do: [{ a: 'heal', who: 'self', n: 2 }, { a: 'heal', who: 'self', n: 3, per: 'maxHpPct' }] }]
+    // 100 / 200 → +2, then 3% of 200 = 6
+    expect(resolveTurn(game('XX', [c('P', 0, spec)]), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(108)
+  })
+  it('heal 10% of missing HP', () => {
+    const spec: EffectSpec = [{ hook: 'onResolve', do: [{ a: 'heal', who: 'self', n: 10, per: 'missingHpPct' }] }]
+    expect(resolveTurn(game('XX', [c('P', 0, spec)], [], 55), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(69) // missing 145 → 14
+  })
+})

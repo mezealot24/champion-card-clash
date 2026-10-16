@@ -52,6 +52,8 @@ export type StyleDef = {
 
 const say = (state: GameState, side: Side, line: string) => state.log.push(`T${state.turn} ${side} ${line}`)
 const pctHp = (p: PlayerState) => (p.hp * 100) / p.maxHp
+/** Overgrowth: +1 dmg per 20 Max HP grown */
+export const overgrowthDmg = (p: PlayerState) => Math.floor((p.styleData?.grown ?? 0) / 20)
 
 export const STYLES: Record<string, StyleDef> = {
   /**
@@ -83,6 +85,7 @@ export const STYLES: Record<string, StyleDef> = {
    * Tank · Overgrowth: Max HP starts at 210 (160 + 50, Q 2026-10-15). Each time attacked: +1 per hit taken,
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
+   * Q buff 2026-10-16: every 20 Max HP grown this way = +1 dmg on every card you strike with (Max HP lost later doesn't undo it).
    */
   'TK:2': {
     name: 'Overgrowth',
@@ -96,7 +99,14 @@ export const STYLES: Record<string, StyleDef> = {
       const gain = Math.min(500 - p.maxHp, r.hitsTaken + r.hitsBlocked * 2 + r.facing * 3)
       if (gain <= 0) return
       p.maxHp += gain
+      p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
       say(state, side, `Overgrowth: Max HP +${gain} → ${p.maxHp}`)
+    },
+    beforeHits: (state, side, bonus) => {
+      const n = overgrowthDmg(state.players[side])
+      if (!n) return
+      for (let i = 0; i < bonus.length; i++) bonus[i] += n
+      say(state, side, `Overgrowth: ทุกใบ +${n} dmg`)
     },
   },
 }
