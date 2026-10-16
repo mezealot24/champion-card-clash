@@ -63,6 +63,9 @@ button.tag.on { background: var(--accent); color: var(--on-accent); border-color
 .hp-bar > div.low { background: var(--danger); }
 .hand { display: flex; gap: 10px; flex-wrap: wrap; min-height: 40px; }
 .card-tile { color: var(--text); width: 150px; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); font-size: 13px; }
+.card-tile.discarded { border: 2px dashed var(--danger); opacity: .75; position: relative; }
+.card-tile.discarded .dmg, .card-tile.discarded .effect { text-decoration: line-through; text-decoration-color: var(--danger); }
+.discard-badge { color: var(--danger); font-weight: 700; font-size: 12px; margin-bottom: 4px; }
 .card-tile .dmg { font-size: 26px; font-weight: 700; margin: 4px 0; }
 .card-tile .effect { line-height: 1.35; }
 .turn-log { margin: 10px 0 0; padding-left: 18px; font-size: 14px; }

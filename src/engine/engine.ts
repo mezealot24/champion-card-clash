@@ -40,6 +40,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     }
   }
   const state = structuredClone(prev)
+  for (const side of SIDES) state.players[side].discarded = []
   log(state, `p1 ${actions.p1} / p2 ${actions.p2}`)
 
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
@@ -95,6 +96,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       const safe = getStyle(p.style)?.chargeBreakSafe?.(state, side) ?? 0
       if (p.hand.length > Math.max(1, safe)) {
         const lost = p.hand.splice(safe, 1)[0]
+        p.discarded!.push({ card: lost, slot: safe + 1, reason: 'Charge break' })
         toDeckBottom(state, side, [lost])
         log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge)`)
       }
@@ -108,6 +110,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (state.blockStreak >= state.rules.blockStreakDiscard) {
       for (const side of SIDES) {
         const p = state.players[side]
+        p.discarded!.push(...p.hand.map((card, i) => ({ card, slot: i + 1, reason: 'Block streak' })))
         toDeckBottom(state, side, p.hand)
         p.hand = []
       }
@@ -299,6 +302,7 @@ function resolveStrikes(
       const enemy = other(side)
       if (actions[enemy] === 'block') {
         const lost = state.players[enemy].hand.splice(0, 2)
+        state.players[enemy].discarded!.push(...lost.map((card, i) => ({ card, slot: i + 1, reason: 'Guard Crush' })))
         toDeckBottom(state, enemy, lost)
         if (lost.length) log(state, `${side} Guard Crush: ${enemy} ทิ้ง ${lost.map((c) => c.def.id).join(', ')}`)
       }

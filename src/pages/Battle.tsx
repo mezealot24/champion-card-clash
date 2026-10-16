@@ -185,7 +185,10 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
         <div style={{ width: `${pct}%` }} className={pct <= 30 ? 'low' : ''} />
       </div>
       <div className="hand">
-        {p.hand.length === 0 && <span className="muted">มือว่าง</span>}
+        {p.hand.length === 0 && !p.discarded?.length && <span className="muted">มือว่าง</span>}
+        {p.discarded?.map((d) => (
+          <CardTile key={`x-${d.card.uid}`} card={d.card} slot={d.slot} cost={0} costName="" discard={d.reason} />
+        ))}
         {p.hand.map((card, i) => (
           <CardTile key={card.uid} card={card} slot={i + 1} cost={res ? costOf(p.championId, card) : 0} costName={res?.name ?? ''} />
         ))}
@@ -194,13 +197,14 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
   )
 }
 
-function CardTile({ card, slot, cost, costName }: { card: CardInst; slot: number; cost: number; costName: string }) {
+function CardTile({ card, slot, cost, costName, discard }: { card: CardInst; slot: number; cost: number; costName: string; discard?: string }) {
   const { id, type, dmg, effectText, effectSpec } = card.def
   const missing = isEffectMissing(id, effectText, effectSpec)
   // show what the engine actually runs when the card has effect_json
   const text = effectSpec?.length ? describeSpec(effectSpec) : effectText
   return (
-    <div className="card-tile">
+    <div className={discard ? 'card-tile discarded' : 'card-tile'}>
+      {discard && <div className="discard-badge">✕ Discarded · {discard}</div>}
       <div className="muted">
         ช่อง {slot} · <code>{id} · {type}</code>
         {cost > 0 && <span className="cost" title={`Costs ${cost} ${costName} when it strikes; can't pay = hits without its effect`}> · {cost} {costName}</span>}
