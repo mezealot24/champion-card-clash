@@ -1,36 +1,11 @@
 import { useState } from 'react'
-import {
-  buildDeck,
-  createGame,
-  isEffectMissing,
-  legalActions,
-  pickSmartAction,
-  costOf,
-  resourceOf,
-  STYLES,
-  resolveTurn,
-  type Action,
-  type CardInst,
-  type CardRowLike,
-  type GameState,
-  type Side,
-} from '../engine'
-import { describeSpec } from '../engine/effects/describe'
+import { buildDeck, createGame, isEffectMissing, pickSmartAction, STYLES, resolveTurn, type Action, type CardRowLike, type GameState, type Side } from '../engine'
+import { Arena, type Turn } from './Arena'
 
 export type Champ = { id: string; name: string; hp_start: number; hp_max: number }
 export type Row = CardRowLike & { champion_id: string }
 export type StyleRow = { champion_id: string; slot: number; name: string; effect: string }
 export type BattleData = { champions: Champ[]; cards: Row[]; styles?: StyleRow[] }
-
-const ACTIONS: { action: Action; label: string; hint: string }[] = [
-  { action: 'strike', label: 'Strike', hint: 'ตีทั้งมือ ชนะ Charge' },
-  { action: 'block', label: 'Block', hint: 'กัน 2 hit แรก ชนะ Strike' },
-  { action: 'charge', label: 'Charge', hint: 'จั่ว 1 ชนะ Block' },
-]
-const NAME: Record<Side, string> = { p1: 'คุณ', p2: 'AI' }
-
-// engine log says p1/p2; show it as คุณ/AI
-const readable = (line: string) => line.replace(/\bp1\b/g, NAME.p1).replace(/\bp2\b/g, NAME.p2)
 
 /** The game screen. Data comes from Supabase (BattlePage) or a bundled snapshot (play.tsx). */
 export function Battle({ data }: { data: BattleData }) {
@@ -39,12 +14,9 @@ export function Battle({ data }: { data: BattleData }) {
   const [stylePick, setStylePick] = useState<Record<Side, string | null>>({ p1: null, p2: null })
   const stylesOf = (id: string) => (data.styles ?? []).filter((s) => s.champion_id === id && s.name)
   const styleKey = (side: Side) => stylePick[side] ?? (STYLES[`${picks[side]}:1`] ? `${picks[side]}:1` : '')
-  const styleName = (side: Side, g: GameState) => {
-    const key = g.players[side].style
-    return key ? ` · ${STYLES[key]?.name ?? key}` : ''
-  }
   const [game, setGame] = useState<GameState | null>(null)
-  const [lastLog, setLastLog] = useState<string[]>([])
+  // a resolved turn the arena is still playing back; game moves to turn.next when it's done
+  const [turn, setTurn] = useState<Turn | null>(null)
 
   const deckOf = (id: string) => buildDeck(data.cards.filter((c) => c.champion_id === id))
   const missingOf = (id: string) =>
@@ -55,15 +27,14 @@ export function Battle({ data }: { data: BattleData }) {
       const c = data.champions.find((x) => x.id === id)!
       return { championId: id, hpStart: c.hp_start, hpMax: c.hp_max, deck: deckOf(id) }
     }
+    setTurn(null)
     setGame(createGame({ ...setup(picks.p1), style: styleKey('p1') || undefined }, { ...setup(picks.p2), style: styleKey('p2') || undefined }))
-    setLastLog([])
   }
 
   function play(action: Action) {
-    if (!game) return
-    const next = resolveTurn(game, { p1: action, p2: pickSmartAction(game, 'p2') })
-    setLastLog(next.log.slice(game.log.length))
-    setGame(next)
+    if (!game || turn) return
+    const actions = { p1: action, p2: pickSmartAction(game, 'p2') }
+    setTurn({ prev: game, next: resolveTurn(game, actions), actions })
   }
 
   if (!game) {
@@ -109,118 +80,28 @@ export function Battle({ data }: { data: BattleData }) {
     )
   }
 
-  const legal = legalActions(game, 'p1')
-  const champName = (side: Side) => data.champions.find((c) => c.id === game.players[side].championId)?.name
+  const champName = (side: Side) => data.champions.find((c) => c.id === game.players[side].championId)?.name ?? game.players[side].championId
+  const styleOf = (side: Side) => {
+    const key = game.players[side].style
+    return key ? (STYLES[key]?.name ?? key) : ''
+  }
 
   return (
-    <div className="battle">
-      <PlayerPanel game={game} side="p2" title={`AI · ${champName('p2')}${styleName('p2', game)}`} />
-
-      <div className="panel">
-        {game.winner ? (
-          <div className="actions">
-            <strong>{game.winner === 'draw' ? 'เสมอ!' : game.winner === 'p1' ? 'คุณชนะ! 🎉' : 'AI ชนะ'}</strong>
-            <button onClick={start}>เล่นอีกครั้ง</button>
-            <button className="secondary" onClick={() => setGame(null)}>เปลี่ยน Champion</button>
-          </div>
-        ) : (
-          <div className="actions">
-            <span className="muted">เทิร์น {game.turn}</span>
-            {ACTIONS.map(({ action, label, hint }) => (
-              <button key={action} title={hint} disabled={!legal.includes(action)} onClick={() => play(action)}>
-                {label}
-              </button>
-            ))}
-            <span className="muted">Strike &gt; Charge &gt; Block &gt; Strike</span>
-          </div>
-        )}
-        {lastLog.length > 0 && (
-          <ul className="turn-log">
-            {lastLog.map((line, i) => (
-              <li key={i}>{readable(line)}</li>
-            ))}
-          </ul>
-        )}
-        <details>
-          <summary className="muted">Log ทั้งเกม</summary>
-          <ul className="turn-log">
-            {game.log.map((line, i) => (
-              <li key={i}>{readable(line)}</li>
-            ))}
-          </ul>
-        </details>
-      </div>
-
-      <PlayerPanel game={game} side="p1" title={`คุณ · ${champName('p1')}${styleName('p1', game)}`} />
-    </div>
-  )
-}
-
-function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title: string }) {
-  const p = game.players[side]
-  const pct = Math.max(0, Math.round((p.hp / p.maxHp) * 100))
-  const res = game.rules.resources ? resourceOf(p.championId) : undefined
-  return (
-    <div className="panel">
-      <div className="summary">
-        <span>{title}</span>
-        <span>
-          HP {p.hp} / {p.maxHp}
-        </span>
-        {res && !res.payWithHp && (
-          <span className="res" title={`${res.name}: S cards cost ${res.name}`}>
-            {res.name} {res.cap <= 5 ? `${'◆'.repeat(p.res ?? 0)}${'◇'.repeat(Math.max(0, res.cap - (p.res ?? 0)))} ` : ''}{p.res ?? 0}/{res.cap}
-          </span>
-        )}
-        {res?.payWithHp && <span className="muted">S cards cost HP</span>}
-        <span className="muted">มือ {p.hand.length} · กอง {p.deck.length}</span>
-        {!!p.comboData?.conqueror && <span className="warn">Conqueror {p.comboData.conqueror}/6</span>}
-        {p.statuses.map((s, i) => (
-          <span key={i} className="warn">
-            {s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Damage' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind} ({s.turns})
-          </span>
-        ))}
-      </div>
-      <div className="hp-bar">
-        <div style={{ width: `${pct}%` }} className={pct <= 30 ? 'low' : ''} />
-      </div>
-      <div className="hand">
-        {p.hand.length === 0 && !p.discarded?.length && <span className="muted">มือว่าง</span>}
-        {p.discarded?.map((d) => (
-          <CardTile key={`x-${d.card.uid}`} card={d.card} slot={d.slot} cost={0} costName="" discard={d.reason} />
-        ))}
-        {p.hand.map((card, i) => (
-          <CardTile key={card.uid} card={card} slot={i + 1} cost={res ? costOf(p.championId, card) : 0} costName={res?.name ?? ''} short={!!res && !res.payWithHp && res.unpaidDmgPct != null && costOf(p.championId, card) > (p.res ?? 0) ? res.unpaidDmgPct : undefined} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function CardTile({ card, slot, cost, costName, discard, short }: { card: CardInst; slot: number; cost: number; costName: string; discard?: string; short?: number }) {
-  const { id, type, dmg, effectText, effectSpec } = card.def
-  const missing = isEffectMissing(id, effectText, effectSpec)
-  // show what the engine actually runs when the card has effect_json
-  const text = effectSpec?.length ? describeSpec(effectSpec) : effectText
-  return (
-    <div className={discard ? 'card-tile discarded' : 'card-tile'}>
-      {discard && <div className="discard-badge">✕ Discarded · {discard}</div>}
-      <div className="muted">
-        ช่อง {slot} · <code>{id} · {type}</code>
-        {cost > 0 && <span className="cost" title={`Costs ${cost} ${costName} when it strikes; can't pay = hits without its effect`}> · {cost} {costName}</span>}
-        {card.owner && <span className="warn"> · stolen</span>}
-      </div>
-      {short != null && <div className="warn" title={`${costName} is below the cost: base dmg ${short}%, effect off, drawbacks still fire`}>⚠ {costName} short: dmg {short}%, no effect</div>}
-      <div className="dmg">
-        {short != null ? <>{Math.floor((dmg * short) / 100) + (card.grow ?? 0) + (card.growNext ?? 0)} <s className="muted">{dmg}</s></> : dmg + (card.grow ?? 0) + (card.growNext ?? 0)}
-        {card.grow || card.growNext ? <span className="muted"> ({dmg}{card.grow ? ` ${card.grow > 0 ? '+' : ''}${card.grow}` : ''}{card.growNext ? ` ${card.growNext > 0 ? '+' : ''}${card.growNext} next` : ''})</span> : null}
-      </div>
-      {text && (
-        <div className="effect">
-          {missing && <span className="warn" title="effect นี้ยังไม่มีโค้ด เล่นเป็น dmg เปล่า">⚠ </span>}
-          {text}
-        </div>
-      )}
-    </div>
+    <Arena
+      game={game}
+      turn={turn}
+      names={{ p1: champName('p1'), p2: champName('p2') }}
+      styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
+      onAction={play}
+      onDone={() => {
+        if (turn) setGame(turn.next)
+        setTurn(null)
+      }}
+      onRestart={start}
+      onQuit={() => {
+        setTurn(null)
+        setGame(null)
+      }}
+    />
   )
 }

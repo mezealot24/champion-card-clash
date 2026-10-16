@@ -1,7 +1,7 @@
 // ตัวต่อ (building blocks) สำหรับเขียน effect การ์ด
 // รวมกันเป็น effect ใน registry.ts เช่น when(enemyHandAtLeast(2), heal('self', 10))
 import { addRes, resourceOf } from '../resources'
-import { drawCards, heal as healHp, log, loseHp as loseHpRaw, toDeckBottom } from '../state'
+import { drawCards, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond } from './types'
 
@@ -184,7 +184,7 @@ export const cut =
       if (!lost) return
       foe.hand.splice(i, 1)
       foe.cutTaken = (foe.cutTaken ?? 0) + 1
-      ;(foe.discarded ??= []).push({ card: lost, slot: i + 1, reason: 'Cut' })
+      markDiscarded(ctx.state, ctx.enemy, [{ card: lost, slot: i + 1, reason: 'Cut' }])
       toDeckBottom(ctx.state, ctx.enemy, [lost])
       log(ctx.state, `${ctx.card.def.id}: Cut → ${ctx.enemy} ทิ้ง ${lost.def.id} ลงใต้กอง`)
     }

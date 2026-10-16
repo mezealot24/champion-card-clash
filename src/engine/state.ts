@@ -1,6 +1,6 @@
 // Small state helpers shared by the clash resolver and effect primitives.
 // They mutate the draft GameState passed in (resolveTurn clones first).
-import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side } from './types'
+import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, TurnEvent } from './types'
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
 import { getStyle } from './styles'
@@ -87,6 +87,7 @@ export function drawCards(state: GameState, side: Side, n: number): number {
     const card = p.deck.shift()!
     p.hand.push(card)
     card.enteredWith = p.hand.length
+    emit(state, { k: 'draw', side, card })
     drawn++
     p.drawsSinceShuffle = (p.drawsSinceShuffle ?? 0) + 1
     if (p.drawsSinceShuffle >= p.deck.length + p.hand.length) {
@@ -113,12 +114,28 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
 
 export function heal(state: GameState, side: Side, n: number) {
   const p = state.players[side]
+  const before = p.hp
   p.hp = Math.min(p.maxHp, p.hp + n)
+  if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
 }
 
 export function loseHp(state: GameState, side: Side, n: number) {
   const p = state.players[side]
+  const before = p.hp
   p.hp = Math.max(0, p.hp - n)
+  if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
+}
+
+/** Record a turn event for the battle screen (see TurnEvent). */
+export function emit(state: GameState, ev: TurnEvent) {
+  ;(state.events ??= []).push(ev)
+}
+
+/** Cards a side lost from its Field this turn (shown on the Field until the next turn). */
+export function markDiscarded(state: GameState, side: Side, lost: { card: CardInst; slot: number; reason: string }[]) {
+  const p = state.players[side]
+  ;(p.discarded ??= []).push(...lost)
+  for (const d of lost) emit(state, { k: 'discard', side, uid: d.card.uid, reason: d.reason })
 }
 
 export function log(state: GameState, line: string) {

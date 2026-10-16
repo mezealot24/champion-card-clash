@@ -83,6 +83,19 @@ export const DEFAULT_RULES: RulesConfig = {
   resources: true, // Q 2026-10-15: every S card has a cost
 }
 
+/**
+ * What happened during the last resolveTurn, in order, for the battle screen to play back.
+ * hit = one chain card landing (dmg before cuts, dealt = what got through); hp = any HP change;
+ * sweep = a Strike chain going back under the deck.
+ */
+export type TurnEvent =
+  | { k: 'hit'; side: Side; slot: number; uid: string; type: CardType; dmg: number; dealt: number; blocked: boolean; parried: boolean; absorbed: number; crit: boolean }
+  | { k: 'hp'; side: Side; delta: number }
+  | { k: 'draw'; side: Side; card: CardInst }
+  | { k: 'discard'; side: Side; uid: string; reason: string }
+  | { k: 'sweep'; side: Side; uids: string[] }
+  | { k: 'combo'; side: Side; name: string }
+
 export type GameState = {
   turn: number
   players: Record<Side, PlayerState>
@@ -91,6 +104,8 @@ export type GameState = {
   rules: RulesConfig
   rngSeed: number
   log: string[] // human-readable, newest last
+  /** Events of the last turn only (reset by resolveTurn). */
+  events?: TurnEvent[]
 }
 
 export const other = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1')
