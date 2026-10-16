@@ -49,7 +49,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
     name: 'Rage',
     cap: 20, // Q 17:59Z: nerf, cap 5 → 20
     start: 0,
-    defaultCost: 20, // default 20; cards.cost can set 10 or 20 per card (Q 2026-10-16)
+    defaultCost: 10, // Q 2026-10-16 21:50Z: every Bruiser S costs 10 (was 20); cards.cost can still set it per card
     unpaidDmgPct: 50, // Rage short of the cost: S still strikes at half base dmg, effects off, drawbacks fire
     gain: (t) => {
       const fromFoe = 2 * (t.hitsTaken + t.foeDmg)
