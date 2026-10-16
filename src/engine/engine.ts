@@ -1,7 +1,7 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { getStyle } from './styles'
-import { gainRes, holdUnpaid, payChain } from './resources'
+import { baseDmgOf, gainRes, payChain } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, effectOf, heal, log, loseHp, toDeckBottom } from './state'
@@ -166,9 +166,8 @@ function resolveStrikes(
     chains[side] = state.players[side].hand
     state.players[side].hand = [] // Strike uses the whole hand
     // resource costs, in chain order: an unpaid card still hits but only its drawbacks fire this turn
-    // (Bruiser: an unpaid S card can't be used at all and stays on the Field)
+    // (Bruiser: base dmg also drops to 50%)
     payChain(state, side, chains[side])
-    chains[side] = holdUnpaid(state, side, chains[side])
     bonus[side] = chains[side].map(() => 0)
     mult[side] = chains[side].map(() => 1)
     pierce[side] = chains[side].map(() => 0)
@@ -216,7 +215,7 @@ function resolveStrikes(
     // True Damage: dmg cuts (negative bonus, multiplier below 1) don't apply; only Block stops the hit
     const b = trueDmg[side] ? Math.max(0, bonus[side]![i]) : bonus[side]![i]
     const m = trueDmg[side] ? Math.max(1, mult[side]![i]) : mult[side]![i]
-    const raw = card.def.dmg + (card.grow ?? 0) + (card.growNext ?? 0) + b
+    const raw = baseDmgOf(state, side, card) + (card.grow ?? 0) + (card.growNext ?? 0) + b
     // Vulnerable: the side being hit takes N% more dmg from every hit
     return Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)])) / 100))
   }

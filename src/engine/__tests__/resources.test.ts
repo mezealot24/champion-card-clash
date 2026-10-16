@@ -39,15 +39,24 @@ describe('resources', () => {
     expect(resolveTurn(game('BR', [], [], 3), { p1: 'block', p2: 'charge' }).players.p1.res).toBe(2)
   })
 
-  it('Bruiser: Rage cap 20, an S card needs the full 20 (Q 17:59Z)', () => {
+  it('Bruiser: Rage cap 20; an S card costs 20 by default, or 10 / 20 per card (Q 2026-10-16)', () => {
     expect(resolveTurn(game('BR', [c('P')], [c('P')], 20), { p1: 'strike', p2: 'strike' }).players.p1.res).toBe(20)
-    // under 20: the S card can't be used, it stays on the Field; the P still strikes
-    const s = c('S', 10, heal5)
-    const short = resolveTurn(game('BR', [c('P', 5), s], [], 19), { p1: 'strike', p2: 'charge' })
-    expect([short.players.p1.hp, short.players.p2.hp, short.players.p1.res]).toEqual([50, 95, 20])
-    expect(short.players.p1.hand.map((x) => x.uid)).toEqual([s.uid])
+    // short of the cost: the S still strikes at half base dmg, effect off; the P is unaffected
+    const short = resolveTurn(game('BR', [c('P', 5), c('S', 10, heal5)], [], 19), { p1: 'strike', p2: 'charge' })
+    expect([short.players.p1.hp, short.players.p2.hp, short.players.p1.res]).toEqual([50, 90, 20]) // 5 + floor(10/2)
     const full = resolveTurn(game('BR', [c('S', 10, heal5)], [], 20), { p1: 'strike', p2: 'charge' })
-    expect([full.players.p1.hp, full.players.p1.res]).toEqual([55, 1])
+    expect([full.players.p1.hp, full.players.p2.hp, full.players.p1.res]).toEqual([55, 90, 1])
+    // cost 10 set on the card: 10 Rage is enough
+    const ten = resolveTurn(game('BR', [c('S', 10, heal5, 10)], [], 10), { p1: 'strike', p2: 'charge' })
+    expect([ten.players.p1.hp, ten.players.p2.hp, ten.players.p1.res]).toEqual([55, 90, 1])
+    const tenShort = resolveTurn(game('BR', [c('S', 10, heal5, 10)], [], 9), { p1: 'strike', p2: 'charge' })
+    expect([tenShort.players.p1.hp, tenShort.players.p2.hp]).toEqual([50, 95])
+  })
+
+  it('Bruiser: unpaid S still fires its drawbacks', () => {
+    const pain: EffectSpec = [{ hook: 'onResolve', do: [{ a: 'loseHp', who: 'self', n: 7 }, { a: 'heal', who: 'self', n: 5 }] }]
+    const s = resolveTurn(game('BR', [c('S', 10, pain)], [], 5), { p1: 'strike', p2: 'charge' })
+    expect([s.players.p1.hp, s.players.p2.hp]).toEqual([43, 95])
   })
 
   it('Assassin gains 1 Energy every turn', () => {

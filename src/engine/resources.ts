@@ -22,8 +22,10 @@ export type ResourceDef = {
   defaultCost: number
   /** Tank: costs are paid in HP (never down to 0) instead of a bar. */
   payWithHp?: boolean
-  /** Unpaid S cards can't be used at all: they stay on the Field and skip the chain (Bruiser, Q 17:59Z). */
+  /** Unpaid S cards can't be used at all: they stay on the Field and skip the chain. Unused now (Bruiser switched to unpaidDmgPct, Q 2026-10-16). */
   unpaidStays?: boolean
+  /** An unpaid S card still strikes but its base dmg is cut to this % (Bruiser 50, Q 2026-10-16). Effects off, drawbacks still fire. */
+  unpaidDmgPct?: number
   /** Change to the bar at the end of the turn. */
   gain?: (t: TurnSummary) => number
 }
@@ -36,8 +38,8 @@ export const RESOURCES: Record<string, ResourceDef> = {
     name: 'Rage',
     cap: 20, // Q 17:59Z: nerf, cap 5 → 20
     start: 0,
-    defaultCost: 20, // Q 17:59Z: an S card needs a full 20 Rage, below that it can't be used
-    unpaidStays: true,
+    defaultCost: 20, // default 20; cards.cost can set 10 or 20 per card (Q 2026-10-16)
+    unpaidDmgPct: 50, // Rage short of the cost: S still strikes at half base dmg, effects off, drawbacks fire
     gain: (t) => (t.action !== 'strike' && t.enemyAction !== 'strike' ? -1 : t.hitsTaken + t.cleanHits),
   },
   // Energy: starts full, +1 every turn, small cap.
@@ -82,7 +84,7 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
       log(state, `${side} จ่าย ${cost} ${def.name} ให้ ${card.def.id}`)
     } else {
       p.unpaid.push(card.uid)
-      log(state, `${side} ${def.name} ไม่พอสำหรับ ${card.def.id} (ต้องการ ${cost}): ${def.unpaidStays ? 'ใช้ไม่ได้ ค้างบน Field' : 'ตีได้ แต่เหลือแค่ผลเสีย'}`)
+      log(state, `${side} ${def.name} ไม่พอสำหรับ ${card.def.id} (ต้องการ ${cost}): ${def.unpaidStays ? 'ใช้ไม่ได้ ค้างบน Field' : def.unpaidDmgPct != null ? `ตีได้ dmg ฐาน ${def.unpaidDmgPct}% เหลือแค่ผลเสีย` : 'ตีได้ แต่เหลือแค่ผลเสีย'}`)
     }
   }
 }
@@ -105,4 +107,11 @@ export function gainRes(state: GameState, side: Side, t: TurnSummary) {
   const def = resourceOf(state.players[side].championId)
   const n = def?.gain?.(t) ?? 0
   if (n) addRes(state, side, n)
+}
+
+/** Base dmg of a card this turn: halved (or whatever the class says) when it went unpaid. */
+export function baseDmgOf(state: GameState, side: Side, card: CardInst): number {
+  const p = state.players[side]
+  const pct = resourceOf(p.championId)?.unpaidDmgPct
+  return pct != null && p.unpaid?.includes(card.uid) ? Math.floor((card.def.dmg * pct) / 100) : card.def.dmg
 }
