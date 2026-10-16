@@ -104,7 +104,12 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
         markDiscarded(state, side, [{ card: lost, slot: safe + 1, reason: 'Charge break' }])
         toDeckBottom(state, side, [lost])
         log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge) → ลงใต้กอง จั่วใบใหม่แทน`)
-        drawCards(state, side, 1)
+        // the replacement takes the lost card's slot (Q 2026-10-16), not the end of the Field
+        if (drawCards(state, side, 1)) {
+          p.hand.splice(safe, 0, p.hand.pop()!)
+          const ev = state.events?.findLast((e) => e.k === 'draw' && e.side === side)
+          if (ev?.k === 'draw') ev.slot = safe
+        }
       }
     } else {
       drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))

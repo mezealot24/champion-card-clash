@@ -91,7 +91,7 @@ export const DEFAULT_RULES: RulesConfig = {
 export type TurnEvent =
   | { k: 'hit'; side: Side; slot: number; uid: string; type: CardType; dmg: number; dealt: number; blocked: boolean; parried: boolean; absorbed: number; crit: boolean }
   | { k: 'hp'; side: Side; delta: number }
-  | { k: 'draw'; side: Side; card: CardInst }
+  | { k: 'draw'; side: Side; card: CardInst; slot?: number } // slot = index it went to, when not the end of the Field
   | { k: 'discard'; side: Side; uid: string; reason: string }
   | { k: 'sweep'; side: Side; uids: string[] }
   | { k: 'combo'; side: Side; name: string }

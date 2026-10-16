@@ -31,6 +31,9 @@ describe('turn events for the battle screen', () => {
     const kinds = n.events!.map((e) => e.k)
     expect(kinds).toEqual(['hit', 'hp', 'sweep', 'discard', 'draw'])
     expect(n.events![3]).toEqual({ k: 'discard', side: 'p2', uid: oldest.uid, reason: 'Charge break' })
+    // the replacement goes into the lost card's slot, ahead of the cards that stayed
+    expect(n.events![4]).toMatchObject({ k: 'draw', side: 'p2', slot: 0 })
+    expect(n.players.p2.hand[1].def.dmg).toBe(4)
   })
 
   it('events hold only the last turn', () => {

@@ -42,7 +42,7 @@ describe('Cut', () => {
 
   it('stacks with a charge break: Cut first, then the charge break takes the next oldest and draws 1', () => {
     const s = resolveTurn(game([card(5, 'S', cutRule('oldest', 1, [{ c: 'enemyAction', a: 'charge' }]))], named(3)), { p1: 'strike', p2: 'charge' })
-    expect(ids(s.players.p2.hand).slice(0, 1)).toEqual(['FOE-3'])
+    expect(ids(s.players.p2.hand).slice(1)).toEqual(['FOE-3']) // replacement took slot 1
     expect(s.players.p2.hand).toHaveLength(2)
   })
 

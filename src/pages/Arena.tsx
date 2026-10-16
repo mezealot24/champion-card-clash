@@ -255,14 +255,18 @@ export function Arena(props: {
 
     let tail: Promise<unknown> = Promise.resolve()
     const count: Record<Side, number> = { p1: 0, p2: 0 }
-    for (const ev of next.events ?? []) {
+    const events = next.events ?? []
+    for (const [i, ev] of events.entries()) {
       if (ev.k !== 'hp') await tail
       tail = Promise.resolve()
       if (ev.k === 'hit') tail = (await hit(ev, count)).done
       else if (ev.k === 'hp') hpChange(ev)
       else if (ev.k === 'sweep') await sweep(ev.side, ev.uids)
-      else if (ev.k === 'discard') await discard(ev.side, ev.uid, ev.reason)
-      else if (ev.k === 'draw') await draw(ev.side, ev.card)
+      else if (ev.k === 'discard') {
+        // a charge break replacement takes the lost card's slot: leave the gap for it instead of sliding
+        const nx = events[i + 1]
+        await discard(ev.side, ev.uid, ev.reason, nx?.k === 'draw' && nx.side === ev.side && nx.slot != null)
+      } else if (ev.k === 'draw') await draw(ev.side, ev.card, ev.slot)
       else if (ev.k === 'combo') await combo(ev.side, ev.name, next)
     }
     await tail
@@ -370,7 +374,7 @@ export function Arena(props: {
     commit((v) => ({ ...v, [side]: { ...v[side], field: v[side].field.filter((c) => !uids.includes(c.card.uid)) } }))
   }
 
-  async function discard(side: Side, uid: string, reason: string) {
+  async function discard(side: Side, uid: string, reason: string, keepGap = false) {
     if (!viewRef.current[side].field.some((c) => c.card.uid === uid)) return
     commit((v) => ({ ...v, [side]: { ...v[side], field: v[side].field.map((c) => (c.card.uid === uid ? { ...c, gone: reason } : c)) } }))
     const el = cardEl(uid)
@@ -380,12 +384,23 @@ export function Arena(props: {
     const to = pos(pile(side))
     const a = pos(el)
     await anim(el, [{ transform: 'none', opacity: 1 }, { transform: `translate(${to.x - a.x}px,${to.y - a.y}px) scale(.35) rotate(15deg)`, opacity: 0 }], 380, { fill: 'forwards', easing: 'ease-in' })
+    if (keepGap) return // draw() swaps the new card into this slot
     await slideRest(side, (v) => ({ ...v, [side]: { ...v[side], field: v[side].field.filter((c) => c.card.uid !== uid) } }))
   }
 
-  async function draw(side: Side, card: CardInst) {
+  async function draw(side: Side, card: CardInst, slot?: number) {
     if (viewRef.current[side].field.some((c) => c.card.uid === card.uid)) return
-    commit((v) => ({ ...v, [side]: { ...v[side], field: [...v[side].field, { card }] } }))
+    commit((v) => {
+      const field = [...v[side].field]
+      if (slot == null) field.push({ card })
+      else {
+        // replace the discarded card still sitting in that slot, or insert there
+        const at = field.findIndex((c) => c.gone)
+        if (at >= 0) field.splice(at, 1, { card })
+        else field.splice(slot, 0, { card })
+      }
+      return { ...v, [side]: { ...v[side], field } }
+    })
     const el = cardEl(card.uid)
     if (!el) return
     const from = pos(pile(side))
@@ -482,6 +497,7 @@ export function Arena(props: {
                     {i + 1}
                     {vc && (
                       <CardView
+                        key={vc.card.uid}
                         vc={vc}
                         game={game}
                         side={side}

@@ -96,7 +96,7 @@ describe('Bruiser Styles', () => {
     healthy.players.p1.hand = field()
     healthy.players.p2.hand = [hit(1)]
     const h = resolveTurn(healthy, { p1: 'charge', p2: 'strike' }).players.p1.hand.map((c) => c.def.dmg)
-    expect(h.slice(0, 2)).toEqual([2, 3]) // oldest lost, replacement drawn at the end
+    expect(h.slice(1)).toEqual([2, 3]) // oldest lost, the replacement takes its slot
     expect(h).toHaveLength(3)
   })
 })
