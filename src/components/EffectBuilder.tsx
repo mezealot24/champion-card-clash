@@ -27,6 +27,10 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   silenced: { c: 'silenced', who: 'enemy' },
   hasStatus: { c: 'hasStatus', who: 'self', kind: 'shield' },
   res: { c: 'res', who: 'self', n: 3 },
+  chainHas: { c: 'chainHas', who: 'self', type: 'P', n: 1 },
+  prevIs: { c: 'prevIs', type: 'P' },
+  facingIs: { c: 'facingIs', type: 'K' },
+  fieldHas: { c: 'fieldHas', who: 'enemy', type: 'K', n: 2 },
 }
 const COND_LABEL: Record<CondSpec['c'], string> = {
   hitResult: 'Hit result is…',
@@ -49,6 +53,10 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   silenced: 'You / opponent is Silenced',
   hasStatus: 'You / opponent has Shield / Parry / …',
   res: 'You / opponent has N+ resource (Mana / Rage / Energy)',
+  chainHas: 'Your / opponent\'s chain has N+ Punch / Kick / Skill',
+  prevIs: 'Card before this one is…',
+  facingIs: 'Facing card is…',
+  fieldHas: 'You / opponent has N+ Punch / Kick / Skill on the Field',
 }
 const ACT_DEFAULTS: Record<string, ActSpec> = {
   draw: { a: 'draw', who: 'self', n: 1 },
@@ -214,7 +222,14 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
           <input type="checkbox" checked={!!value.pct} onChange={(e) => onChange({ ...value, pct: e.target.checked || undefined })} /> % of Max HP
         </label>
       )}
-      {value.c === 'chainAll' && <TypeSelect value={value.type} onChange={(type) => onChange({ ...value, type: type! })} />}
+      {(value.c === 'chainHas' || value.c === 'fieldHas') && (
+        <select value={value.who} onChange={(e) => onChange({ ...value, who: e.target.value as 'self' | 'enemy' })}>
+          <option value="self">you</option><option value="enemy">opponent</option>
+        </select>
+      )}
+      {(value.c === 'chainAll' || value.c === 'chainHas' || value.c === 'prevIs' || value.c === 'facingIs' || value.c === 'fieldHas') && (
+        <TypeSelect value={value.type} onChange={(type) => onChange({ ...value, type: type! })} />
+      )}
     </>
   )
 }
@@ -288,7 +303,7 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
       )}
       {value.a === 'mulDmg' && <><Num value={value.pct} min={0} onChange={(pct) => onChange({ ...value, pct })} />%</>}
       {'n' in value && value.a !== 'status' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' || value.a === 'blockNow' || value.a === 'gainRes' ? undefined : value.a === 'cut' ? 1 : 0} onChange={(n) => onChange({ ...value, n })} />}
-      {(value.a === 'draw' || value.a === 'heal' || value.a === 'loseHp') && (
+      {(value.a === 'draw' || value.a === 'heal' || value.a === 'loseHp' || value.a === 'addDmg' || value.a === 'gainRes') && (
         <select value={value.per ?? ''} onChange={(e) => onChange({ ...value, per: (e.target.value || undefined) as typeof value.per })} title="Multiply by a count">
           <option value="">(flat)</option>
           {Object.entries(PER_LABEL).map(([k, label]) => <option key={k} value={k}>per {label}</option>)}

@@ -13,7 +13,7 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
 }
 
 /** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
-export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard'
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS'
 
 export function perCount(ctx: BaseCtx, per?: Per): number {
   if (!per) return 1
@@ -24,6 +24,9 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
     case 'chainCard': return c.chain?.length ?? 0
     case 'selfCard': return hand(ctx.self).length
     case 'enemyCard': return hand(ctx.enemy).length
+    case 'chainP':
+    case 'chainK':
+    case 'chainS': return (c.chain ?? []).filter((x) => x.def.type === per.slice(5)).length
   }
 }
 
@@ -127,9 +130,11 @@ function eachTarget(ctx: ChainCtx, target: DmgTarget, onlyType: CardType | undef
 }
 
 export const addDmg =
-  (target: DmgTarget, n: number, onlyType?: CardType): Act =>
-  (ctx) =>
+  (target: DmgTarget, base: number, onlyType?: CardType, per?: Per): Act =>
+  (ctx) => {
+    const n = base * perCount(ctx, per)
     eachTarget(ctx, target, onlyType, ctx.bonus, ctx.enemyBonus, (arr, i) => (arr[i] += n))
+  }
 
 /** ใช้ใน hook `modify`: คูณ dmg เป็น pct% (50 = ครึ่งเดียว, 200 = x2) ปัดลง */
 export const mulDmg =
@@ -192,8 +197,10 @@ export const cut =
 
 /** Gain (or lose, negative) class resource: Mana / Rage / Energy. Nothing for Tank. */
 export const gainRes =
-  (who: Who, n: number): Act<BaseCtx> =>
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
+    const n = base * perCount(ctx, per)
+    if (per && n === 0) return
     for (const s of sides(ctx, who)) addRes(ctx.state, s, n)
     log(ctx.state, `${ctx.card.def.id}: ${who} resource ${n >= 0 ? '+' : ''}${n}`)
   }
@@ -260,6 +267,24 @@ export const slotIs = (n: number): Cond => (ctx) => ctx.slot === n - 1
 /** มีใบประจันหน้า = มือศัตรูมีการ์ดลำดับเดียวกับใบนี้ (ไม่สน action ศัตรู) */
 export const hasFacing: Cond = (ctx) => handOf(ctx, 'enemy').length > ctx.slot
 export const facingSameType: Cond = (ctx) => handOf(ctx, 'enemy')[ctx.slot]?.def.type === ctx.card.def.type
+
+// ---------- P/K/S conditions (2026-10-16) ----------
+const countType = (cards: { def: { type: CardType } }[], type: CardType) => cards.filter((c) => c.def.type === type).length
+
+/** Your Strike chain (empty if you didn't Strike) / the opponent's (empty if they didn't) has n+ cards of this type. */
+export const chainHas =
+  (who: 'self' | 'enemy', type: CardType, n: number): Cond =>
+  (ctx) =>
+    countType(who === 'self' ? ctx.chain : (ctx.enemyChain ?? []), type) >= n
+/** The card right before this one in your chain is this type. */
+export const prevIs = (type: CardType): Cond => (ctx) => ctx.slot > 0 && ctx.chain[ctx.slot - 1]?.def.type === type
+/** The opponent's card in this card's slot (as Fields were at reveal) is this type. */
+export const facingIs = (type: CardType): Cond => (ctx) => handOf(ctx, 'enemy')[ctx.slot]?.def.type === type
+/** Your / the opponent's Field (at reveal) has n+ cards of this type. */
+export const fieldHas =
+  (who: 'self' | 'enemy', type: CardType, n: number): Cond =>
+  (ctx) =>
+    countType(handOf(ctx, who), type) >= n
 
 /** เราโดน hit รวม ≥ n dmg ในเทิร์นนี้ (Block ที่กันได้ไม่นับ) */
 export const tookDmg = (n: number): Cond => (ctx) => ctx.hitDmgTaken[ctx.self] >= n
