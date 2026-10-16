@@ -20,6 +20,9 @@ export const PER_LABEL: Record<Per, string> = {
   chainCard: 'card in your chain',
   selfCard: 'card in your hand',
   enemyCard: "card in opponent's hand",
+  chainP: 'Punch in your chain',
+  chainK: 'Kick in your chain',
+  chainS: 'Skill in your chain',
 }
 
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
@@ -47,6 +50,11 @@ export function describeCond(c: CondSpec): string {
     case 'silenced': return c.who === 'self' ? 'you are Silenced' : 'opponent is Silenced'
     case 'hasStatus': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${STATUS[c.kind]}`
     case 'res': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.n}+ resource`
+    case 'chainHas': return `${c.who === 'self' ? 'your' : "opponent's"} chain has ${c.n}+ ${TYPE[c.type]}`
+    case 'prevIs': return `the card before this one is a ${TYPE[c.type]}`
+    case 'facingIs': return `facing card is a ${TYPE[c.type]}`
+    case 'fieldHas': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.n}+ ${TYPE[c.type]} on the Field`
+    default: return '(unknown condition)'
   }
 }
 
@@ -74,7 +82,10 @@ export function describeAct(a: ActSpec, now = false): string {
       return `${WHO[a.who]} ${STATUS[a.kind]} ${turns}`
     }
     case 'grow': return `this card gains ${signed(a.n)} dmg ${a.dur === 'next' ? 'on its next attack' : 'for the rest of the game'}${a.stack ? ' (stacks)' : ''}`
-    case 'addDmg': return `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''} ${signed(a.n)} dmg`
+    case 'addDmg': {
+      const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`
+      return `${what} ${signed(a.n)} dmg` + per(a.per)
+    }
     case 'blockNow': {
       const n = Math.abs(a.n)
       return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops ${n} ${a.n >= 0 ? 'more' : 'fewer'} hit${n === 1 ? '' : 's'} this turn`
@@ -85,9 +96,10 @@ export function describeAct(a: ActSpec, now = false): string {
       const what = a.which === 'facing' ? 'card in this slot' : a.n === 1 ? `${a.which} card` : `${a.n} ${a.which} cards`
       return `opponent discards their ${what} from the Field to the bottom of their deck (Cut)`
     }
-    case 'gainRes': return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gain`} ${a.n} resource`
+    case 'gainRes': return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gain`} ${a.n} resource` + per(a.per)
     case 'mulDmg': {
       const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`
+      if (a.pct === 0) return `${what} deal 0 dmg`
       if (a.pct < 100) return `${what} lose ${100 - a.pct}% dmg`
       return a.pct % 100 === 0 ? `${what} dmg x${a.pct / 100}` : `${what} dmg ${a.pct}%`
     }

@@ -33,19 +33,24 @@ export type CondSpec =
   | { c: 'silenced'; who: 'self' | 'enemy' }
   | { c: 'hasStatus'; who: 'self' | 'enemy'; kind: StatusKind }
   | { c: 'res'; who: 'self' | 'enemy'; n: number }
+  // P/K/S conditions (2026-10-16)
+  | { c: 'chainHas'; who: 'self' | 'enemy'; type: CardType; n: number }
+  | { c: 'prevIs'; type: CardType }
+  | { c: 'facingIs'; type: CardType }
+  | { c: 'fieldHas'; who: 'self' | 'enemy'; type: CardType; n: number }
 
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
   | { a: 'maxHp'; who: P.Who; n: number }
   | { a: 'status'; who: P.Who; kind: StatusKind; turns: number; n?: number }
   | { a: 'grow'; n: number; dur: 'next' | 'game'; stack?: boolean }
-  | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType }
+  | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType; per?: P.Per }
   | { a: 'mulDmg'; target: P.DmgTarget; pct: number; onlyType?: CardType }
   | { a: 'blockNow'; who: P.Who; n: number }
   | { a: 'pierce'; target: 'this' | 'next' | 'following' | 'chain' }
   | { a: 'steal' }
   | { a: 'cut'; which: P.CutWhich; n: number }
-  | { a: 'gainRes'; who: P.Who; n: number }
+  | { a: 'gainRes'; who: P.Who; n: number; per?: P.Per }
 
 /**
  * One rule = when [hook], if all [if], do all [do]. A card can have several rules.
@@ -78,6 +83,12 @@ function cond(s: CondSpec): Cond {
     case 'silenced': return P.silenced(s.who)
     case 'hasStatus': return P.hasStatus(s.who, s.kind)
     case 'res': return P.resAtLeast(s.who, s.n)
+    case 'chainHas': return P.chainHas(s.who, s.type, s.n)
+    case 'prevIs': return P.prevIs(s.type)
+    case 'facingIs': return P.facingIs(s.type)
+    case 'fieldHas': return P.fieldHas(s.who, s.type, s.n)
+    // a condition this build doesn't know never passes (old builds reading newer DB rows)
+    default: return () => false
   }
 }
 
@@ -89,13 +100,15 @@ function act(s: ActSpec): Act {
     case 'maxHp': return P.maxHp(s.who, s.n)
     case 'status': return P.status(s.who, s.kind, s.turns, P.SIZED.includes(s.kind) ? (s.n ?? 1) : undefined)
     case 'grow': return P.grow(s.n, s.dur ?? 'game', s.stack)
-    case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType)
+    case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType, s.per)
     case 'mulDmg': return P.mulDmg(s.target, s.pct, s.onlyType)
     case 'blockNow': return P.blockNow(s.who, s.n)
     case 'pierce': return P.pierce(s.target)
     case 'steal': return P.steal
     case 'cut': return P.cut(s.which, s.n)
-    case 'gainRes': return P.gainRes(s.who, s.n)
+    case 'gainRes': return P.gainRes(s.who, s.n, s.per)
+    // an action this build doesn't know does nothing
+    default: return () => {}
   }
 }
 
