@@ -1,7 +1,7 @@
 export * from './types'
 export { createGame, type ChampionSetup } from './state'
 export { resolveTurn, legalActions, buildDeck, type CardRowLike } from './engine'
-export { pickAiAction } from './ai'
+export { pickAiAction, pickSmartAction } from './ai'
 export { STYLES, getStyle, type StyleDef, type HitReport } from './styles'
 export { codeEffects, getEffect, isEffectMissing } from './effects/registry'
 export { compileSpec, type EffectSpec, type EffectRule, type CondSpec, type ActSpec, type Hook } from './effects/spec'

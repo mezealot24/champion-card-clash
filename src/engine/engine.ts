@@ -40,6 +40,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     }
   }
   const state = structuredClone(prev)
+  for (const side of SIDES) state.players[side].discarded = []
   log(state, `p1 ${actions.p1} / p2 ${actions.p2}`)
 
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
@@ -90,13 +91,16 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (actions[side] !== 'charge') continue
     const p = state.players[side]
     if (actions[other(side)] === 'strike') {
-      // Strike > Charge: charger loses the oldest card if holding more than 1
-      // (a Style like Tenacity can keep the first slots safe; the next card goes instead)
+      // Strike > Charge: Charge break (Q 2026-10-16). The oldest card goes to the bottom of the deck and a new one is
+      // drawn in its place, even if it was the only card. A Style like Tenacity can keep the first slots safe:
+      // the next card goes instead, and with no card beyond the safe slots nothing is lost.
       const safe = getStyle(p.style)?.chargeBreakSafe?.(state, side) ?? 0
-      if (p.hand.length > Math.max(1, safe)) {
+      if (p.hand.length > safe) {
         const lost = p.hand.splice(safe, 1)[0]
+        p.discarded!.push({ card: lost, slot: safe + 1, reason: 'Charge break' })
         toDeckBottom(state, side, [lost])
-        log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge)`)
+        log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge) → ลงใต้กอง จั่วใบใหม่แทน`)
+        drawCards(state, side, 1)
       }
     } else {
       drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))
@@ -108,6 +112,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (state.blockStreak >= state.rules.blockStreakDiscard) {
       for (const side of SIDES) {
         const p = state.players[side]
+        p.discarded!.push(...p.hand.map((card, i) => ({ card, slot: i + 1, reason: 'Block streak' })))
         toDeckBottom(state, side, p.hand)
         p.hand = []
       }
@@ -299,6 +304,7 @@ function resolveStrikes(
       const enemy = other(side)
       if (actions[enemy] === 'block') {
         const lost = state.players[enemy].hand.splice(0, 2)
+        state.players[enemy].discarded!.push(...lost.map((card, i) => ({ card, slot: i + 1, reason: 'Guard Crush' })))
         toDeckBottom(state, enemy, lost)
         if (lost.length) log(state, `${side} Guard Crush: ${enemy} ทิ้ง ${lost.map((c) => c.def.id).join(', ')}`)
       }

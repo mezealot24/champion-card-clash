@@ -139,3 +139,13 @@ describe('wow building blocks', () => {
     expect(resolveTurn(game('MG', [c('P', 1, rich)], [], 2), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(50)
   })
 })
+
+describe('discard info for the UI', () => {
+  it('Charge break records the lost card for that turn only', () => {
+    const a = c('P', 1), b = c('K', 2)
+    const g = game('AS', [c('P', 1)], [a, b])
+    const t = resolveTurn(g, { p1: 'strike', p2: 'charge' })
+    expect(t.players.p2.discarded?.map((d) => [d.card.uid, d.slot, d.reason])).toEqual([[a.uid, 1, 'Charge break']])
+    expect(resolveTurn(t, { p1: 'block', p2: 'block' }).players.p2.discarded).toEqual([])
+  })
+})

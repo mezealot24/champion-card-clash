@@ -58,6 +58,8 @@ export type PlayerState = {
   res?: number
   /** Chain cards whose cost couldn't be paid this turn: they hit, but their effects are off. */
   unpaid?: string[]
+  /** Cards this side lost to a discard effect this turn (Charge break, Block streak, Guard Crush), for the UI. */
+  discarded?: { card: CardInst; slot: number; reason: string }[]
 }
 
 export type RulesConfig = {

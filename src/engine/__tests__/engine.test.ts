@@ -57,13 +57,23 @@ describe('clash rules', () => {
     expect(n.players.p1.deck).toHaveLength(deckBefore + 4)
   })
 
-  it('Strike vs Charge: full damage, charger loses oldest card and does not draw', () => {
+  it('Strike vs Charge: full damage, the oldest card goes to the bottom of the deck and a new one is drawn in its place', () => {
     const oldest = vanilla(1)
     const s = setup([vanilla(5), vanilla(5)], [oldest, vanilla(1)])
     const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     expect(hp(n, 'p2')).toBe(90)
     expect(n.players.p2.hand.map((c) => c.uid)).not.toContain(oldest.uid)
+    expect(n.players.p2.hand).toHaveLength(2) // 1 kept + 1 replacement
+    expect(n.players.p2.deck.at(-1)?.uid).toBe(oldest.uid)
+    expect(n.players.p2.discarded?.map((d) => d.card.uid)).toEqual([oldest.uid])
+  })
+
+  it('Charge break with a single card still swaps it for a new one (Q 2026-10-16)', () => {
+    const only = vanilla(1)
+    const n = resolveTurn(setup([vanilla(5)], [only]), { p1: 'strike', p2: 'charge' })
     expect(n.players.p2.hand).toHaveLength(1)
+    expect(n.players.p2.hand[0].uid).not.toBe(only.uid)
+    expect(n.players.p2.deck.at(-1)?.uid).toBe(only.uid)
   })
 
   it('Strike vs Strike: both hit fully, both hands empty', () => {
