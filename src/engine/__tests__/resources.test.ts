@@ -32,11 +32,29 @@ describe('resources', () => {
     expect(resolveTurn(game('MG', [c('P')], [], 2), { p1: 'strike', p2: 'block' }).players.p1.res).toBe(2)
   })
 
-  it('Bruiser gains Rage per hit taken and per clean hit landed, loses 1 on a quiet turn', () => {
+  it('Bruiser gains 2 Rage per hit taken and 1 per clean hit landed, loses 1 on a quiet turn', () => {
     // takes 2 hits, lands 1 clean
     const s = resolveTurn(game('BR', [c('P')], [c('P'), c('K')]), { p1: 'strike', p2: 'strike' })
-    expect(s.players.p1.res).toBe(3)
+    expect(s.players.p1.res).toBe(5)
     expect(resolveTurn(game('BR', [], [], 3), { p1: 'block', p2: 'charge' }).players.p1.res).toBe(2)
+  })
+
+  it('Bruiser: HP lost outside a hit gives Rage, 2 from the opponent, 1 from own drawbacks (Q 2026-10-16)', () => {
+    const pain: EffectSpec = [{ hook: 'onResolve', do: [{ a: 'loseHp', who: 'self', n: 3 }] }]
+    // lands 2 clean P hits, one of them costs 3 HP: 2 clean + 1 other dmg
+    expect(resolveTurn(game('BR', [c('P'), c('P', 10, pain)]), { p1: 'strike', p2: 'charge' }).players.p1.res).toBe(3)
+    // quiet turn but an enemy Hold effect burns 4 HP: +2, no −1
+    const burn: EffectSpec = [{ hook: 'onHeld', do: [{ a: 'loseHp', who: 'enemy', n: 4 }] }]
+    expect(resolveTurn(game('BR', [], [c('K', 5, burn)], 3), { p1: 'block', p2: 'charge' }).players.p1.res).toBe(5)
+  })
+
+  it('Bruiser: no −1 on a quiet turn while HP is red (below 30% Max HP)', () => {
+    const red = game('BR', [], [], 3)
+    red.players.p1.hp = 29
+    expect(resolveTurn(red, { p1: 'block', p2: 'charge' }).players.p1.res).toBe(3)
+    const notRed = game('BR', [], [], 3)
+    notRed.players.p1.hp = 30
+    expect(resolveTurn(notRed, { p1: 'block', p2: 'charge' }).players.p1.res).toBe(2)
   })
 
   it('Bruiser: Rage cap 20; an S card costs 20 by default, or 10 / 20 per card (Q 2026-10-16)', () => {

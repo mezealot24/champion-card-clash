@@ -68,7 +68,7 @@ export const loseHp =
   (ctx) => {
     const n = base * perCount(ctx, per)
     if (n <= 0) return
-    for (const s of sides(ctx, who)) loseHpRaw(ctx.state, s, n)
+    for (const s of sides(ctx, who)) loseHpRaw(ctx.state, s, n, s === ctx.self ? 'self' : 'foe')
     log(ctx.state, `${ctx.card.def.id}: ${who} เสีย ${n} HP`)
   }
 

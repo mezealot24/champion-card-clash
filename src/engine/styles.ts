@@ -1,5 +1,6 @@
 // Champion Styles (passives). Code registry keyed by "CHAMP:slot" (champion_styles.slot).
 // Kept free of state.ts imports so createGame can call setup without an import cycle.
+import { RED_HP_PCT } from './resources'
 import type { Action, CardInst, GameState, PlayerState, Side } from './types'
 
 /** Sonic Bliz Overdrive: dmg added to every chain card per Energy spent (Claude default 2026-10-16). */
@@ -7,7 +8,7 @@ export const SONIC_DMG_PER_ENERGY = 2
 /** Sonic Bliz Overdrive: fewest cards in the chain that set it off (Q 2026-10-16: 3, was a full Field of 5). */
 export const OVERDRIVE_MIN_CHAIN = 3
 /** Coup de grâce: enemy HP below this % of Max HP (the red HP bar) → Critical x4 instead of x3. */
-export const COUP_RED_HP_PCT = 30
+export const COUP_RED_HP_PCT = RED_HP_PCT
 
 /** What a side went through in this turn's Strike phase. */
 export type HitReport = {
