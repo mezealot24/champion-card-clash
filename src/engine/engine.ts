@@ -1,7 +1,7 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { getStyle } from './styles'
-import { baseDmgOf, gainRes, payChain } from './resources'
+import { addRes, baseDmgOf, gainRes, payChain, resourceOf } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, effectOf, heal, log, loseHp, toDeckBottom } from './state'
@@ -129,6 +129,17 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   // class resources fill at the end of the turn, so what you earn now is spent next turn
   for (const side of SIDES) {
     gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side] })
+  }
+  // Dual Strike Styles (Sonic Bliz Acceleration): after resources fill, so a full bar stays full
+  if (actions.p1 === 'strike' && actions.p2 === 'strike') {
+    for (const side of SIDES) {
+      const ds = getStyle(state.players[side].style)?.dualStrike
+      if (!ds) continue
+      const cap = resourceOf(state.players[side].championId)?.cap ?? 0
+      if (ds.fillRes && state.rules.resources) addRes(state, side, cap)
+      const n = ds.draw ? drawCards(state, side, ds.draw) : 0
+      log(state, `${side} Acceleration (Dual Strike): ${ds.fillRes ? 'Energy เต็ม, ' : ''}จั่ว ${n}`)
+    }
   }
   for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side, actions[side])
   for (const side of SIDES) {

@@ -38,6 +38,8 @@ export type StyleDef = {
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
+  /** Dual Strike (both sides Strike this turn): at the end of the turn, after resources fill, draw n and/or fill the bar to its cap */
+  dualStrike?: { draw?: number; fillRes?: boolean }
   /** extra cards a Charge that isn't broken draws */
   chargeDraw?: number
   /** last thing in the turn, before the winner check (action = what this side played) */
@@ -120,8 +122,7 @@ Object.assign(STYLES, {
 Object.assign(STYLES, {
   /**
    * Assassin · Sonic Bliz: start the game with 3 cards on the Field (Q buff 2026-10-15).
-   * 1+ clean hit in one chain (Q 2026-10-16, was 3+) → extra hits 6–10, one per card on the
-   * opponent's Field at the start of the turn. Each extra hit deals dmg = cards in your chain + 1 (Claude default for "cards in hand"; Q buff 2026-10-15: 0–5 → 1–6).
+   * Acceleration (Q 2026-10-16, replaced Extra Hits): when you and the opponent both Strike, Energy refills and you draw 2.
    */
   'AS:1': {
     name: 'Sonic Bliz',
@@ -141,15 +142,8 @@ Object.assign(STYLES, {
       p.res = 0
       say(state, side, `Sonic Bliz Overdrive: ใช้ Energy ${energy} ทั้งหมด → ทุกใบในสาย +${add} dmg`)
     },
-    afterChain: (state, side, r) => {
-      if (r.cleanHits < 1 || r.enemyField === 0) return 0
-      const enemy = side === 'p1' ? 'p2' : 'p1'
-      const p = state.players[enemy]
-      const dmg = r.chainLength + 1
-      p.hp = Math.max(0, p.hp - r.enemyField * dmg)
-      say(state, side, `Sonic Bliz: Extra Hit ${r.enemyField} ครั้ง x ${dmg} dmg`)
-      return r.enemyField
-    },
+    // Acceleration (Q 2026-10-16, replaces Extra Hits): Strike meets Strike → Energy full + draw 2 at the end of the turn
+    dualStrike: { draw: 2, fillRes: true },
   },
   /** Assassin · Coup de grâce: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg. */
   'AS:2': {

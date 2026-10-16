@@ -16,25 +16,23 @@ function game(style: string, mine: CardInst[], theirs: CardInst[] = []): GameSta
 }
 const field = (n: number) => Array.from({ length: n }, () => hit(0))
 
-describe('Sonic Bliz', () => {
-  it('3 clean hits: one extra hit per opponent card, each = chain length + 1', () => {
-    // chain 3 x 2 dmg = 6, then 4 extra hits x 4 dmg = 16
-    expect(resolveTurn(game('AS:1', [hit(2), hit(2), hit(2)], field(4)), { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 6 - 16)
+describe('Sonic Bliz Acceleration', () => {
+  it('Strike meets Strike: Energy refills to 3 and you draw 2 at the end of the turn', () => {
+    const g = game('AS:1', [hit(2)], [hit(1)])
+    g.players.p1.res = 0
+    const s = resolveTurn(g, { p1: 'strike', p2: 'strike' })
+    expect(s.players.p1.res).toBe(3)
+    expect(s.players.p1.hand).toHaveLength(2)
+    expect(s.players.p2.hand).toHaveLength(0) // the opponent has no Acceleration
   })
 
-  it('needs at least 1 clean hit in the chain (Q 2026-10-16)', () => {
-    // Block stops both hits: nothing lands clean, no extra hits
-    expect(resolveTurn(game('AS:1', [hit(2), hit(2)], field(3)), { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100)
-    // 0-dmg hits are not clean
-    expect(resolveTurn(game('AS:1', [hit(0)], field(3)), { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100)
-    // 1 of 3 lands clean: 2 dmg + 3 extra hits x (3 cards + 1)
-    expect(resolveTurn(game('AS:1', [hit(2), hit(2), hit(2)], field(3)), { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100 - 2 - 3 * 4)
-  })
-
-  it('5 blocked-through chain: hits 3–5 clean → extra hits', () => {
-    const s = game('AS:1', [hit(1), hit(1), hit(1), hit(1), hit(1)], field(2))
-    s.players.p1.res = 0 // no Overdrive
-    expect(resolveTurn(s, { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100 - 3 - 2 * 6)
+  it('no Extra Hits any more, and nothing when only one side Strikes', () => {
+    const g = game('AS:1', [hit(2), hit(2), hit(2)], field(4))
+    g.players.p1.res = 0
+    const s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
+    expect(s.players.p2.hp).toBe(94)
+    expect(s.players.p1.res).toBe(1)
+    expect(s.players.p1.hand).toHaveLength(0)
   })
 })
 
@@ -64,11 +62,3 @@ describe('Sonic Bliz start', () => {
   })
 })
 
-describe('Sonic Bliz extra hits', () => {
-  it('count as hit dmg for the opponent\'s "you take N+ dmg" cards', () => {
-    const watcher: CardInst = { uid: 'w', def: { id: 'XX-W', type: 'P', dmg: 1, effectText: '', effectSpec: [{ hook: 'onResolve', if: [{ c: 'tookDmg', n: 15 }], do: [{ a: 'heal', who: 'self', n: 50 }] }] } }
-    // chain 3 x 2 = 6 dmg, + 3 extra hits x 3 = 9 → 15 taken → watcher heals 50 (capped at 100)
-    const s = resolveTurn(game('AS:1', [hit(2), hit(2), hit(2)], [watcher, hit(0), hit(0)]), { p1: 'strike', p2: 'charge' })
-    expect(s.players.p2.hp).toBe(100)
-  })
-})
