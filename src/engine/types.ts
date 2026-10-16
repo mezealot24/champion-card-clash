@@ -60,6 +60,8 @@ export type PlayerState = {
   unpaid?: string[]
   /** Cards this side lost to a discard effect this turn (Charge break, Block streak, Guard Crush), for the UI. */
   discarded?: { card: CardInst; slot: number; reason: string }[]
+  /** Field cards this side lost to Cut effects this turn (capped by CUT_CAP). */
+  cutTaken?: number
 }
 
 export type RulesConfig = {

@@ -1,6 +1,9 @@
 // Champion Styles (passives). Code registry keyed by "CHAMP:slot" (champion_styles.slot).
 // Kept free of state.ts imports so createGame can call setup without an import cycle.
-import type { Action, GameState, PlayerState, Side } from './types'
+import type { Action, CardInst, GameState, PlayerState, Side } from './types'
+
+/** Sonic Bliz Overdrive: dmg added to every chain card per Energy spent (Claude default 2026-10-16). */
+export const SONIC_DMG_PER_ENERGY = 2
 
 /** What a side went through in this turn's Strike phase. */
 export type HitReport = {
@@ -30,7 +33,7 @@ export type StyleDef = {
    * bonus = dmg added per slot of this side's chain, mult = dmg multiplier per slot (applied after bonus),
    * crit = add a slot index to show that hit as Critical in the log
    */
-  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>) => void
+  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[]) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
@@ -123,6 +126,21 @@ Object.assign(STYLES, {
   'AS:1': {
     name: 'Sonic Bliz',
     startDraw: 3,
+    /**
+     * Overdrive (Q 2026-10-16): Strike with a full Field (5 cards) and no S card in the chain → all Energy
+     * left is spent, every card in the chain gets +SONIC_DMG_PER_ENERGY dmg per Energy spent (Claude default).
+     * A Style, so Silence doesn't stop it.
+     */
+    beforeHits: (state, side, bonus, _mult, _crit, chain) => {
+      const p = state.players[side]
+      const energy = p.res ?? 0
+      if (!state.rules.resources || energy <= 0 || bonus.length < state.rules.handMax) return
+      if (chain?.some((c) => c.def.type === 'S')) return
+      const add = energy * SONIC_DMG_PER_ENERGY
+      for (let i = 0; i < bonus.length; i++) bonus[i] += add
+      p.res = 0
+      say(state, side, `Sonic Bliz Overdrive: ใช้ Energy ${energy} ทั้งหมด → ทุกใบในสาย +${add} dmg`)
+    },
     afterChain: (state, side, r) => {
       if (r.cleanHits < 1 || r.enemyField === 0) return 0
       const enemy = side === 'p1' ? 'p2' : 'p1'

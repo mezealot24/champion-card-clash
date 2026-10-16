@@ -32,7 +32,9 @@ describe('Sonic Bliz', () => {
   })
 
   it('5 blocked-through chain: hits 3–5 clean → extra hits', () => {
-    expect(resolveTurn(game('AS:1', [hit(1), hit(1), hit(1), hit(1), hit(1)], field(2)), { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100 - 3 - 2 * 6)
+    const s = game('AS:1', [hit(1), hit(1), hit(1), hit(1), hit(1)], field(2))
+    s.players.p1.res = 0 // no Overdrive
+    expect(resolveTurn(s, { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100 - 3 - 2 * 6)
   })
 })
 

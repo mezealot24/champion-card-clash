@@ -40,7 +40,10 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     }
   }
   const state = structuredClone(prev)
-  for (const side of SIDES) state.players[side].discarded = []
+  for (const side of SIDES) {
+    state.players[side].discarded = []
+    state.players[side].cutTaken = 0
+  }
   log(state, `p1 ${actions.p1} / p2 ${actions.p2}`)
 
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
@@ -232,7 +235,7 @@ function resolveStrikes(
 
   // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
   const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }
-  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!, crit[side])
+  for (const side of strikers) getStyle(state.players[side].style)?.beforeHits?.(state, side, bonus[side]!, mult[side]!, crit[side], chains[side]!)
 
   // Every hit's outcome is worked out now, in hit order: Block, then Parry, then Shield, then HP.
   // So dmg each side will take from hits this turn is known before any hit lands.
