@@ -53,6 +53,18 @@ describe('Coup de grâce', () => {
     expect(s.players.p1.styleData?.attacks).toBe(8)
   })
 
+  it('a blocked Critical still deals 50%, other blocked hits deal 0', () => {
+    const s = resolveTurn(game('AS:2', [hit(2), hit(2), hit(2), hit(4)]), { p1: 'strike', p2: 'block' })
+    // hits 1–2 blocked (0), hit 3 lands 2; hit 4 is Critical 12 but not blocked (Block stops first 2)
+    expect(s.players.p2.hp).toBe(100 - 2 - 12)
+    const b = game('AS:2', [hit(2), hit(2), hit(2)])
+    b.players.p1.styleData = { attacks: 2 } // this chain is attacks 3, 4, 5 → slot 2 is the Critical
+    const r = resolveTurn(b, { p1: 'strike', p2: 'block' })
+    // slot 1 blocked 0, slot 2 Critical 6 blocked → 3, slot 3 lands 2
+    expect(r.players.p2.hp).toBe(100 - 3 - 2)
+    expect(r.log.some((l) => l.includes('Critical ทะลุ 3'))).toBe(true)
+  })
+
   it('Critical is x4 while the enemy HP is red (below 30% of Max HP)', () => {
     let s = game('AS:2', [hit(2), hit(2), hit(2), hit(4)])
     s.players.p2.hp = 29
