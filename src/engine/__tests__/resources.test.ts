@@ -57,12 +57,12 @@ describe('resources', () => {
     expect(resolveTurn(notRed, { p1: 'block', p2: 'charge' }).players.p1.res).toBe(2)
   })
 
-  it('Bruiser: Rage cap 20; an S card costs 20 by default, or 10 / 20 per card (Q 2026-10-16)', () => {
+  it('Bruiser: Rage cap 20; an S card costs 10 by default (Q 2026-10-16 21:50Z), cards.cost can change it', () => {
     expect(resolveTurn(game('BR', [c('P')], [c('P')], 20), { p1: 'strike', p2: 'strike' }).players.p1.res).toBe(20)
     // short of the cost: the S still strikes at half base dmg, effect off; the P is unaffected
-    const short = resolveTurn(game('BR', [c('P', 5), c('S', 10, heal5)], [], 19), { p1: 'strike', p2: 'charge' })
-    expect([short.players.p1.hp, short.players.p2.hp, short.players.p1.res]).toEqual([50, 90, 20]) // 5 + floor(10/2)
-    const full = resolveTurn(game('BR', [c('S', 10, heal5)], [], 20), { p1: 'strike', p2: 'charge' })
+    const short = resolveTurn(game('BR', [c('P', 5), c('S', 10, heal5)], [], 9), { p1: 'strike', p2: 'charge' })
+    expect([short.players.p1.hp, short.players.p2.hp, short.players.p1.res]).toEqual([50, 90, 11]) // 5 + floor(10/2)
+    const full = resolveTurn(game('BR', [c('S', 10, heal5)], [], 10), { p1: 'strike', p2: 'charge' })
     expect([full.players.p1.hp, full.players.p2.hp, full.players.p1.res]).toEqual([55, 90, 1])
     // cost 10 set on the card: 10 Rage is enough
     const ten = resolveTurn(game('BR', [c('S', 10, heal5, 10)], [], 10), { p1: 'strike', p2: 'charge' })
