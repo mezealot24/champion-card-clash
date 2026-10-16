@@ -52,6 +52,18 @@ describe('Coup de grâce', () => {
     expect(s.players.p2.hp).toBe(98 - 15 - 2 - 2 - 2 - 6)
     expect(s.players.p1.styleData?.attacks).toBe(8)
   })
+
+  it('Critical is x4 while the enemy HP is red (below 30% of Max HP)', () => {
+    let s = game('AS:2', [hit(2), hit(2), hit(2), hit(4)])
+    s.players.p2.hp = 29
+    s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(s.players.p2.hp).toBe(29 - 6 - 16)
+    expect(s.log.some((l) => l.includes('x4'))).toBe(true)
+    let t = game('AS:2', [hit(2), hit(2), hit(2), hit(4)])
+    t.players.p2.hp = 30
+    t = resolveTurn(t, { p1: 'strike', p2: 'charge' })
+    expect(t.players.p2.hp).toBe(30 - 6 - 12)
+  })
 })
 
 describe('Sonic Bliz start', () => {

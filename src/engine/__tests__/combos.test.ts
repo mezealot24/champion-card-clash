@@ -27,35 +27,35 @@ describe('Tank S > S > S', () => {
   })
 })
 
-describe('Assassin P > K > S', () => {
-  it('works in any order', () => {
+describe('Assassin P > K > S → Death Mark', () => {
+  const mark = { kind: 'deathMark', turns: 9999 }
+  it('works in any order: marks the opponent for the rest of the game', () => {
     const s = resolveTurn(game('AS', [c('S'), c('P'), c('K')]), { p1: 'strike', p2: 'charge' })
-    expect(s.players.p1.statuses).toContainEqual({ kind: 'trueDmg', turns: 3 })
-  })
-  const halve: EffectSpec = [{ hook: 'modify', do: [{ a: 'mulDmg', target: 'enemyAll', pct: 50 }] }]
-  it('all clean → True Damage for the next 3 turns: dmg cuts no longer apply', () => {
-    let s = resolveTurn(game('AS', [c('P'), c('K'), c('S')]), { p1: 'strike', p2: 'charge' })
-    expect(s.players.p1.statuses).toContainEqual({ kind: 'trueDmg', turns: 3 })
-    // opponent holds a card that halves all our hits; with True Damage our 10 stays 10
-    for (let t = 0; t < 3; t++) {
-      const hp = s.players.p2.hp
-      s.players.p1.hand = [c('P', 10)]
-      s.players.p2.hand = [c('P', 0, halve)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(hp - s.players.p2.hp, `turn ${t + 1}`).toBe(10)
-    }
-    // 4th turn: back to normal
-    const hp = s.players.p2.hp
-    s.players.p1.hand = [c('P', 10)]
-    s.players.p2.hand = [c('P', 0, halve)]
-    s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-    expect(hp - s.players.p2.hp).toBe(5)
+    expect(s.players.p2.statuses).toContainEqual(mark)
+    expect(s.players.p2.hp).toBe(94) // no burst on the Strike that places the mark
   })
   it('needs all 3 clean', () => {
     const s = resolveTurn(game('AS', [c('P'), c('K'), c('S')]), { p1: 'strike', p2: 'block' })
-    expect(s.players.p1.statuses).toHaveLength(0)
+    expect(s.players.p2.statuses).toHaveLength(0)
   })
-  it('Block still stops True Damage hits', () => {
+  it('later Strikes burst for 50% of the chain total, even when Blocked', () => {
+    let s = game('AS', [c('P', 10), c('K', 7)])
+    s.players.p2.statuses = [{ kind: 'deathMark', turns: 9999 }]
+    s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(s.players.p2.hp).toBe(100 - 17 - 8) // floor(17 / 2)
+    s.players.p1.hand = [c('P', 10), c('K', 10)]
+    s = resolveTurn(s, { p1: 'strike', p2: 'block' }) // both hits blocked, burst still 10
+    expect(s.players.p2.hp).toBe(75 - 10)
+    expect(s.players.p2.statuses.some((x) => x.kind === 'deathMark')).toBe(true)
+  })
+  it('a second combo does not stack the mark', () => {
+    const s = game('AS', [c('P'), c('K'), c('S')])
+    s.players.p2.statuses = [{ kind: 'deathMark', turns: 9999 }]
+    const out = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(out.players.p2.statuses.filter((x) => x.kind === 'deathMark')).toHaveLength(1)
+    expect(out.players.p2.hp).toBe(100 - 6 - 3)
+  })
+  it('True Damage (from cards) still lets Block stop hits', () => {
     const s = game('AS', [c('P', 10)])
     s.players.p1.statuses = [{ kind: 'trueDmg', turns: 2 }]
     expect(resolveTurn(s, { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(100)
