@@ -6,6 +6,8 @@ import type { Action, CardInst, GameState, PlayerState, Side } from './types'
 export const SONIC_DMG_PER_ENERGY = 2
 /** Sonic Bliz Overdrive: fewest cards in the chain that set it off (Q 2026-10-16: 3, was a full Field of 5). */
 export const OVERDRIVE_MIN_CHAIN = 3
+/** Coup de grâce: enemy HP below this % of Max HP (the red HP bar) → Critical x4 instead of x3. */
+export const COUP_RED_HP_PCT = 30
 
 /** What a side went through in this turn's Strike phase. */
 export type HitReport = {
@@ -147,17 +149,20 @@ Object.assign(STYLES, {
     // Acceleration (Q 2026-10-16, replaces Extra Hits): Strike meets Strike → Energy full + draw 2 at the end of the turn
     dualStrike: { draw: 2, fillRes: true },
   },
-  /** Assassin · Coup de grâce: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg. */
+  /** Assassin · Coup de grâce: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg,
+   *  4x while the enemy's HP is in the red (below 30% of Max HP at the start of the Strike, like the HP bar). */
   'AS:2': {
     name: 'Coup de grâce',
     beforeHits: (state, side, _bonus, mult, crit) => {
       const p = state.players[side]
+      const enemy = state.players[side === 'p1' ? 'p2' : 'p1']
+      const x = enemy.hp * 100 < enemy.maxHp * COUP_RED_HP_PCT ? 4 : 3
       const before = p.styleData?.attacks ?? 0
       mult.forEach((_, i) => {
         if ((before + i + 1) % 4 === 0) {
-          mult[i] *= 3
+          mult[i] *= x
           crit.add(i)
-          say(state, side, `Coup de grâce Critical: ช่อง ${i + 1} (ตีครั้งที่ ${before + i + 1}) dmg x3`)
+          say(state, side, `Coup de grâce Critical: ช่อง ${i + 1} (ตีครั้งที่ ${before + i + 1}) dmg x${x}`)
         }
       })
       p.styleData = { ...p.styleData, attacks: before + mult.length }
