@@ -5,6 +5,8 @@ import {
   isEffectMissing,
   legalActions,
   pickAiAction,
+  costOf,
+  resourceOf,
   STYLES,
   resolveTurn,
   type Action,
@@ -157,6 +159,7 @@ export function Battle({ data }: { data: BattleData }) {
 function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title: string }) {
   const p = game.players[side]
   const pct = Math.max(0, Math.round((p.hp / p.maxHp) * 100))
+  const res = game.rules.resources ? resourceOf(p.championId) : undefined
   return (
     <div className="panel">
       <div className="summary">
@@ -164,6 +167,12 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
         <span>
           HP {p.hp} / {p.maxHp}
         </span>
+        {res && !res.payWithHp && (
+          <span className="res" title={`${res.name}: S cards cost ${res.name}`}>
+            {res.name} {res.cap <= 5 ? `${'◆'.repeat(p.res ?? 0)}${'◇'.repeat(Math.max(0, res.cap - (p.res ?? 0)))} ` : ''}{p.res ?? 0}/{res.cap}
+          </span>
+        )}
+        {res?.payWithHp && <span className="muted">S cards cost HP</span>}
         <span className="muted">มือ {p.hand.length} · กอง {p.deck.length}</span>
         {!!p.comboData?.conqueror && <span className="warn">Conqueror {p.comboData.conqueror}/6</span>}
         {p.statuses.map((s, i) => (
@@ -178,14 +187,14 @@ function PlayerPanel({ game, side, title }: { game: GameState; side: Side; title
       <div className="hand">
         {p.hand.length === 0 && <span className="muted">มือว่าง</span>}
         {p.hand.map((card, i) => (
-          <CardTile key={card.uid} card={card} slot={i + 1} />
+          <CardTile key={card.uid} card={card} slot={i + 1} cost={res ? costOf(p.championId, card) : 0} costName={res?.name ?? ''} />
         ))}
       </div>
     </div>
   )
 }
 
-function CardTile({ card, slot }: { card: CardInst; slot: number }) {
+function CardTile({ card, slot, cost, costName }: { card: CardInst; slot: number; cost: number; costName: string }) {
   const { id, type, dmg, effectText, effectSpec } = card.def
   const missing = isEffectMissing(id, effectText, effectSpec)
   // show what the engine actually runs when the card has effect_json
@@ -194,6 +203,8 @@ function CardTile({ card, slot }: { card: CardInst; slot: number }) {
     <div className="card-tile">
       <div className="muted">
         ช่อง {slot} · <code>{id} · {type}</code>
+        {cost > 0 && <span className="cost" title={`Costs ${cost} ${costName} when it strikes; can't pay = hits without its effect`}> · {cost} {costName}</span>}
+        {card.owner && <span className="warn"> · stolen</span>}
       </div>
       <div className="dmg">
         {dmg + (card.grow ?? 0) + (card.growNext ?? 0)}

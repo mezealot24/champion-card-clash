@@ -8,7 +8,7 @@ const c = (type: CardType, dmg = 2, effectSpec?: EffectSpec): CardInst => ({ uid
 const deck = Array.from({ length: 10 }, (_, i): CardDef => ({ id: `XX-${i}`, type: 'P', dmg: 1, effectText: '' }))
 
 function game(champ: string, mine: CardInst[], theirs: CardInst[] = [], hp = 100): GameState {
-  const s = createGame({ championId: champ, hpStart: hp, hpMax: 200, deck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1 })
+  const s = createGame({ championId: champ, hpStart: hp, hpMax: 200, deck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1, rules: { resources: false } })
   s.players.p1.hand = mine
   s.players.p2.hand = theirs
   return s

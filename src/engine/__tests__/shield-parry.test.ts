@@ -83,7 +83,7 @@ describe('Bruiser drawbacks (migration 20261015000008)', () => {
   const rules = [...sql8.matchAll(/'(\[.*?\])'::jsonb/g)].map((m) => JSON.parse(m[1]) as EffectSpec) // Exhaust, Recoil, Scar
   const rule = (name: 'Exhaust' | 'Recoil' | 'Scar') => rules[{ Exhaust: 0, Recoil: 1, Scar: 2 }[name]]
   const br = (spec: EffectSpec, dmg = 10): CardInst => ({ uid: `b${uid++}`, def: { id: 'BR-T', type: 'S', dmg, effectText: '', effectSpec: spec } })
-  const g = () => createGame({ championId: 'BR', hpStart: 190, hpMax: 190, deck: vdeck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck: vdeck }, { seed: 1 })
+  const g = () => createGame({ championId: 'BR', hpStart: 190, hpMax: 190, deck: vdeck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck: vdeck }, { seed: 1, rules: { resources: false } })
 
   it('Exhaust: next turn no Block and +50% dmg taken', () => {
     let s = g()

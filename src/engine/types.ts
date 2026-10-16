@@ -12,6 +12,8 @@ export type CardDef = {
   dmg: number
   effectText: string // display only
   effectSpec?: EffectSpec | null // cards.effect_json; wins over code in effects/registry.ts
+  /** Resource cost paid when it fires in a Strike chain (engine/resources.ts). Null on an S card = class default. */
+  cost?: number | null
 }
 
 /** One physical card in a game. uid is unique even for copies. */
@@ -21,7 +23,8 @@ export type CardDef = {
  * usedOnce = indexes of this card's "once per game" rules that already fired.
  * enteredWith = cards on the Field (this one included) when this copy last came into play.
  */
-export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number }
+/** owner = the side whose deck this copy goes back to, when it was stolen onto the other Field. */
+export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number; owner?: Side }
 
 /** trueDmg = your hits ignore dmg cuts (only Block stops them) */
 /** guardBreak = Guard Crush: on your next Strike, blocked hits deal half and a Blocking opponent loses their 2 oldest Field cards */
@@ -51,6 +54,10 @@ export type PlayerState = {
   silenced?: boolean
   /** Cards drawn since the last shuffle; the deck reshuffles once a whole deck's worth is drawn. */
   drawsSinceShuffle?: number
+  /** Class resource (Mana / Rage / Energy), see engine/resources.ts. Tank has none (pays HP). */
+  res?: number
+  /** Chain cards whose cost couldn't be paid this turn: they hit, but their effects are off. */
+  unpaid?: string[]
 }
 
 export type RulesConfig = {
@@ -59,6 +66,8 @@ export type RulesConfig = {
   blockStopsHits: number
   blockStreakDiscard: number
   chargeDraw: number
+  /** Class resources + S card costs (engine/resources.ts). Off = every card is free (older card tests, A/B sims). */
+  resources: boolean
 }
 
 export const DEFAULT_RULES: RulesConfig = {
@@ -67,6 +76,7 @@ export const DEFAULT_RULES: RulesConfig = {
   blockStopsHits: 2,
   blockStreakDiscard: 3,
   chargeDraw: 1,
+  resources: true, // Q 2026-10-15: every S card has a cost
 }
 
 export type GameState = {

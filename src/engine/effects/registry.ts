@@ -5,7 +5,7 @@
 // วิธีแก้ effect: เปลี่ยนบรรทัดของการ์ดนั้น ใช้ตัวต่อจาก primitives.ts
 //   hook: modify (ปรับ dmg ก่อนตี) | onResolve (ตอนตี โดน Block ก็ทำงาน) | onClean | onBlocked | onDraw
 import type { CardDef } from '../types'
-import { compileSpec, type EffectSpec } from './spec'
+import { compileSpec, drawbacksOf, type EffectSpec } from './spec'
 import type { CardEffect } from './types'
 import {
   addDmg,
@@ -55,8 +55,18 @@ export function codeEffects(): Record<string, CardEffect> {
 
 const compiled = new Map<string, CardEffect>()
 
-/** effect_json จาก DB มาก่อน ถ้าไม่มีค่อยใช้โค้ดในไฟล์นี้ */
-export function getEffect(def: Pick<CardDef, 'id' | 'effectSpec'>): CardEffect | undefined {
+/**
+ * effect_json จาก DB มาก่อน ถ้าไม่มีค่อยใช้โค้ดในไฟล์นี้
+ * drawbacksOnly = the card's resource cost wasn't paid: only its self-hurting actions run (code effects: none).
+ */
+export function getEffect(def: Pick<CardDef, 'id' | 'effectSpec'>, drawbacksOnly = false): CardEffect | undefined {
+  if (drawbacksOnly) {
+    if (!def.effectSpec?.length) return undefined
+    const key = `drawbacks:${JSON.stringify(def.effectSpec)}`
+    let fx = compiled.get(key)
+    if (!fx) compiled.set(key, (fx = compileSpec(drawbacksOf(def.effectSpec))))
+    return fx
+  }
   if (def.effectSpec?.length) {
     const key = JSON.stringify(def.effectSpec)
     let fx = compiled.get(key)

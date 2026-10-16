@@ -1,5 +1,6 @@
 // ตัวต่อ (building blocks) สำหรับเขียน effect การ์ด
 // รวมกันเป็น effect ใน registry.ts เช่น when(enemyHandAtLeast(2), heal('self', 10))
+import { addRes, resourceOf } from '../resources'
 import { drawCards, heal as healHp, log, loseHp as loseHpRaw } from '../state'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond } from './types'
@@ -136,6 +137,38 @@ export const mulDmg =
   (ctx) =>
     eachTarget(ctx, target, onlyType, ctx.mult, ctx.enemyMult, (arr, i) => (arr[i] *= pct / 100))
 
+/** Before action only: the target cards in your chain ignore Block (Pierce). */
+export const pierce =
+  (target: 'this' | 'next' | 'following' | 'chain'): Act =>
+  (ctx) => {
+    const slots = target === 'chain' ? ctx.chain.map((_, i) => i) : targetSlots(ctx, target)
+    for (const i of slots) if (i < ctx.pierce.length) ctx.pierce[i] = 1
+    if (ctx.chain.length) log(ctx.state, `${ctx.card.def.id}: Pierce (ทะลุ Block)`)
+  }
+
+/**
+ * Steal: take the opponent's card in the same Field slot as this card (as Fields are now) onto your Field,
+ * if you have room. It goes back under its owner's deck once it leaves your Field.
+ */
+export const steal: Act = (ctx) => {
+  const foe = ctx.state.players[ctx.enemy]
+  const me = ctx.state.players[ctx.self]
+  const taken = foe.hand[ctx.slot]
+  if (!taken || me.hand.length >= ctx.state.rules.handMax) return
+  foe.hand.splice(ctx.slot, 1)
+  taken.owner = taken.owner === ctx.self ? undefined : (taken.owner ?? ctx.enemy)
+  me.hand.push(taken)
+  log(ctx.state, `${ctx.card.def.id}: ${ctx.self} ขโมย ${taken.def.id} มาไว้บน Field`)
+}
+
+/** Gain (or lose, negative) class resource: Mana / Rage / Energy. Nothing for Tank. */
+export const gainRes =
+  (who: Who, n: number): Act<BaseCtx> =>
+  (ctx) => {
+    for (const s of sides(ctx, who)) addRes(ctx.state, s, n)
+    log(ctx.state, `${ctx.card.def.id}: ${who} resource ${n >= 0 ? '+' : ''}${n}`)
+  }
+
 function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing' | 'enemyAll' | { enemySlot: number }>): number[] {
   if (target === 'this') return [ctx.slot]
   if (target === 'next') return [ctx.slot + 1]
@@ -222,6 +255,12 @@ export const silenced = (who: 'self' | 'enemy'): Cond => (ctx) => !!ctx.state.pl
 /** you / the opponent have an active status of this kind (e.g. a Shield that isn't used up) */
 export const hasStatus = (who: 'self' | 'enemy', kind: StatusKind): Cond => (ctx) =>
   ctx.state.players[who === 'self' ? ctx.self : ctx.enemy].statuses.some((s) => s.kind === kind && (s.n ?? 1) > 0)
+
+/** you / the opponent have N+ of your class resource (Tank: HP) */
+export const resAtLeast = (who: 'self' | 'enemy', n: number): Cond => (ctx) => {
+  const p = ctx.state.players[who === 'self' ? ctx.self : ctx.enemy]
+  return (resourceOf(p.championId)?.payWithHp ? p.hp : (p.res ?? 0)) >= n
+}
 
 /** Status kinds that carry a size n */
 export const SIZED: StatusKind[] = ['blockPlus', 'shield', 'parry', 'vulnerable']

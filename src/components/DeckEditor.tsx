@@ -65,7 +65,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
     const sort_order = Math.max(0, ...cards.map((c) => c.sort_order)) + 1
     setCards([...cards, {
       id, champion_id: championId, name: 'New card', source: '', line: '', tags: [], type: 'P',
-      dmg: 0, dmg_tct: null, dmg_tentative: true, effect: '', effect_json: null, copies: 1, in_deck: false, sort_order,
+      dmg: 0, dmg_tct: null, dmg_tentative: true, effect: '', effect_json: null, cost: null, copies: 1, in_deck: false, sort_order,
     }])
     setDirty(new Set(dirty).add(id))
   }
@@ -126,7 +126,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
         <table className="deck">
           <thead>
             <tr>
-              <th title="เอาไปสู้">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th>
+              <th title="เอาไปสู้">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 20 Rage, set 10 or 20 per card, Assassin 1 Energy, Tank 10 HP)">Cost</th>
               <th>TCT</th><th>Copies</th><th>Effect</th><th />
             </tr>
           </thead>
@@ -161,6 +161,16 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
                 <td><input className="num" type="number" min={0} value={c.dmg} onChange={(e) => edit(c.id, { dmg: Number(e.target.value) })} /></td>
                 <td title="ค่าชั่วคราว รอ Q ตั้ง">
                   <input type="checkbox" checked={c.dmg_tentative} onChange={(e) => edit(c.id, { dmg_tentative: e.target.checked })} />
+                </td>
+                <td>
+                  <input
+                    className="num"
+                    type="number"
+                    min={0}
+                    placeholder={c.type === 'S' ? 'def' : ''}
+                    value={c.cost ?? ''}
+                    onChange={(e) => edit(c.id, { cost: e.target.value === '' ? null : Number(e.target.value) })}
+                  />
                 </td>
                 <td className="muted">{c.dmg_tct ?? '–'}</td>
                 <td><input className="num" type="number" min={1} max={4} value={c.copies} onChange={(e) => edit(c.id, { copies: Number(e.target.value) })} /></td>

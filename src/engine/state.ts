@@ -4,6 +4,7 @@ import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side } fro
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
 import { getStyle } from './styles'
+import { resourceOf } from './resources'
 
 // --- seeded RNG (mulberry32) so a match can be replayed from its seed ---
 export function nextRandom(state: GameState): number {
@@ -63,12 +64,15 @@ function emptyPlayer(setup: ChampionSetup, side: Side): PlayerState {
     deck: setup.deck.map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
     statuses: [],
     style: setup.style,
+    res: resourceOf(setup.championId)?.start ?? 0,
   }
 }
 
 /** A card's effect, or nothing while its owner is Silenced. */
+/** A chain card whose resource cost couldn't be paid this turn keeps only its drawbacks (Q 2026-10-15). */
 export function effectOf(state: GameState, side: Side, card: CardInst) {
-  return state.players[side].silenced ? undefined : getEffect(card.def)
+  const p = state.players[side]
+  return p.silenced ? undefined : getEffect(card.def, !!p.unpaid?.includes(card.uid))
 }
 
 /**
@@ -98,8 +102,13 @@ export function drawCards(state: GameState, side: Side, n: number): number {
 }
 
 /** Used / lost cards go to the bottom of the deck (deck never runs out). */
+/** A stolen card goes back under its owner's deck. */
 export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
-  state.players[side].deck.push(...cards)
+  for (const card of cards) {
+    const to = card.owner ?? side
+    card.owner = undefined
+    state.players[to].deck.push(card)
+  }
 }
 
 export function heal(state: GameState, side: Side, n: number) {
