@@ -31,6 +31,8 @@ const ACTIONS: { action: Action; label: string; beats: string }[] = [
 ]
 const SPEEDS = [1, 1.5, 2]
 /** Banner text per signature combo (champion · pattern). */
+/** Juggernaut: Conqueror stacks full (6) lights the fighter up. */
+const conqMax = (g: GameState, s: Side) => (g.players[s].comboData?.conqueror ?? 0) >= 6
 const COMBO_TEXT: Record<string, [string, string]> = {
   'TK:P > K > P': ['SECOND HELPING', 'Heal 10% of your HP'],
   'AS:P > K > S': ['DEATH MARK', 'Every later Strike bursts +50%'],
@@ -512,11 +514,11 @@ export function Arena(props: {
           <div className="lane">
             <div className="log">{playing ? '' : lastLines.map(readable).join(' · ') || 'Pick an action. Both sides lock in, then reveal together.'}</div>
             <div className="vs">
-              <div className={`fighter p2${down === 'p2' ? ' down' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId) }} />
+              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId) }} />
               <TokenView side="p2" tok={tok} playing={playing} />
               <div className="verdict">{hits || tok.verdict}</div>
               <TokenView side="p1" tok={tok} playing={playing} locked={locked} />
-              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId) }} />
+              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId) }} />
             </div>
           </div>
           <div className="side">
@@ -646,7 +648,7 @@ function Hud({ game, side, hp, name, style }: { game: GameState; side: Side; hp:
     ...p.statuses.map((s) =>
       s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? 'No Strike' : s.kind === 'noCharge' ? 'No Charge' : s.kind === 'deathMark' ? '💀 Death Mark' : s.kind,
     ),
-    ...(p.comboData?.conqueror ? [`Conqueror ${p.comboData.conqueror}/6`] : []),
+    ...(p.comboData?.conqueror ? [p.comboData.conqueror >= 6 ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/6`] : []),
   ]
   const who = (
     <div className="who" key="who">
