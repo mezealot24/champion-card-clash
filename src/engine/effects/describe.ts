@@ -5,6 +5,7 @@ import type { DmgTarget, Per, Who } from './primitives'
 
 export const HOOK_LABEL: Record<Hook, string> = {
   modify: 'Before action',
+  onHit: 'On hit',
   onResolve: 'After action',
   onHeld: 'Every turn (Hold)',
   onDraw: 'Comes into play',

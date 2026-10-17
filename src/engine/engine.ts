@@ -316,6 +316,8 @@ function resolveStrikes(
       const clean = !blocked && dealt > 0
       if (clean) cleanHits[side]++
       hitResults.set(card.uid, { blocked, clean })
+      // On hit: fires right here, between hits, so e.g. a heal lands before the next enemy hit (Q 2026-10-17)
+      effectOf(state, side, card)?.onHit?.(ctxFor(side, i, blocked, clean))
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
   }

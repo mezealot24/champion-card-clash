@@ -6,11 +6,12 @@ import type { Act, BaseCtx, CardEffect, ChainCtx, Cond } from './types'
 
 /**
  * Timings, Tekken Card Tournament style: modify = Before attack, onResolve = After attack,
- * onHeld = Every turn (Hold), onDraw = Comes into play.
+ * onHeld = Every turn (Hold), onDraw = Comes into play,
+ * onHit = On hit: right after this card's own hit in the chain, so a heal lands before the next hits (Q 2026-10-17).
  * onClean / onBlocked are legacy: normalizeSpec turns them into onResolve + a hitResult condition.
  */
-export type Hook = 'modify' | 'onResolve' | 'onHeld' | 'onDraw' | 'onClean' | 'onBlocked'
-export const HOOKS: Hook[] = ['modify', 'onResolve', 'onHeld', 'onDraw']
+export type Hook = 'modify' | 'onHit' | 'onResolve' | 'onHeld' | 'onDraw' | 'onClean' | 'onBlocked'
+export const HOOKS: Hook[] = ['modify', 'onHit', 'onResolve', 'onHeld', 'onDraw']
 
 export type CondSpec =
   | { c: 'enemyHandAtLeast'; n: number }

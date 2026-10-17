@@ -48,6 +48,7 @@ export type Cond = (ctx: ChainCtx) => boolean
 /**
  * Hooks a card can have. All optional.
  * - modify: before any hit, adjust dmg of this / later cards (chain auras)
+ * - onHit: right after this card's own hit, mid-chain (only when its side Strikes); blocked / clean are known
  * - onResolve: when this card hits, blocked or not (Q: blocked cards still fire effects, just 0 dmg)
  * - onClean: when this card hits clean (not blocked, dmg > 0)
  * - onBlocked: when this card is stopped by Block
@@ -57,6 +58,7 @@ export type Cond = (ctx: ChainCtx) => boolean
  */
 export type CardEffect = {
   modify?: Act
+  onHit?: Act
   onResolve?: Act
   onClean?: Act
   onBlocked?: Act

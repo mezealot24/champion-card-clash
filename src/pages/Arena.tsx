@@ -697,6 +697,7 @@ function Hud({ game, side, hp, name, style }: { game: GameState; side: Side; hp:
 
 const TIMING: [string, string][] = [
   ['Before action', 'BEFORE'],
+  ['On hit', 'ON HIT'],
   ['After action', 'AFTER'],
   ['Every turn (Hold)', 'HOLD'],
   ['Comes into play', 'ON DRAW'],
