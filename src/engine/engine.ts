@@ -1,6 +1,6 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, DEATH_MARK_PCT, lifestealPct } from './combos'
-import { getStyle } from './styles'
+import { getStyle, igniteBurn, igniteStacks } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
@@ -72,6 +72,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   }
   const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
   const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') } }
+
+  // Styles that act on the action picked (Molten Shield), before statuses are read
+  for (const side of SIDES) getStyle(state.players[side].style)?.actionStart?.(state, side, actions[side])
 
   // Silence: a side Silenced at the start of the turn has no card effects all turn
   for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
@@ -168,6 +171,13 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     }
   }
   for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side, actions[side])
+  // Ignite burns at the end of every turn it's on (Pyromancer)
+  for (const side of SIDES) {
+    const burn = igniteBurn(state.players[side])
+    if (!burn) continue
+    loseHp(state, side, burn)
+    log(state, `${side} 🔥 Ignite ${igniteStacks(state.players[side])} stack ไหม้ ${burn}`)
+  }
   for (const side of SIDES) {
     const p = state.players[side]
     p.silenced = false
@@ -462,6 +472,7 @@ export type CardRowLike = {
   in_deck?: boolean
   effect_json?: EffectSpec | null
   cost?: number | null
+  style_only?: string | null
 }
 
 /** DB rows → deck list, expanded by copies. Rows with in_deck = false are left out. */
@@ -475,5 +486,6 @@ export function buildDeck(rows: CardRowLike[]): CardDef[] {
       effectText: r.effect,
       effectSpec: r.effect_json ?? null,
       cost: r.cost ?? null,
+      styleOnly: r.style_only ?? null,
     })))
 }

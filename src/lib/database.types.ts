@@ -45,6 +45,8 @@ export type CardRow = {
   effect_json: EffectSpec | null // see src/engine/effects/spec.ts
   /** Resource cost when it strikes (src/engine/resources.ts). Null on an S card = class default. */
   cost: number | null
+  /** "MG:1" = only in the deck under that Style; "!MG:1" = under every Style but that one; null = always (engine inStyleDeck). */
+  style_only?: string | null
   copies: number
   in_deck: boolean
   sort_order: number

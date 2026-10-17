@@ -44,7 +44,8 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
   const [tagFilter, setTagFilter] = useState<CardTag | ''>('')
   const [deckFilter, setDeckFilter] = useState<'all' | 'in' | 'out'>('all')
 
-  const deckCount = cards.filter((c) => c.in_deck).reduce((n, c) => n + c.copies, 0)
+  // a Style's own cards (style_only "MG:1") replace the "!MG:1" ones, so count the deck every other Style plays
+  const deckCount = cards.filter((c) => c.in_deck && !(c.style_only && !c.style_only.startsWith('!'))).reduce((n, c) => n + c.copies, 0)
   const q = query.trim().toLowerCase()
   const visible = cards.filter((c) =>
     (!q || [c.id, c.name, c.source, c.effect].some((v) => v.toLowerCase().includes(q))) &&
@@ -53,7 +54,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
     (deckFilter === 'all' || c.in_deck === (deckFilter === 'in')),
   )
   // Max deck_size cards (counting copies) can be picked for battle
-  const canPick = (c: EditableCard) => c.in_deck || deckCount + c.copies <= deckSize
+  const canPick = (c: EditableCard) => c.in_deck || (!!c.style_only && !c.style_only.startsWith('!')) || deckCount + c.copies <= deckSize
 
   const edit = (id: string, patch: Partial<EditableCard>) => {
     setCards(cards.map((c) => (c.id === id ? { ...c, ...patch } : c)))
@@ -127,7 +128,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
           <thead>
             <tr>
               <th title="เอาไปสู้">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 10 Rage, Assassin 1 Energy, Tank 10 HP)">Cost</th>
-              <th>TCT</th><th>Copies</th><th>Effect</th><th />
+              <th title='"MG:1" = only under that Style · "!MG:1" = every Style but that one · empty = always'>Style</th><th>TCT</th><th>Copies</th><th>Effect</th><th />
             </tr>
           </thead>
           <tbody>
@@ -172,6 +173,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
                     onChange={(e) => edit(c.id, { cost: e.target.value === '' ? null : Number(e.target.value) })}
                   />
                 </td>
+                <td><input className="short" placeholder="all" value={c.style_only ?? ''} onChange={(e) => edit(c.id, { style_only: e.target.value.trim() || null })} /></td>
                 <td className="muted">{c.dmg_tct ?? '–'}</td>
                 <td><input className="num" type="number" min={1} max={4} value={c.copies} onChange={(e) => edit(c.id, { copies: Number(e.target.value) })} /></td>
                 <td>

@@ -2,6 +2,7 @@
 // รวมกันเป็น effect ใน registry.ts เช่น when(enemyHandAtLeast(2), heal('self', 10))
 import { addRes, resourceOf } from '../resources'
 import { drawCards, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
+import { addIgnite, igniteBurn, igniteStacks } from '../styles'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond } from './types'
 
@@ -13,7 +14,7 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
 }
 
 /** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
-export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'maxHpPct' | 'missingHpPct'
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'maxHpPct' | 'missingHpPct' | 'enemyIgnite'
 
 export function perCount(ctx: BaseCtx, per?: Per): number {
   if (!per) return 1
@@ -38,6 +39,8 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
       const p = ctx.state.players[ctx.self]
       return Math.max(0, p.maxHp - p.hp) / 100
     }
+    // Ignite stacks on the opponent (Pyromancer)
+    case 'enemyIgnite': return igniteStacks(ctx.state.players[ctx.enemy])
     // a "per" this build doesn't know counts 0 (old builds reading newer DB rows)
     default: return 0
   }
@@ -130,6 +133,7 @@ export type DmgTarget =
   | 'this' // ใบนี้
   | 'next' // ใบถัดไป 1 ใบ
   | 'following' // ทุกใบที่ตามหลัง
+  | 'chain' // ทุกใบในสายเรา รวมใบนี้
   | { slot: number } // ช่องที่ n (นับ 1)
   | { enemySlot: number } // ช่องที่ n ในสายศัตรู (มีผลเมื่อศัตรู Strike)
   | 'facing' // ใบประจันหน้าของศัตรู (มีผลเมื่อศัตรู Strike)
@@ -213,6 +217,34 @@ export const cut =
     }
   }
 
+/** Ignite (Pyromancer): add n stacks (× per) (max 4) and reset the timer to 3 turns. n = 0 only refreshes a burn that's on. */
+export const ignite =
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
+  (ctx) => {
+    const n = Math.floor(base * perCount(ctx, per))
+    if (per && n <= 0) return
+    for (const s of sides(ctx, who)) {
+      const had = igniteStacks(ctx.state.players[s])
+      const now = addIgnite(ctx.state, s, n)
+      if (now || had) log(ctx.state, `${ctx.card.def.id}: ${s} 🔥 Ignite ${now} stack (นับ 3 เทิร์นใหม่)`)
+    }
+  }
+
+/** Detonate Ignite: every burn it had left lands at once (stacks × turns left), then it's gone. */
+export const consumeIgnite =
+  (who: Who): Act<BaseCtx> =>
+  (ctx) => {
+    for (const s of sides(ctx, who)) {
+      const p = ctx.state.players[s]
+      const st = p.statuses.find((x) => x.kind === 'ignite')
+      if (!st) continue
+      const dmg = igniteBurn(p) * st.turns
+      p.statuses = p.statuses.filter((x) => x !== st)
+      loseHpRaw(ctx.state, s, dmg, s === ctx.self ? 'self' : 'foe')
+      log(ctx.state, `${ctx.card.def.id}: 🔥 Ignite ของ ${s} ระเบิด ${dmg}`)
+    }
+  }
+
 /** Gain (or lose, negative) class resource: Mana / Rage / Energy. Nothing for Tank. */
 export const gainRes =
   (who: Who, base: number, per?: Per): Act<BaseCtx> =>
@@ -227,6 +259,7 @@ function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing' | 'enemy
   if (target === 'this') return [ctx.slot]
   if (target === 'next') return [ctx.slot + 1]
   if (target === 'following') return ctx.chain.map((_, i) => i).filter((i) => i > ctx.slot)
+  if (target === 'chain') return ctx.chain.map((_, i) => i)
   return [target.slot - 1]
 }
 
@@ -303,6 +336,14 @@ export const fieldHas =
   (who: 'self' | 'enemy', type: CardType, n: number): Cond =>
   (ctx) =>
     countType(handOf(ctx, who), type) >= n
+
+/** Ignite stacks on you / the opponent compared with n (Pyromancer). */
+export const igniteCmp =
+  (who: 'self' | 'enemy', op: '>=' | '<', n: number): Cond =>
+  (ctx) => {
+    const k = igniteStacks(ctx.state.players[who === 'self' ? ctx.self : ctx.enemy])
+    return op === '>=' ? k >= n : k < n
+  }
 
 /** เราโดน hit รวม ≥ n dmg ในเทิร์นนี้ (Block ที่กันได้ไม่นับ) */
 export const tookDmg = (n: number): Cond => (ctx) => ctx.hitDmgTaken[ctx.self] >= n

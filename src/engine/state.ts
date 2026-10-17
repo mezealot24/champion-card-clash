@@ -3,7 +3,7 @@
 import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, TurnEvent } from './types'
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
-import { getStyle } from './styles'
+import { getStyle, healAfterIgnite } from './styles'
 import { resourceOf } from './resources'
 
 // --- seeded RNG (mulberry32) so a match can be replayed from its seed ---
@@ -55,13 +55,23 @@ export function createGame(
   return state
 }
 
+/**
+ * cards.style_only: "MG:1" = only in the deck under that Style (Pyromancer's own cards);
+ * "!MG:1" = in the deck under every Style but that one (the cards those replace). Null = always.
+ */
+export function inStyleDeck(def: CardDef, style?: string): boolean {
+  const k = def.styleOnly
+  if (!k) return true
+  return k.startsWith('!') ? k.slice(1) !== style : k === style
+}
+
 function emptyPlayer(setup: ChampionSetup, side: Side): PlayerState {
   return {
     championId: setup.championId,
     hp: setup.hpStart,
     maxHp: setup.hpMax,
     hand: [],
-    deck: setup.deck.map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
+    deck: setup.deck.filter((def) => inStyleDeck(def, setup.style)).map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
     statuses: [],
     style: setup.style,
     res: resourceOf(setup.championId)?.start ?? 0,
@@ -112,11 +122,12 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
   }
 }
 
-/** Heal up to Max HP; returns HP actually gained. A side already at 0 HP is down for good:
+/** Heal up to Max HP (Ignite cuts it by 25%); returns HP actually gained. A side already at 0 HP is down for good:
  *  heals later in the same turn (After action, Hold, combos, Omnivamp) can't bring it back (Q 2026-10-17). */
 export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   if (p.hp <= 0) return 0
+  n = healAfterIgnite(p, n)
   const before = p.hp
   p.hp = Math.min(p.maxHp, p.hp + n)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
