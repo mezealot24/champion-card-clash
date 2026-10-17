@@ -28,7 +28,7 @@ describe('Tank P > K > P', () => {
   })
 })
 
-describe('Assassin P > K > S → Death Mark', () => {
+describe('Assassin P > K > S → Mark of Assassin', () => {
   const mark = { kind: 'deathMark', turns: 9999 }
   it('works in any order: marks the opponent for the rest of the game', () => {
     const s = resolveTurn(game('AS', [c('S'), c('P'), c('K')]), { p1: 'strike', p2: 'charge' })

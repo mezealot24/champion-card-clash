@@ -321,7 +321,7 @@ function resolveStrikes(
     }
   }
 
-  // Death Mark (Assassin combo): a Strike against a marked opponent bursts for 50% of the chain's total dmg,
+  // Mark of Assassin (Assassin combo): a Strike against a marked opponent bursts for 50% of the chain's total dmg,
   // whatever Block / Shield let through (Claude reading of Q 2026-10-16: total = every card's dmg in the chain).
   // Lost straight from HP. A mark placed by this turn's combo only counts from the next Strike.
   for (const side of strikers) {
@@ -331,7 +331,7 @@ function resolveStrikes(
     if (burst <= 0) continue
     loseHp(state, other(side), burst)
     hitDmgTaken[other(side)] += burst
-    log(state, `${side} 💀 Death Mark ระเบิด ${burst} (50% ของ dmg รวม ${total} ในสาย)`)
+    log(state, `${side} 💀 Mark of Assassin ระเบิด ${burst} (50% ของ dmg รวม ${total} ในสาย)`)
   }
 
   // Guard Crush is used up by this Strike: if the opponent Blocked it, they lose their 2 oldest Field cards.
