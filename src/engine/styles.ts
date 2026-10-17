@@ -22,8 +22,9 @@ export const IGNITE_TURNS = 3
 export const IGNITE_FLAT_PER_STACK = 2 // Q asked 3; sim 3 = 65% win, 2 = 47%, 1 = 39% (Claude pick)
 export const IGNITE_HEAL_CUT_PER_STACK = 25
 export const IGNITE_HEAL_CUT_MAX = 50
-/** Molten Shield: Shield a Block always gets. */
-export const MOLTEN_SHIELD = 5
+/** Molten Shield: a Block spends up to MOLTEN_MAX_MANA Mana for Shield MOLTEN_SHIELD_PER_MANA each. */
+export const MOLTEN_MAX_MANA = 3
+export const MOLTEN_SHIELD_PER_MANA = 5
 
 export const igniteStacks = (p: PlayerState) => p.statuses.find((s) => s.kind === 'ignite')?.n ?? 0
 /** HP one end-of-turn burn takes. */
@@ -253,8 +254,8 @@ Object.assign(STYLES, {
   /**
    * Mage · Pyromancer (Q 2026-10-17, replaces Mana Flow; reworked the same day so it costs no extra Mana).
    * Touch of Flame: every Skill card you paid for that hits clean gives the opponent 1 Ignite (after your chain).
-   * Molten Shield: every Block gets Shield 5 this turn; with 1+ Mana (not spent), each hit your Block stops
-   * gives the attacker 1 Ignite.
+   * Molten Shield (first version, Q asked it back): a Block with Mana spends up to 3 of it for Shield 5 per Mana
+   * this turn, and each hit that Block stops gives the attacker 1 Ignite. No Mana, no Molten Shield.
    */
   'MG:1': {
     name: 'Pyromancer',
@@ -266,12 +267,14 @@ Object.assign(STYLES, {
     },
     actionStart: (state, side, action) => {
       const p = state.players[side]
-      if (action !== 'block') return
+      // Molten Shield v1 (Q asked it back 2026-10-17): Block spends up to 3 Mana, Shield 5 per Mana
+      if (action !== 'block' || !state.rules.resources || (p.res ?? 0) <= 0) return
+      const spent = Math.min(MOLTEN_MAX_MANA, p.res ?? 0)
+      p.res = (p.res ?? 0) - spent
       // turns 1: an old-shield tick at the end of this turn removes it
-      p.statuses.push({ kind: 'shield', turns: 1, n: MOLTEN_SHIELD })
-      const hot = !state.rules.resources || (p.res ?? 0) >= 1
-      p.styleData = { ...p.styleData, molten: hot ? 1 : 0 }
-      say(state, side, `Molten Shield: Shield ${MOLTEN_SHIELD} เทิร์นนี้${hot ? ' + hit ที่ Block ได้จุด Ignite' : ''}`)
+      p.statuses.push({ kind: 'shield', turns: 1, n: spent * MOLTEN_SHIELD_PER_MANA })
+      p.styleData = { ...p.styleData, molten: 1 }
+      say(state, side, `Molten Shield: ใช้ Mana ${spent} → Shield ${spent * MOLTEN_SHIELD_PER_MANA} เทิร์นนี้ + hit ที่ Block ได้จุด Ignite`)
     },
     afterHits: (state, side, r) => {
       const p = state.players[side]

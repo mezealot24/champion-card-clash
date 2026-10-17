@@ -48,21 +48,30 @@ describe('Pyromancer', () => {
     s.players.p2.statuses[0].n = 4
     expect(heal(s, 'p2', 20)).toBe(10)
   })
-  it('Molten Shield: every Block gets Shield 5; with Mana (kept) each blocked hit Ignites the attacker', () => {
+  it('Molten Shield: Block spends up to 3 Mana for Shield 5 per Mana; each blocked hit Ignites the attacker', () => {
+    const s = game('MG:1')
+    s.players.p1.res = 4
+    s.players.p2.hand = [hit(10), hit(10), hit(22)]
+    const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    expect(n.players.p1.hp).toBe(93) // 3rd hit 22, Shield 15 soaks 15
+    expect(n.players.p1.res).toBe(2) // 4 - 3 spent, +1 for Blocking
+    expect(ignite(n)?.n).toBe(2)
+    expect(shield(n)).toBe(0) // this turn only
+  })
+  it('Molten Shield spends only the Mana there is', () => {
     const s = game('MG:1')
     s.players.p1.res = 1
     s.players.p2.hand = [hit(10), hit(10), hit(12)]
     const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
-    expect(n.players.p1.hp).toBe(93) // 3rd hit 12, Shield 5 soaks 5
-    expect(n.players.p1.res).toBe(2) // not spent, +1 for Blocking
-    expect(ignite(n)?.n).toBe(2)
-    expect(shield(n)).toBe(0) // this turn only
+    expect(n.players.p1.hp).toBe(93) // Shield 5 soaks 5 of 12
+    expect(n.players.p1.res).toBe(1) // 1 - 1, +1 for Blocking
   })
-  it('Molten Shield with no Mana: Shield only', () => {
+  it('Molten Shield with no Mana: no Shield, no Ignite', () => {
     const s = game('MG:1')
-    s.players.p2.hand = [hit(10)]
+    s.players.p2.hand = [hit(10), hit(10), hit(12)]
     const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
     expect(ignite(n)).toBeUndefined()
+    expect(n.players.p1.hp).toBe(88)
   })
 })
 
