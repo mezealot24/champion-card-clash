@@ -230,16 +230,20 @@ export const ignite =
     }
   }
 
-/** Detonate Ignite: every burn it had left lands at once (stacks × turns left), then it's gone. */
+/** Clear Ignite. burn = it explodes: every burn it had left lands at once (burn × turns left). */
 export const consumeIgnite =
-  (who: Who): Act<BaseCtx> =>
+  (who: Who, burn = false): Act<BaseCtx> =>
   (ctx) => {
     for (const s of sides(ctx, who)) {
       const p = ctx.state.players[s]
       const st = p.statuses.find((x) => x.kind === 'ignite')
       if (!st) continue
-      const dmg = igniteBurn(p) * st.turns
+      const dmg = burn ? igniteBurn(p) * st.turns : 0
       p.statuses = p.statuses.filter((x) => x !== st)
+      if (!dmg) {
+        log(ctx.state, `${ctx.card.def.id}: ล้าง 🔥 Ignite ของ ${s}`)
+        continue
+      }
       loseHpRaw(ctx.state, s, dmg, s === ctx.self ? 'self' : 'foe')
       log(ctx.state, `${ctx.card.def.id}: 🔥 Ignite ของ ${s} ระเบิด ${dmg}`)
     }

@@ -17,50 +17,52 @@ const skill = (dmg: number, cost = 0): CardInst => ({ uid: `s${uid++}`, def: { i
 const ignite = (s: GameState, side: 'p1' | 'p2' = 'p2') => s.players[side].statuses.find((x) => x.kind === 'ignite')
 
 describe('Pyromancer', () => {
-  it('a Strike with a Skill card and Mana left spends 1 Mana to Ignite, even when Blocked', () => {
-    const s = game('MG:1')
-    s.players.p1.res = 3
-    s.players.p1.hand = [hit(5), skill(5, 2)]
-    const n = resolveTurn(s, { p1: 'strike', p2: 'block' })
-    expect(n.players.p1.res).toBe(0) // 2 for the card, 1 for Ignite
-    expect(ignite(n)?.n).toBe(1)
-  })
-  it('no Skill card or no Mana left = no Ignite', () => {
+  it('Touch of Flame: each paid Skill card that hits clean gives 1 Ignite, no extra Mana', () => {
     const s = game('MG:1')
     s.players.p1.res = 2
-    s.players.p1.hand = [skill(5, 2)]
-    expect(ignite(resolveTurn(s, { p1: 'strike', p2: 'charge' }))).toBeUndefined()
-    const t = game('MG:1')
-    t.players.p1.res = 5
-    t.players.p1.hand = [hit(5)]
-    expect(ignite(resolveTurn(t, { p1: 'strike', p2: 'charge' }))).toBeUndefined()
+    s.players.p1.hand = [skill(5, 1), skill(5, 1), skill(5, 1)]
+    const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(ignite(n)?.n).toBe(2) // the 3rd went unpaid
+    expect(n.players.p1.res).toBe(0)
   })
-  it('Ignite put on this turn burns 1% Max HP per stack at the end of this turn and the next 2', () => {
+  it('a blocked Skill card gives no Ignite', () => {
+    const s = game('MG:1')
+    s.players.p1.hand = [skill(5)]
+    expect(ignite(resolveTurn(s, { p1: 'strike', p2: 'block' }))).toBeUndefined()
+  })
+  it('Ignite burns 3 HP + 1% Max HP per stack at the end of this turn and the next 2', () => {
     let s = game('MG:1')
     s.players.p2.maxHp = 200
-    s.players.p1.res = 1
-    s.players.p1.hand = [skill(0)]
+    s.players.p1.hand = [skill(1)]
     const hp = s.players.p2.hp
     s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-    expect(hp - s.players.p2.hp).toBe(6) // 3 burns of 2 (1% of 200), none on the 4th turn
+    expect(hp - s.players.p2.hp).toBe(1 + 15) // the hit, then 3 burns of 3 + 2
     expect(ignite(s)).toBeUndefined()
   })
-  it('heals are cut by 25% while Ignited', () => {
+  it('heals are cut 25% per stack, at most 50%', () => {
     const s = game('MG:1')
     s.players.p2.hp = 50
     s.players.p2.statuses.push({ kind: 'ignite', turns: 3, n: 1 })
     expect(heal(s, 'p2', 20)).toBe(15)
+    s.players.p2.statuses[0].n = 4
+    expect(heal(s, 'p2', 20)).toBe(10)
   })
-  it('Molten Shield: Block spends 1 Mana for Shield 5, and each blocked hit Ignites the attacker', () => {
+  it('Molten Shield: every Block gets Shield 5; with Mana (kept) each blocked hit Ignites the attacker', () => {
     const s = game('MG:1')
-    s.players.p1.res = 4
+    s.players.p1.res = 1
     s.players.p2.hand = [hit(10), hit(10), hit(12)]
     const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
     expect(n.players.p1.hp).toBe(93) // 3rd hit 12, Shield 5 soaks 5
-    expect(n.players.p1.res).toBe(4) // 4 − 1 + 1 for Blocking
+    expect(n.players.p1.res).toBe(2) // not spent, +1 for Blocking
     expect(ignite(n)?.n).toBe(2)
     expect(shield(n)).toBe(0) // this turn only
+  })
+  it('Molten Shield with no Mana: Shield only', () => {
+    const s = game('MG:1')
+    s.players.p2.hand = [hit(10)]
+    const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    expect(ignite(n)).toBeUndefined()
   })
 })
 

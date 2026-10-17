@@ -13,26 +13,26 @@ export const OVERDRIVE_MIN_CHAIN = 3
 export const COUP_RED_HP_PCT = RED_HP_PCT
 
 /**
- * Ignite (Pyromancer, Q 2026-10-17): a burning debuff, stacks up to IGNITE_MAX.
- * End of every turn: lose 1% of Max HP per stack (at least 1). Heals are cut by IGNITE_HEAL_CUT_PCT while it burns.
- * Lasts IGNITE_TURNS turns (3 burns); a new stack resets the timer. Claude defaults: the heal cut is flat, not per stack.
+ * Ignite (Pyromancer, Q rework 2026-10-17): a burning debuff, stacks up to IGNITE_MAX.
+ * End of every turn: lose 3 HP + 1% of Max HP per stack. Heals are cut 25% per stack, at most 50% (Claude pick of Q's 50/75).
+ * Lasts IGNITE_TURNS turns (3 burns); a new stack resets the timer.
  */
 export const IGNITE_MAX = 4
 export const IGNITE_TURNS = 3
-export const IGNITE_HEAL_CUT_PCT = 25
-/** Pyromancer: Mana spent to Ignite with a Strike that has a Skill card. */
-export const PYRO_IGNITE_COST = 1
-/** Molten Shield: most Mana a Block spends, and Shield per Mana spent. 1 (Q: "ใช้มานา 1 หน่วย"); spending up to 3 left S cards unpaid, sim 20% vs 26%. */
-export const MOLTEN_MAX_MANA = 1
-export const MOLTEN_SHIELD_PER_MANA = 5
+export const IGNITE_FLAT_PER_STACK = 3
+export const IGNITE_HEAL_CUT_PER_STACK = 25
+export const IGNITE_HEAL_CUT_MAX = 50
+/** Molten Shield: Shield a Block always gets. */
+export const MOLTEN_SHIELD = 5
 
 export const igniteStacks = (p: PlayerState) => p.statuses.find((s) => s.kind === 'ignite')?.n ?? 0
 /** HP one end-of-turn burn takes. */
 export const igniteBurn = (p: PlayerState) => {
   const n = igniteStacks(p)
-  return n ? Math.max(1, Math.floor((p.maxHp * n) / 100)) : 0
+  return n * IGNITE_FLAT_PER_STACK + Math.floor((p.maxHp * n) / 100)
 }
-export const healAfterIgnite = (p: PlayerState, n: number) => (igniteStacks(p) ? Math.floor((n * (100 - IGNITE_HEAL_CUT_PCT)) / 100) : n)
+export const healAfterIgnite = (p: PlayerState, n: number) =>
+  Math.floor((n * (100 - Math.min(IGNITE_HEAL_CUT_MAX, IGNITE_HEAL_CUT_PER_STACK * igniteStacks(p)))) / 100)
 
 /** Add n Ignite stacks to a side (capped) and reset its timer. Returns the stacks it has now. */
 export function addIgnite(state: GameState, side: Side, n: number): number {
@@ -61,6 +61,7 @@ export type ChainReport = {
   chainLength: number
   cleanHits: number
   enemyField: number // cards on the opponent's Field when actions were revealed
+  paidSkillClean: number // Skill cards in the chain whose cost was paid and that hit clean
 }
 
 export type StyleDef = {
@@ -251,30 +252,27 @@ Object.assign(STYLES, {
 
 Object.assign(STYLES, {
   /**
-   * Mage · Pyromancer (Q 2026-10-17, replaces Mana Flow).
-   * Strike with 1+ Skill card in the chain and Mana left after paying the chain → spend 1 Mana, opponent gains 1 Ignite
-   * (before any hit, so it lands even when the chain is Blocked; Claude default).
-   * Molten Shield: when you Block with Mana, spend 1 (MOLTEN_MAX_MANA) → Shield 5 per Mana this turn only,
-   * and the attacker gains 1 Ignite per hit your Block stopped.
+   * Mage · Pyromancer (Q 2026-10-17, replaces Mana Flow; reworked the same day so it costs no extra Mana).
+   * Touch of Flame: every Skill card you paid for that hits clean gives the opponent 1 Ignite (after your chain).
+   * Molten Shield: every Block gets Shield 5 this turn; with 1+ Mana (not spent), each hit your Block stops
+   * gives the attacker 1 Ignite.
    */
   'MG:1': {
     name: 'Pyromancer',
-    strikeStart: (state, side, chain) => {
-      const p = state.players[side]
-      if (!chain.some((c) => c.def.type === 'S') || (p.res ?? 0) < PYRO_IGNITE_COST) return
-      p.res = (p.res ?? 0) - PYRO_IGNITE_COST
-      const n = addIgnite(state, other(side), 1)
-      say(state, side, `Pyromancer: ใช้ Mana ${PYRO_IGNITE_COST} → ศัตรูติด 🔥 Ignite (${n} stack)`)
+    afterChain: (state, side, r) => {
+      if (!r.paidSkillClean) return 0
+      const n = addIgnite(state, other(side), r.paidSkillClean)
+      say(state, side, `Touch of Flame: Skill ที่จ่ายแล้วเข้า ${r.paidSkillClean} ใบ → ศัตรูติด 🔥 Ignite (${n} stack)`)
+      return 0
     },
     actionStart: (state, side, action) => {
       const p = state.players[side]
-      if (action !== 'block' || !state.rules.resources || (p.res ?? 0) <= 0) return
-      const spent = Math.min(MOLTEN_MAX_MANA, p.res ?? 0)
-      p.res = (p.res ?? 0) - spent
+      if (action !== 'block') return
       // turns 1: an old-shield tick at the end of this turn removes it
-      p.statuses.push({ kind: 'shield', turns: 1, n: spent * MOLTEN_SHIELD_PER_MANA })
-      p.styleData = { ...p.styleData, molten: 1 }
-      say(state, side, `Molten Shield: ใช้ Mana ${spent} → Shield ${spent * MOLTEN_SHIELD_PER_MANA} เทิร์นนี้`)
+      p.statuses.push({ kind: 'shield', turns: 1, n: MOLTEN_SHIELD })
+      const hot = !state.rules.resources || (p.res ?? 0) >= 1
+      p.styleData = { ...p.styleData, molten: hot ? 1 : 0 }
+      say(state, side, `Molten Shield: Shield ${MOLTEN_SHIELD} เทิร์นนี้${hot ? ' + hit ที่ Block ได้จุด Ignite' : ''}`)
     },
     afterHits: (state, side, r) => {
       const p = state.players[side]

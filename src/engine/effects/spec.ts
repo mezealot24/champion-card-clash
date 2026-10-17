@@ -55,7 +55,7 @@ export type ActSpec =
   | { a: 'cut'; which: P.CutWhich; n: number }
   | { a: 'gainRes'; who: P.Who; n: number; per?: P.Per }
   | { a: 'ignite'; who: P.Who; n: number; per?: P.Per }
-  | { a: 'consumeIgnite'; who: P.Who }
+  | { a: 'consumeIgnite'; who: P.Who; burn?: boolean }
 
 /**
  * One rule = when [hook], if all [if], do all [do]. A card can have several rules.
@@ -114,7 +114,7 @@ function act(s: ActSpec): Act {
     case 'cut': return P.cut(s.which, s.n)
     case 'gainRes': return P.gainRes(s.who, s.n, s.per)
     case 'ignite': return P.ignite(s.who, s.n, s.per)
-    case 'consumeIgnite': return P.consumeIgnite(s.who)
+    case 'consumeIgnite': return P.consumeIgnite(s.who, s.burn)
     // an action this build doesn't know does nothing
     default: return () => {}
   }

@@ -393,6 +393,7 @@ function resolveStrikes(
       chainLength: chains[side]!.length,
       cleanHits: cleanHits[side],
       enemyField: handAtStart[other(side)].length,
+      paidSkillClean: chains[side]!.filter((c) => c.def.type === 'S' && hitResults.get(c.uid)?.clean && !state.players[side].unpaid?.includes(c.uid)).length,
     })
     if (extra) env.hitsTaken[other(side)] += extra
     hitDmgTaken[other(side)] += hpBefore - foe.hp // extra hits count as hit dmg (e.g. "you take N+ dmg")

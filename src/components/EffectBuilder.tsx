@@ -80,7 +80,7 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
 const ACT_LABEL: Record<string, string> = {
   draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', mulDmg: 'Dmg × % (this chain)', grow: 'Gain dmg (later attacks)', blockNow: 'Block ±N hits (this turn)',
   pierce: 'Pierce: ignore Block (Before action)', steal: "Steal opponent's card in this slot", cut: 'Cut: opponent discards Field cards', gainRes: 'Gain resource',
-  ignite: 'Ignite (0 = reset timer)', consumeIgnite: 'Explode Ignite',
+  ignite: 'Ignite (0 = reset timer)', consumeIgnite: 'Clear / explode Ignite',
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -322,6 +322,11 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
         <select value={value.which} onChange={(e) => onChange({ ...value, which: e.target.value as typeof value.which })}>
           <option value="oldest">oldest</option><option value="newest">newest</option><option value="facing">card in this slot</option>
         </select>
+      )}
+      {value.a === 'consumeIgnite' && (
+        <label className="inline" title="Deal all the burn it had left at once">
+          <input type="checkbox" checked={!!value.burn} onChange={(e) => onChange({ ...value, burn: e.target.checked || undefined })} /> explode
+        </label>
       )}
       {value.a === 'mulDmg' && <><Num value={value.pct} min={0} onChange={(pct) => onChange({ ...value, pct })} />%</>}
       {'n' in value && value.a !== 'status' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' || value.a === 'blockNow' || value.a === 'gainRes' ? undefined : value.a === 'cut' ? 1 : 0} onChange={(n) => onChange({ ...value, n })} />}

@@ -5,11 +5,12 @@ import { buildDeck, createGame, resolveTurn } from '../index'
 import type { CardDef, CardInst, EffectSpec, GameState } from '../index'
 
 const sql = readFileSync(new URL('../../../supabase/migrations/20261017000005_mage_pyromancer.sql', import.meta.url), 'utf8')
-const rows = [...sql.matchAll(/\('(MG-\d{3})', 'MG', '([^']*)', .*?'(\[.*\])'::jsonb, (\d+), 'MG:1'\)/g)]
-const specs = Object.fromEntries(rows.map((m) => [m[1], JSON.parse(m[3]) as EffectSpec]))
+const all = [...sql.matchAll(/\('(MG-\d{3})', 'MG', '([^']*)', .*?, (true|false), '\{[^}]*\}', '(\[.*\])'::jsonb, (\d+|null), 'MG:1'\)/g)]
+const rows = all.filter((m) => m[3] === 'true')
+const specs = Object.fromEntries(rows.map((m) => [m[1], JSON.parse(m[4]) as EffectSpec]))
 
 let uid = 0
-const mg = (id: string, dmg = 4): CardInst => ({ uid: `m${uid++}`, def: { id, type: 'S', dmg, effectText: '', effectSpec: specs[id] } })
+const mg = (id: string, dmg = 4, type: 'P' | 'K' | 'S' = 'S'): CardInst => ({ uid: `m${uid++}`, def: { id, type, dmg, effectText: '', effectSpec: specs[id] } })
 const plain = (dmg = 1): CardInst => ({ uid: `x${uid++}`, def: { id: 'XX-000', type: 'P', dmg, effectText: '' } })
 const deck = Array.from({ length: 10 }, (_, i): CardDef => ({ id: `XX-${i}`, type: 'P', dmg: 1, effectText: '' }))
 
@@ -23,7 +24,8 @@ function game(p1: CardInst[], p2: CardInst[], ignite = 0): GameState {
 }
 const stacks = (s: GameState) => s.players.p2.statuses.find((x) => x.kind === 'ignite')?.n ?? 0
 
-it('has 7 Pyro-only cards', () => expect(rows.map((m) => m[2])).toEqual(['Blazing Catalyst', 'Infernal Conflagration', 'Wildfire Command', 'Sear Flesh', 'Heatstroke', 'Ash to Ash', 'Magma Trap']))
+it('keeps the first Pyro set out of the deck', () => expect(all.filter((m) => m[3] === 'false').map((m) => m[1])).toEqual(['MG-033', 'MG-034', 'MG-035', 'MG-036', 'MG-037', 'MG-038', 'MG-039']))
+it('has 7 Pyro-only cards in the deck', () => expect(rows.map((m) => m[2])).toEqual(['Cinder Jab', 'Blazing Kick', 'Flame Snap', 'Searing Chains', 'Heat Absorb', 'Combustion', 'Supernova']))
 
 describe('style_only decks', () => {
   const rowsOf = [
@@ -39,36 +41,40 @@ describe('style_only decks', () => {
 })
 
 describe('Pyro cards', () => {
-  it('Blazing Catalyst: every chain card +5 per Ignite stack', () => {
-    const s = resolveTurn(game([plain(1), mg('MG-026', 1)], [], 2), { p1: 'strike', p2: 'charge' })
-    expect(100 - s.players.p2.hp).toBe(22 + 2) // (1+10)+(1+10), then a 2-stack burn of 2
-  })
-  it('Infernal Conflagration at 3+ stacks: x1.5 and the Ignite explodes', () => {
-    const s = resolveTurn(game([mg('MG-027', 16)], [], 3), { p1: 'strike', p2: 'charge' })
-    expect(stacks(s)).toBe(0)
-    expect(100 - s.players.p2.hp).toBe(24 + 3 * 2) // 16 × 1.5, + burn 3 × 2 turns left after this turn's tick
-  })
-  it('Infernal Conflagration under 3 stacks: plain hit', () => {
-    const s = resolveTurn(game([mg('MG-027', 16)], [], 2), { p1: 'strike', p2: 'charge' })
-    expect(stacks(s)).toBe(2)
-  })
-  it('Wildfire Command: Cut 2 oldest when not Ignited, the facing card when Ignited', () => {
-    expect(resolveTurn(game([mg('MG-028')], [plain(), plain(), plain()]), { p1: 'strike', p2: 'charge' }).players.p2.discarded).toHaveLength(2 + 1) // + charge break
-    const s = resolveTurn(game([mg('MG-028')], [plain(), plain(), plain()], 1), { p1: 'strike', p2: 'charge' })
-    expect(s.players.p2.discarded!.filter((d) => d.reason === 'Cut')).toHaveLength(1)
-  })
-  it('Sear Flesh: no Block next turn and the Ignite timer starts again', () => {
-    const g = game([mg('MG-029')], [], 1)
-    g.players.p2.statuses[0].turns = 2 // ticks to 1 at the start of the turn
+  it('Cinder Jab: clean hit → 1 Ignite, and +1 Mana if it was already burning', () => {
+    const g = game([mg('MG-026', 9, 'P')], [], 1)
+    g.rules.resources = true
+    g.players.p1.res = 0
     const s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
-    expect(s.players.p2.statuses.find((x) => x.kind === 'ignite')?.turns).toBe(3)
-    expect(s.players.p2.statuses.some((x) => x.kind === 'noBlock')).toBe(true)
+    expect(stacks(s)).toBe(2)
+    expect(s.players.p1.res).toBe(1 + 1) // + clean Punch Mana
   })
-  it('Ash to Ash: 1 Ignite per Skill in the chain', () => {
-    expect(stacks(resolveTurn(game([mg('MG-031'), mg('MG-031'), plain()], []), { p1: 'strike', p2: 'charge' }))).toBe(4)
+  it('Blazing Kick: +3 dmg per Ignite stack', () => {
+    const s = resolveTurn(game([mg('MG-027', 10, 'K')], [], 3), { p1: 'strike', p2: 'charge' })
+    expect(100 - s.players.p2.hp).toBe(19 + 3 * 4) // 10 + 9, then a 3-stack burn (3·3 + 3)
   })
-  it('Magma Trap: opponent Charges → lose 5 and 1 Ignite', () => {
-    const s = resolveTurn(game([mg('MG-032')], []), { p1: 'block', p2: 'charge' })
-    expect([100 - s.players.p2.hp, stacks(s)]).toEqual([5 + 1, 1])
+  it('Flame Snap: 2 Ignite before the hits, so later cards already see it', () => {
+    const s = resolveTurn(game([mg('MG-028', 5), mg('MG-027', 10, 'K')], []), { p1: 'strike', p2: 'charge' })
+    expect(stacks(s)).toBe(2)
+    expect(100 - s.players.p2.hp).toBe(5 + 16 + 2 * 4) // Blazing Kick +6, then burn 2·3 + 2
+  })
+  it('Searing Chains: 1 Ignite, Silence when it reaches 2+', () => {
+    expect(resolveTurn(game([mg('MG-029')], []), { p1: 'strike', p2: 'charge' }).players.p2.statuses.some((x) => x.kind === 'silence')).toBe(false)
+    const s = resolveTurn(game([mg('MG-029')], [], 1), { p1: 'strike', p2: 'charge' })
+    expect([stacks(s), s.players.p2.statuses.some((x) => x.kind === 'silence')]).toEqual([2, true])
+  })
+  it('Heat Absorb: Shield 4 per stack this turn', () => {
+    const s = resolveTurn(game([mg('MG-030', 1)], [plain(12)], 3), { p1: 'strike', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(100) // 12 soaked by Shield 12
+  })
+  it('Combustion: ignores Block, +7 per stack, clears the Ignite', () => {
+    const s = resolveTurn(game([plain(), plain(), mg('MG-031', 12)], [], 4), { p1: 'strike', p2: 'block' })
+    expect(stacks(s)).toBe(0)
+    expect(100 - s.players.p2.hp).toBe(40) // only the 2 plain cards are Blocked
+  })
+  it('Supernova: +2 Ignite first; at 4 stacks dmg x2 and Cut 2', () => {
+    const s = resolveTurn(game([mg('MG-032', 17)], [plain(), plain(), plain()], 2), { p1: 'strike', p2: 'charge' })
+    expect(s.players.p2.discarded!.filter((d) => d.reason === 'Cut')).toHaveLength(2)
+    expect(100 - s.players.p2.hp).toBe(34 + 4 * 4)
   })
 })
