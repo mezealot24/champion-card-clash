@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { buildDeck, createGame, resolveTurn } from '../index'
 import type { CardDef, CardInst, EffectSpec, GameState } from '../index'
 
-const sql = readFileSync(new URL('../../../supabase/migrations/20261017000005_mage_pyromancer.sql', import.meta.url), 'utf8')
+const sql = readFileSync(new URL('../../../supabase/migrations/20261017000007_mage_pyromancer.sql', import.meta.url), 'utf8')
 const all = [...sql.matchAll(/\('(MG-\d{3})', 'MG', '([^']*)', .*?, (true|false), '\{[^}]*\}', '(\[.*\])'::jsonb, (\d+|null), 'MG:1'\)/g)]
 const rows = all.filter((m) => m[3] === 'true')
 const specs = Object.fromEntries(rows.map((m) => [m[1], JSON.parse(m[4]) as EffectSpec]))
