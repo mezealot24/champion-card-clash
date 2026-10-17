@@ -218,9 +218,8 @@ Object.assign(STYLES, {
     beforeHits: (state, side, bonus, _mult, _crit, chain) => {
       const p = state.players[side]
       const energy = p.res ?? 0
-      if (!state.rules.resources || energy <= 0 || bonus.length < OVERDRIVE_MIN_CHAIN) return
-      if (chain?.some((c) => c.def.type === 'S')) return
-      const add = energy * SONIC_DMG_PER_ENERGY
+      const add = overdriveAdd(state, side, chain ?? p.hand)
+      if (!add) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += add
       p.res = 0
       say(state, side, `Sonic Bliz Overdrive: ใช้ Energy ${energy} ทั้งหมด → ทุกใบในสาย +${add} dmg`)
@@ -305,5 +304,16 @@ Object.assign(STYLES, {
     },
   },
 } satisfies Record<string, StyleDef>)
+
+/**
+ * Sonic Bliz Overdrive dmg each card would get if `side` Struck right now with its whole Field (0 = no Overdrive).
+ * Shared by the Style, the AI's look-ahead score and the "Overdrive +N" chip on the battle HUD.
+ */
+export function overdriveAdd(state: GameState, side: Side, chain: CardInst[] = state.players[side].hand): number {
+  const p = state.players[side]
+  if (p.style !== 'AS:1' || !state.rules.resources || (p.res ?? 0) <= 0) return 0
+  if (chain.length < OVERDRIVE_MIN_CHAIN || chain.some((c) => c.def.type === 'S')) return 0
+  return (p.res ?? 0) * SONIC_DMG_PER_ENERGY
+}
 
 export const getStyle = (key?: string | null) => (key ? STYLES[key] : undefined)

@@ -1,6 +1,6 @@
 // Assassin Cut cards (Q 2026-10-16) and Sonic Bliz Overdrive.
 import { describe, expect, it } from 'vitest'
-import { createGame, resolveTurn } from '../index'
+import { createGame, overdriveAdd, resolveTurn } from '../index'
 import type { CardDef, CardInst, GameState } from '../index'
 import type { EffectSpec } from '../effects/spec'
 
@@ -84,5 +84,15 @@ describe('Sonic Bliz Overdrive', () => {
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(98)
     g = game(five(), [], 'AS:2')
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 4 - 3)
+  })
+
+  it('overdriveAdd previews the bonus for the HUD chip and the AI (Q 2026-10-17)', () => {
+    const g = game(five(), [], 'AS:1')
+    g.players.p1.res = 3
+    expect(overdriveAdd(g, 'p1')).toBe(6)
+    g.players.p1.res = 0
+    expect(overdriveAdd(g, 'p1')).toBe(0)
+    expect(overdriveAdd(game([...five().slice(0, 4), card(1, 'S')], [], 'AS:1'), 'p1')).toBe(0)
+    expect(overdriveAdd(game(five(), [], 'AS:2'), 'p1')).toBe(0)
   })
 })

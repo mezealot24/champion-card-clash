@@ -6,6 +6,7 @@ import {
   costOf,
   isEffectMissing,
   legalActions,
+  overdriveAdd,
   resourceOf,
   STYLES,
   type Action,
@@ -665,6 +666,8 @@ function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side
       s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? 'No Strike' : s.kind === 'noCharge' ? 'No Charge' : s.kind === 'deathMark' ? '💀 Mark of Assassin' : s.kind === 'ignite' ? `🔥 Ignite ${s.n ?? 1}` : s.kind,
     ),
     ...(p.comboData?.conqueror ? [p.comboData.conqueror >= 6 ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/6`] : []),
+    // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
+    ...(overdriveAdd(game, side) ? [`⚡ Overdrive +${overdriveAdd(game, side)}`] : []),
   ]
   const who = (
     <div className="who" key="who">
