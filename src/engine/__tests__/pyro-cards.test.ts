@@ -51,12 +51,12 @@ describe('Pyro cards', () => {
   })
   it('Blazing Kick: +3 dmg per Ignite stack', () => {
     const s = resolveTurn(game([mg('MG-027', 10, 'K')], [], 3), { p1: 'strike', p2: 'charge' })
-    expect(100 - s.players.p2.hp).toBe(19 + 3 * 4) // 10 + 9, then a 3-stack burn (3·3 + 3)
+    expect(100 - s.players.p2.hp).toBe(19 + 9) // 10 + 9, then a 3-stack burn (3·2 + 3)
   })
   it('Flame Snap: 2 Ignite before the hits, so later cards already see it', () => {
     const s = resolveTurn(game([mg('MG-028', 5), mg('MG-027', 10, 'K')], []), { p1: 'strike', p2: 'charge' })
     expect(stacks(s)).toBe(2)
-    expect(100 - s.players.p2.hp).toBe(5 + 16 + 2 * 4) // Blazing Kick +6, then burn 2·3 + 2
+    expect(100 - s.players.p2.hp).toBe(5 + 16 + 6) // Blazing Kick +6, then burn 2·2 + 2
   })
   it('Searing Chains: 1 Ignite, Silence when it reaches 2+', () => {
     expect(resolveTurn(game([mg('MG-029')], []), { p1: 'strike', p2: 'charge' }).players.p2.statuses.some((x) => x.kind === 'silence')).toBe(false)
@@ -75,6 +75,6 @@ describe('Pyro cards', () => {
   it('Supernova: +2 Ignite first; at 4 stacks dmg x2 and Cut 2', () => {
     const s = resolveTurn(game([mg('MG-032', 17)], [plain(), plain(), plain()], 2), { p1: 'strike', p2: 'charge' })
     expect(s.players.p2.discarded!.filter((d) => d.reason === 'Cut')).toHaveLength(2)
-    expect(100 - s.players.p2.hp).toBe(34 + 4 * 4)
+    expect(100 - s.players.p2.hp).toBe(34 + 12) // x2, then burn 4·2 + 4
   })
 })

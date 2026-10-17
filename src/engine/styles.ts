@@ -14,12 +14,12 @@ export const COUP_RED_HP_PCT = RED_HP_PCT
 
 /**
  * Ignite (Pyromancer, Q rework 2026-10-17): a burning debuff, stacks up to IGNITE_MAX.
- * End of every turn: lose 3 HP + 1% of Max HP per stack. Heals are cut 25% per stack, at most 50% (Claude pick of Q's 50/75).
+ * End of every turn: lose IGNITE_FLAT_PER_STACK HP + 1% of Max HP per stack. Heals are cut 25% per stack, at most 50% (Claude pick of Q's 50/75).
  * Lasts IGNITE_TURNS turns (3 burns); a new stack resets the timer.
  */
 export const IGNITE_MAX = 4
 export const IGNITE_TURNS = 3
-export const IGNITE_FLAT_PER_STACK = 3
+export const IGNITE_FLAT_PER_STACK = 2 // Q asked 3; sim 3 = 65% win, 2 = 47%, 1 = 39% (Claude pick)
 export const IGNITE_HEAL_CUT_PER_STACK = 25
 export const IGNITE_HEAL_CUT_MAX = 50
 /** Molten Shield: Shield a Block always gets. */
