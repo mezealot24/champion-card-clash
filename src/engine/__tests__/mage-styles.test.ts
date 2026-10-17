@@ -1,4 +1,4 @@
-// Mage Styles: Pyromancer (MG:1) and Mana Barrier (MG:2).
+// Mage Styles: Pyromancer (MG:1) and Frostbinder (MG:2).
 import { describe, expect, it } from 'vitest'
 import { createGame, resolveTurn } from '../index'
 import { heal } from '../state'
@@ -75,25 +75,38 @@ describe('Pyromancer', () => {
   })
 })
 
-describe('Mana Barrier', () => {
-  it('starts with Shield 30 that soaks hits until used up', () => {
-    let s = game('MG:2')
-    expect(shield(s)).toBe(30)
-    s.players.p2.hand = [hit(20)]
-    s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-    expect([s.players.p1.hp, shield(s)]).toEqual([100, 10])
-    s.players.p2.hand = [hit(20)]
-    s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-    expect([s.players.p1.hp, shield(s)]).toEqual([90, 0])
+describe('Frostbinder', () => {
+  const chill = (s: GameState) => s.players.p2.statuses.find((x) => x.kind === 'chill')?.n
+  const fresh = () => {
+    const s = game('MG:2')
+    s.players.p1.statuses = [] // drop the Shield 40 it starts with
+    return s
+  }
+  it('starts the game with Shield 40', () => {
+    expect(shield(game('MG:2'))).toBe(40)
   })
-  it('Block tops the Shield up to 8 for 2 turns', () => {
-    let s = game('MG:2')
-    s.players.p1.statuses = []
-    s = resolveTurn(s, { p1: 'block', p2: 'charge' })
-    expect(shield(s)).toBe(8)
-    s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-    expect(shield(s)).toBe(8)
-    s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-    expect(shield(s)).toBe(0)
+  it('Glacial Guard: Block gets Shield 10, each blocked hit gives the attacker 1 Chill', () => {
+    const s = fresh()
+    s.players.p2.hand = [hit(10), hit(10), hit(12)]
+    const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    expect(n.players.p1.hp).toBe(98) // 3rd hit 12, Shield 10 soaks 10
+    expect(chill(n)).toBe(2)
+    expect(shield(n)).toBe(0)
+  })
+  it('Chill: each stack makes the chilled side hit 15% less', () => {
+    const s = fresh()
+    s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 2 })
+    s.players.p2.hand = [hit(50)]
+    const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect(n.players.p1.hp).toBe(100 - 35) // 50 × 70%
+  })
+  it('3 Chill stacks freeze: Chill clears, Shatter takes 15% Max HP, no Strike next turn', () => {
+    const s = fresh()
+    s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 1 })
+    s.players.p2.hand = [hit(10), hit(10)]
+    const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    expect(chill(n)).toBeUndefined()
+    expect(n.players.p2.hp).toBe(85)
+    expect(n.players.p2.statuses.some((x) => x.kind === 'noStrike')).toBe(true)
   })
 })

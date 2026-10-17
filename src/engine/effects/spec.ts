@@ -41,6 +41,7 @@ export type CondSpec =
   | { c: 'fieldHas'; who: 'self' | 'enemy'; type: CardType; n: number }
   // Pyromancer (2026-10-17)
   | { c: 'ignite'; who: 'self' | 'enemy'; op: '>=' | '<'; n: number }
+  | { c: 'chill'; who: 'self' | 'enemy'; op: '>=' | '<'; n: number }
 
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
@@ -55,6 +56,7 @@ export type ActSpec =
   | { a: 'cut'; which: P.CutWhich; n: number }
   | { a: 'gainRes'; who: P.Who; n: number; per?: P.Per }
   | { a: 'ignite'; who: P.Who; n: number; per?: P.Per }
+  | { a: 'chill'; who: P.Who; n: number; per?: P.Per }
   | { a: 'consumeIgnite'; who: P.Who; burn?: boolean }
 
 /**
@@ -93,6 +95,7 @@ function cond(s: CondSpec): Cond {
     case 'facingIs': return P.facingIs(s.type)
     case 'fieldHas': return P.fieldHas(s.who, s.type, s.n)
     case 'ignite': return P.igniteCmp(s.who, s.op, s.n)
+    case 'chill': return P.chillCmp(s.who, s.op, s.n)
     // a condition this build doesn't know never passes (old builds reading newer DB rows)
     default: return () => false
   }
@@ -114,6 +117,7 @@ function act(s: ActSpec): Act {
     case 'cut': return P.cut(s.which, s.n)
     case 'gainRes': return P.gainRes(s.who, s.n, s.per)
     case 'ignite': return P.ignite(s.who, s.n, s.per)
+    case 'chill': return P.chill(s.who, s.n, s.per)
     case 'consumeIgnite': return P.consumeIgnite(s.who, s.burn)
     // an action this build doesn't know does nothing
     default: return () => {}

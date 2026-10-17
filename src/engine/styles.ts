@@ -22,6 +22,40 @@ export const IGNITE_TURNS = 3
 export const IGNITE_FLAT_PER_STACK = 2 // Q asked 3; sim 3 = 65% win, 2 = 47%, 1 = 39% (Claude pick)
 export const IGNITE_HEAL_CUT_PER_STACK = 25
 export const IGNITE_HEAL_CUT_MAX = 50
+// Frostbinder (Mage Style 2, Q 2026-10-17: slows Bruiser, hits lighter, easier to read; Claude's numbers)
+// sim 2026-10-17 (360 games): 6% cut, freeze at 5, no start Shield = 1% win; these numbers = 50%
+export const CHILL_MAX = 3 // reaching this many stacks freezes
+export const CHILL_TURNS = 3
+export const CHILL_DMG_CUT_PER_STACK = 15
+export const GLACIAL_SHIELD = 10
+export const FROST_START_SHIELD = 40
+/** Shatter: a side that gets Frozen loses this % of its Max HP */
+export const SHATTER_PCT = 15
+export const chillStacks = (p: PlayerState) => p.statuses.find((s) => s.kind === 'chill')?.n ?? 0
+/** % the chilled side's hits lose */
+export const chillCut = (p: PlayerState) => chillStacks(p) * CHILL_DMG_CUT_PER_STACK
+
+/**
+ * Add n Chill stacks to a side and reset its timer. Reaching CHILL_MAX freezes it:
+ * Chill is cleared, it loses SHATTER_PCT of its Max HP and can't Strike next turn. Returns the stacks it has now (0 after a freeze).
+ */
+export function addChill(state: GameState, side: Side, n: number): number {
+  const p = state.players[side]
+  const cur = p.statuses.find((s) => s.kind === 'chill')
+  if (!cur && n <= 0) return 0
+  const stacks = Math.min(CHILL_MAX, (cur?.n ?? 0) + n)
+  p.statuses = p.statuses.filter((s) => s.kind !== 'chill')
+  if (stacks >= CHILL_MAX) {
+    if (!p.statuses.some((s) => s.kind === 'noStrike')) p.statuses.push({ kind: 'noStrike', turns: 1 })
+    const lost = Math.floor((p.maxHp * SHATTER_PCT) / 100)
+    p.hp = Math.max(0, p.hp - lost)
+    state.log.push(`T${state.turn} ${side} 🧊 Frozen: Chill ครบ ${CHILL_MAX} → Shatter เสีย ${lost} HP, Strike ไม่ได้เทิร์นหน้า`)
+    return 0
+  }
+  p.statuses.push({ kind: 'chill', turns: CHILL_TURNS, n: stacks })
+  return stacks
+}
+
 /** Molten Shield: a Block spends up to MOLTEN_MAX_MANA Mana for Shield MOLTEN_SHIELD_PER_MANA each. */
 export const MOLTEN_MAX_MANA = 3
 export const MOLTEN_SHIELD_PER_MANA = 5
@@ -288,22 +322,34 @@ Object.assign(STYLES, {
     },
   },
   /**
-   * Mage · Mana Barrier: start the game with Shield 30 (lasts until used up).
-   * Each turn you play Block, your Shield is topped up to 8 if lower; that top-up lasts 2 turns.
+   * Mage · Frostbinder (Q 2026-10-17, replaces Mana Barrier; Claude's numbers).
+   * Start the game with Shield 40 (lasts until used up).
+   * Frost Touch: every Skill card you paid for that hits clean gives the opponent 1 Chill (after your chain).
+   * Glacial Guard: every Block gets Shield 10 this turn, and each hit it stops gives the attacker 1 Chill.
+   * Chill: each stack makes that side's hits deal 15% less (3 turns, refreshed). At 3 stacks it is Frozen:
+   * Chill clears, Shatter takes 15% of its Max HP, and it can't Strike next turn.
    */
   'MG:2': {
-    name: 'Mana Barrier',
+    name: 'Frostbinder',
     setup: (p) => {
-      p.statuses.push({ kind: 'shield', turns: 9999, n: 30 })
+      p.statuses.push({ kind: 'shield', turns: 9999, n: FROST_START_SHIELD })
     },
-    endTurn: (state, side, action) => {
+    afterChain: (state, side, r) => {
+      if (!r.paidSkillClean) return 0
+      const n = addChill(state, other(side), r.paidSkillClean)
+      if (n) say(state, side, `Frost Touch: Skill ที่จ่ายแล้วเข้า ${r.paidSkillClean} ใบ → ศัตรูติด ❄ Chill (${n} stack)`)
+      return 0
+    },
+    actionStart: (state, side, action) => {
       if (action !== 'block') return
-      const p = state.players[side]
-      const now = p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
-      if (now >= 8) return
-      p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
-      p.statuses.push({ kind: 'shield', turns: 2, n: 8 })
-      say(state, side, 'Mana Barrier: Shield 8')
+      // turns 1: an old-shield tick at the end of this turn removes it
+      state.players[side].statuses.push({ kind: 'shield', turns: 1, n: GLACIAL_SHIELD })
+      say(state, side, `Glacial Guard: Shield ${GLACIAL_SHIELD} เทิร์นนี้`)
+    },
+    afterHits: (state, side, r) => {
+      if (!r.hitsBlocked) return
+      const n = addChill(state, other(side), r.hitsBlocked)
+      if (n) say(state, side, `Glacial Guard: Block ได้ ${r.hitsBlocked} hit → ศัตรูติด ❄ Chill (${n} stack)`)
     },
   },
 } satisfies Record<string, StyleDef>)

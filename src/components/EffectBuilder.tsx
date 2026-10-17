@@ -32,6 +32,7 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   facingIs: { c: 'facingIs', type: 'K' },
   fieldHas: { c: 'fieldHas', who: 'enemy', type: 'K', n: 2 },
   ignite: { c: 'ignite', who: 'enemy', op: '>=', n: 1 },
+  chill: { c: 'chill', who: 'enemy', op: '>=', n: 1 },
 }
 const COND_LABEL: Record<CondSpec['c'], string> = {
   hitResult: 'Hit result is…',
@@ -59,6 +60,7 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   facingIs: 'Facing card is…',
   fieldHas: 'You / opponent has N+ Punch / Kick / Skill on the Field',
   ignite: 'You / opponent Ignite stacks ≥ / < N',
+  chill: 'You / opponent Chill stacks ≥ / < N',
 }
 const ACT_DEFAULTS: Record<string, ActSpec> = {
   draw: { a: 'draw', who: 'self', n: 1 },
@@ -75,12 +77,13 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
   cut: { a: 'cut', which: 'oldest', n: 1 },
   gainRes: { a: 'gainRes', who: 'self', n: 1 },
   ignite: { a: 'ignite', who: 'enemy', n: 1 },
+  chill: { a: 'chill', who: 'enemy', n: 1 },
   consumeIgnite: { a: 'consumeIgnite', who: 'enemy' },
 }
 const ACT_LABEL: Record<string, string> = {
   draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', mulDmg: 'Dmg × % (this chain)', grow: 'Gain dmg (later attacks)', blockNow: 'Block ±N hits (this turn)',
   pierce: 'Pierce: ignore Block (Before action)', steal: "Steal opponent's card in this slot", cut: 'Cut: opponent discards Field cards', gainRes: 'Gain resource',
-  ignite: 'Ignite (0 = reset timer)', consumeIgnite: 'Clear / explode Ignite',
+  ignite: 'Ignite (0 = reset timer)', consumeIgnite: 'Clear / explode Ignite', chill: 'Chill (5 = Frozen)',
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -202,7 +205,7 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
           </select>
         </>
       )}
-      {value.c === 'ignite' && (
+      {(value.c === 'ignite' || value.c === 'chill') && (
         <>
           <select value={value.who} onChange={(e) => onChange({ ...value, who: e.target.value as 'self' | 'enemy' })}>
             <option value="enemy">opponent</option><option value="self">you</option>
@@ -330,7 +333,7 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
       )}
       {value.a === 'mulDmg' && <><Num value={value.pct} min={0} onChange={(pct) => onChange({ ...value, pct })} />%</>}
       {'n' in value && value.a !== 'status' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' || value.a === 'blockNow' || value.a === 'gainRes' ? undefined : value.a === 'cut' ? 1 : 0} onChange={(n) => onChange({ ...value, n })} />}
-      {(value.a === 'draw' || value.a === 'heal' || value.a === 'loseHp' || value.a === 'addDmg' || value.a === 'gainRes' || value.a === 'ignite') && (
+      {(value.a === 'draw' || value.a === 'heal' || value.a === 'loseHp' || value.a === 'addDmg' || value.a === 'gainRes' || value.a === 'ignite' || value.a === 'chill') && (
         <select value={value.per ?? ''} onChange={(e) => onChange({ ...value, per: (e.target.value || undefined) as typeof value.per })} title="Multiply by a count">
           <option value="">(flat)</option>
           {Object.entries(PER_LABEL).map(([k, label]) => <option key={k} value={k}>per {label}</option>)}

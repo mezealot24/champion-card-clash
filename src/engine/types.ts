@@ -36,8 +36,8 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  * shield = absorbs n dmg from hits before HP; lasts until used up or its turns run out
  * parry = the next n hits that get past your Block are deflected and deal 0, nothing goes back (this turn; Q 2026-10-17: a Block is 2 Parries)
  */
-/** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite'
+/** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts. chill = Frostbinder's slow (n = stacks, CHILL_*) */
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
 

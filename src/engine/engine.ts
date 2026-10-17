@@ -1,6 +1,6 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, DEATH_MARK_PCT, lifestealPct } from './combos'
-import { getStyle, igniteBurn, igniteStacks } from './styles'
+import { chillCut, getStyle, igniteBurn, igniteStacks } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
@@ -20,6 +20,7 @@ type TurnEnv = {
   hitsTaken: Record<Side, number>
   /** Extra % dmg each side takes from hits this turn (Vulnerable statuses, read before they tick). */
   vulnPct: Record<Side, number>
+  chillPct: Record<Side, number>
   /** Energy Surge this turn: Wraith Step (Block), Shroud (Charge), Elusive (Strike). */
   wraith: Record<Side, boolean>
   shroud: Record<Side, boolean>
@@ -59,6 +60,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const blockNow: Record<Side, number> = { p1: 0, p2: 0 }
   const hitsTaken: Record<Side, number> = { p1: 0, p2: 0 }
   const vulnPct: Record<Side, number> = { p1: 0, p2: 0 }
+  const chillPct: Record<Side, number> = { p1: 0, p2: 0 }
   // Energy Surge (Assassin): a full bar at the start of the turn is spent by the action picked (see resources.ts)
   const surge: Record<Side, number> = { p1: 0, p2: 0 }
   for (const side of SIDES) {
@@ -73,7 +75,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
   }
   const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 } }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, chillPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 } }
 
   // Styles that act on the action picked (Molten Shield), before statuses are read
   for (const side of SIDES) getStyle(state.players[side].style)?.actionStart?.(state, side, actions[side])
@@ -89,6 +91,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const trueDmg = { p1: hasStatus(state, 'p1', 'trueDmg'), p2: hasStatus(state, 'p2', 'trueDmg') }
   const guardBreak = { p1: hasStatus(state, 'p1', 'guardBreak'), p2: hasStatus(state, 'p2', 'guardBreak') }
   for (const side of SIDES) vulnPct[side] = state.players[side].statuses.filter((s) => s.kind === 'vulnerable').reduce((t, s) => t + (s.n ?? 0), 0)
+  // Chill (Frostbinder): the chilled side's hits deal N% less this turn
+  for (const side of SIDES) chillPct[side] = chillCut(state.players[side])
 
   // statuses were checked above; they tick down now (new ones from this turn last into the next).
   // Shields tick at the end of the turn instead, so a Shield still guards this turn's hits.
@@ -274,8 +278,8 @@ function resolveStrikes(
     const b = trueDmg[side] ? Math.max(0, bonus[side]![i]) : bonus[side]![i]
     const m = trueDmg[side] ? Math.max(1, mult[side]![i]) : mult[side]![i]
     const raw = baseDmgOf(state, side, card) + (card.grow ?? 0) + (card.growNext ?? 0) + b
-    // Vulnerable: the side being hit takes N% more dmg from every hit
-    return Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)])) / 100))
+    // Vulnerable: the side being hit takes N% more dmg from every hit; Chill: the striker's hits deal N% less
+    return Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)]) * (100 - env.chillPct[side])) / 10000))
   }
   // Before action combos (card types only), then Conqueror stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
