@@ -72,10 +72,19 @@ export function Arena(props: {
   styleNames: Record<Side, string>
   onAction: (a: Action) => void
   onDone: () => void
-  onRestart: () => void
+  /** no Play again button when absent (online matches) */
+  onRestart?: () => void
   onQuit: () => void
+  /** what the opponent is called on screen (default AI) */
+  foe?: string
+  /** a line shown over the board (opponent's taunt, "waiting for opponent"...); a taunt fades out by itself */
+  banner?: string
+  bannerFades?: boolean
+  /** action buttons stay disabled while true (waiting on the opponent's pick) */
+  busy?: boolean
 }) {
   const { game, turn, names, styleNames } = props
+  const foe = props.foe ?? 'AI'
   const stageRef = useRef<HTMLDivElement>(null)
   const fxRef = useRef<HTMLDivElement>(null)
   const [scale, setScale] = useState(1)
@@ -473,7 +482,7 @@ export function Arena(props: {
 
   const legal = legalActions(game, 'p1')
   const lastLines = game.log.filter((l) => l.startsWith(`T${game.turn - 1} `)).slice(-3)
-  const readable = (l: string) => l.replace(/^T\d+ /, '').replace(/\bp1\b/g, 'You').replace(/\bp2\b/g, 'AI')
+  const readable = (l: string) => l.replace(/^T\d+ /, '').replace(/\bp1\b/g, 'You').replace(/\bp2\b/g, foe)
 
   return (
     <div className="arena" style={{ '--k': skip.current ? 12 : speed } as React.CSSProperties}>
@@ -487,10 +496,10 @@ export function Arena(props: {
           }}
         >
           {(['p2', 'p1'] as Side[]).map((side) => (
-            <Hud key={side} game={game} side={side} hp={view[side].hp} name={names[side]} style={styleNames[side]} />
+            <Hud key={side} game={game} side={side} hp={view[side].hp} name={names[side]} style={styleNames[side]} foe={foe} />
           ))}
           {(['p2', 'p1'] as Side[]).map((side) => (
-            <section key={side} className={`field ${side === 'p1' ? 'me' : 'enemy'}`} aria-label={side === 'p1' ? 'Your Field' : 'AI Field'}>
+            <section key={side} className={`field ${side === 'p1' ? 'me' : 'enemy'}`} aria-label={side === 'p1' ? 'Your Field' : `${foe} Field`}>
               {Array.from({ length: game.rules.handMax }, (_, i) => {
                 const vc = view[side].field[i]
                 return (
@@ -515,9 +524,9 @@ export function Arena(props: {
             <div className="log">{playing ? '' : lastLines.map(readable).join(' · ') || 'Pick an action. Both sides lock in, then reveal together.'}</div>
             <div className="vs">
               <div className={`fighter p2${down === 'p2' ? ' down' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId) }} />
-              <TokenView side="p2" tok={tok} playing={playing} />
+              <TokenView side="p2" tok={tok} playing={playing} foe={foe} />
               <div className="verdict">{hits || tok.verdict}</div>
-              <TokenView side="p1" tok={tok} playing={playing} locked={locked} />
+              <TokenView side="p1" tok={tok} playing={playing} locked={locked} foe={foe} />
               <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId) }} />
             </div>
           </div>
@@ -544,7 +553,7 @@ export function Arena(props: {
                   key={action}
                   type="button"
                   className={`act ${action}${locked === action ? ' locked' : ''}`}
-                  disabled={playing || !!turn || !!game.winner || !legal.includes(action)}
+                  disabled={playing || !!turn || !!game.winner || !!props.busy || !legal.includes(action)}
                   onClick={(e) => {
                     e.stopPropagation()
                     choose(action)
@@ -556,6 +565,11 @@ export function Arena(props: {
               ))}
             </div>
           </div>
+          {props.banner && !playing && (
+            <div key={`${game.turn}:${props.banner}`} className={`banner${props.bannerFades ? ' fades' : ''}`}>
+              {props.banner}
+            </div>
+          )}
           <div className="fxl" ref={fxRef}>
             <div className="dim" />
           </div>
@@ -563,9 +577,11 @@ export function Arena(props: {
             <div className="result">
               <h2 className={game.winner === 'p2' ? 'lost' : ''}>{game.winner === 'draw' ? 'DRAW' : game.winner === 'p1' ? 'YOU WIN!' : 'K.O.'}</h2>
               <div className="row">
-                <button type="button" className="big-btn" onClick={props.onRestart}>
-                  Play again
-                </button>
+                {props.onRestart && (
+                  <button type="button" className="big-btn" onClick={props.onRestart}>
+                    Play again
+                  </button>
+                )}
                 <button type="button" className="big-btn alt" onClick={props.onQuit}>
                   Change Champion
                 </button>
@@ -579,7 +595,7 @@ export function Arena(props: {
                   <b>Match log</b>
                   <ul>
                     {game.log.map((l, i) => (
-                      <li key={i}>{l.replace(/\bp1\b/g, 'You').replace(/\bp2\b/g, 'AI')}</li>
+                      <li key={i}>{l.replace(/\bp1\b/g, 'You').replace(/\bp2\b/g, foe)}</li>
                     ))}
                   </ul>
                   <p>Tap anywhere to close.</p>
@@ -608,14 +624,14 @@ export function Arena(props: {
   )
 }
 
-function TokenView({ side, tok, playing, locked }: { side: Side; tok: Tokens; playing: boolean; locked?: Action | null }) {
+function TokenView({ side, tok, playing, locked, foe }: { side: Side; tok: Tokens; playing: boolean; locked?: Action | null; foe: string }) {
   const a = tok.shown ? tok[side] : undefined
   const cls = `tok ${side}${a ? ` ${a}` : ''}${tok.shown && tok.lose === side ? ' lose' : ''}`
   return (
     <div className={cls}>
       {a ? (
         <span>
-          <small>{side === 'p1' ? 'You' : 'AI'}</small>
+          <small>{side === 'p1' ? 'You' : foe}</small>
           {LABEL[a]}
         </span>
       ) : playing || locked ? (
@@ -627,7 +643,7 @@ function TokenView({ side, tok, playing, locked }: { side: Side; tok: Tokens; pl
   )
 }
 
-function Hud({ game, side, hp, name, style }: { game: GameState; side: Side; hp: number; name: string; style: string }) {
+function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side; hp: number; name: string; style: string; foe: string }) {
   const p = game.players[side]
   const pct = Math.max(0, Math.min(100, (hp / p.maxHp) * 100))
   const res = game.rules.resources ? resourceOf(p.championId) : undefined
@@ -659,7 +675,7 @@ function Hud({ game, side, hp, name, style }: { game: GameState; side: Side; hp:
       <div className="name">
         <b>{name}</b>
         <span>
-          {side === 'p1' ? 'You' : 'AI'} · {style || 'No Style'}
+          {side === 'p1' ? 'You' : foe} · {style || 'No Style'}
         </span>
       </div>
     </div>
