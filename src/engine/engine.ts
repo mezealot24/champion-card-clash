@@ -1,7 +1,7 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, DEATH_MARK_PCT, lifestealPct } from './combos'
 import { getStyle } from './styles'
-import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_CHARGE_DRAW, SURGE_HEAL_PER_ENERGY } from './resources'
+import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, effectOf, emit, heal, log, loseHp, markDiscarded, toDeckBottom } from './state'
@@ -20,6 +20,10 @@ type TurnEnv = {
   hitsTaken: Record<Side, number>
   /** Extra % dmg each side takes from hits this turn (Vulnerable statuses, read before they tick). */
   vulnPct: Record<Side, number>
+  /** Energy Surge this turn: Wraith Step (Block), Shroud (Charge), Elusive (Strike). */
+  wraith: Record<Side, boolean>
+  shroud: Record<Side, boolean>
+  elusive: Record<Side, boolean>
 }
 
 export function legalActions(state: GameState, side: Side): Action[] {
@@ -59,10 +63,15 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     const p = state.players[side]
     const def = resourceOf(p.championId)
     if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) continue
-    if (actions[side] === 'strike') continue // Strike part removed (Q 2026-10-17 14:35Z)
+    const mode = actions[side] === 'block' ? 'A' : actions[side] === 'charge' ? 'B' : 'C'
+    if (!SURGE_MODES.includes(mode)) continue
     surge[side] = p.res ?? 0
+    p.res = 0
+    const what = mode === 'A' ? 'Wraith Step (hit ที่ทะลุ Block โดนแค่ 1)' : mode === 'B' ? 'Shroud (ไม่โดน charge break, dmg ครึ่งเดียว)' : 'Elusive (Block ศัตรูกันน้อยลง 1)'
+    log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
   }
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct }
+  const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') } }
 
   // Silence: a side Silenced at the start of the turn has no card effects all turn
   for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
@@ -87,13 +96,6 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   // runs every turn: Before action fires for held cards too (e.g. "if you played Charge"); After action ends it
   const cleanHits = resolveStrikes(state, actions, env, blockStops, trueDmg, guardBreak)
 
-  for (const side of SIDES) {
-    if (!surge[side]) continue
-    state.players[side].res = 0
-    const what = actions[side] === 'charge' ? `จั่วเพิ่ม ${SURGE_CHARGE_DRAW}` : `ฮีล ${surge[side] * SURGE_HEAL_PER_ENERGY}`
-    log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
-    if (actions[side] === 'block') heal(state, side, surge[side] * SURGE_HEAL_PER_ENERGY)
-  }
 
   // Styles that react to this turn's hits
   for (const side of SIDES) {
@@ -111,7 +113,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   for (const side of SIDES) {
     if (actions[side] !== 'charge') continue
     const p = state.players[side]
-    if (actions[other(side)] === 'strike') {
+    if (actions[other(side)] === 'strike' && !env.shroud[side]) {
       // Strike > Charge: Charge break (Q 2026-10-16). The oldest card goes to the bottom of the deck, the cards behind
       // it move up a slot (2-3-4 become 1-2-3) and 1 new card is drawn onto the end (Q 2026-10-17), even if it was the
       // only card. A Style like Tenacity can keep the first slots safe: the next card goes instead, and with no card
@@ -130,8 +132,6 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     } else {
       drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))
     }
-    // Energy Surge on Charge: 1 more card, broken Charge or not
-    if (surge[side]) drawCards(state, side, SURGE_CHARGE_DRAW)
   }
 
   if (actions.p1 === 'block' && actions.p2 === 'block') {
@@ -255,7 +255,7 @@ function resolveStrikes(
 
   const stops = (side: Side) => Math.max(0, blockStops[side] + env.blockNow[side])
   // Pierce: a hit marked by an effect ignores Block
-  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side)) && !pierce[side]![i]
+  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side)) - (env.elusive[side] ? 1 : 0) && !pierce[side]![i]
   const dmgOf = (side: Side, i: number) => {
     const card = chains[side]![i]
     // True Damage: dmg cuts (negative bonus, multiplier below 1) don't apply; only Block stops the hit
@@ -288,6 +288,9 @@ function resolveStrikes(
       if (!card) continue
       const enemy = other(side)
       let dealt = dealtOf(side, i)
+      // Energy Surge: Wraith Step caps hits past Block at 1, Shroud halves them
+      if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, 1)
+      if (env.shroud[enemy]) dealt = Math.floor(dealt / 2)
       const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
       if (parry) parry.n = (parry.n ?? 1) - 1
       let absorbed = 0

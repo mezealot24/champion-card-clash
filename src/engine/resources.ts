@@ -38,12 +38,15 @@ export type ResourceDef = {
 
 /**
  * Assassin Energy Surge (Q 2026-10-17): with a full Energy bar at the start of the turn, the action you pick spends it all.
- * Charge → draw 1 more (even if the Charge is broken). Strike → no Surge, the bar
- * stays (Q 14:35Z removed the S Parry). Block → heal SURGE_HEAL_PER_ENERGY per Energy. Works while Silenced (it's the class, not a card).
+ * Block → Wraith Step: hits that get past your Block deal at most 1 dmg each.
+ * Charge → Shroud: no Charge break this turn, and hits on you deal half (rounded down).
+ * Strike → Elusive: the enemy's Block stops 1 hit fewer.
+ * Works while Silenced (it's the class, not a card). SURGE_MODES picks which are on (sim switch while Q decides).
  */
 export const SURGE_CHAMPION = 'AS'
-export const SURGE_CHARGE_DRAW = 1
-export const SURGE_HEAL_PER_ENERGY = 3
+const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {}
+export const SURGE_MODES: string = env.SURGE_MODES ?? 'ABC'
+const ENERGY_CAP = Number(env.AS_ENERGY_CAP ?? 3)
 
 /** HP below this % of Max HP = the red HP bar (same line as Coup de grâce). */
 export const RED_HP_PCT = 30
@@ -69,7 +72,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
     },
   },
   // Energy: starts full, +1 every turn, small cap.
-  AS: { name: 'Energy', cap: 3, start: 3, defaultCost: 1, gain: () => 1 },
+  AS: { name: 'Energy', cap: ENERGY_CAP, start: 3, defaultCost: 1, gain: () => 1 },
   // Tank: no bar, S cards cost HP.
   TK: { name: 'HP', cap: 0, start: 0, defaultCost: 10, payWithHp: true },
 }
