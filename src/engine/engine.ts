@@ -20,8 +20,6 @@ type TurnEnv = {
   hitsTaken: Record<Side, number>
   /** Extra % dmg each side takes from hits this turn (Vulnerable statuses, read before they tick). */
   vulnPct: Record<Side, number>
-  /** Energy Surge on Strike: enemy S cards deal 0 to this side this turn. */
-  sWard: Record<Side, boolean>
 }
 
 export function legalActions(state: GameState, side: Side): Action[] {
@@ -57,16 +55,14 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const vulnPct: Record<Side, number> = { p1: 0, p2: 0 }
   // Energy Surge (Assassin): a full bar at the start of the turn is spent by the action picked (see resources.ts)
   const surge: Record<Side, number> = { p1: 0, p2: 0 }
-  const sWard: Record<Side, boolean> = { p1: false, p2: false }
   for (const side of SIDES) {
     const p = state.players[side]
     const def = resourceOf(p.championId)
     if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) continue
-    if (actions[side] === 'strike' && handAtStart[side].some((c) => c.def.type === 'S')) continue
+    if (actions[side] === 'strike') continue // Strike part removed (Q 2026-10-17 14:35Z)
     surge[side] = p.res ?? 0
-    if (actions[side] === 'strike') sWard[side] = true
   }
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, sWard }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct }
 
   // Silence: a side Silenced at the start of the turn has no card effects all turn
   for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
@@ -94,7 +90,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   for (const side of SIDES) {
     if (!surge[side]) continue
     state.players[side].res = 0
-    const what = actions[side] === 'charge' ? `จั่วเพิ่ม ${SURGE_CHARGE_DRAW}` : actions[side] === 'block' ? `ฮีล ${surge[side] * SURGE_HEAL_PER_ENERGY}` : 'การ์ด S ของศัตรูทำ dmg 0'
+    const what = actions[side] === 'charge' ? `จั่วเพิ่ม ${SURGE_CHARGE_DRAW}` : `ฮีล ${surge[side] * SURGE_HEAL_PER_ENERGY}`
     log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
     if (actions[side] === 'block') heal(state, side, surge[side] * SURGE_HEAL_PER_ENERGY)
   }
@@ -284,7 +280,7 @@ function resolveStrikes(
   // Every hit's outcome is worked out now, in hit order: Block, then Parry, then Shield, then HP.
   // So dmg each side will take from hits this turn is known before any hit lands.
   const longest = Math.max(...strikers.map((s) => chains[s]!.length))
-  const outcome = new Map<string, { dealt: number; parried: boolean; absorbed: number; warded: boolean }>()
+  const outcome = new Map<string, { dealt: number; parried: boolean; absorbed: number }>()
   const sized = (side: Side, kind: 'shield' | 'parry') => state.players[side].statuses.filter((s) => s.kind === kind && (s.n ?? 0) > 0)
   for (let i = 0; i < longest; i++) {
     for (const side of strikers) {
@@ -292,12 +288,6 @@ function resolveStrikes(
       if (!card) continue
       const enemy = other(side)
       let dealt = dealtOf(side, i)
-      // Energy Surge parries every S hit (before Parry and Shield); a parry deflects, nothing goes back (Q 2026-10-17)
-      const warded = env.sWard[enemy] && card.def.type === 'S' && dealt > 0
-      if (warded) {
-        outcome.set(card.uid, { dealt: 0, parried: false, absorbed: 0, warded })
-        continue
-      }
       const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
       if (parry) parry.n = (parry.n ?? 1) - 1
       let absorbed = 0
@@ -310,7 +300,7 @@ function resolveStrikes(
       }
       if (parry) dealt = 0
       else dealt -= absorbed
-      outcome.set(card.uid, { dealt, parried: !!parry, absorbed, warded: false })
+      outcome.set(card.uid, { dealt, parried: !!parry, absorbed })
       hitDmgTaken[enemy] += dealt
     }
   }
@@ -328,12 +318,12 @@ function resolveStrikes(
       if (blocked) hitsBlocked[enemy]++
       const usedNext = card.growNext ?? 0
       const dmg = dmgOf(side, i)
-      const { dealt, parried, absorbed, warded } = outcome.get(card.uid)!
-      if (!blocked && !parried && !warded) env.hitsTaken[enemy]++
+      const { dealt, parried, absorbed } = outcome.get(card.uid)!
+      if (!blocked && !parried) env.hitsTaken[enemy]++
       emit(state, { k: 'hit', side, slot: i, uid: card.uid, type: card.def.type, dmg, dealt, blocked, parried, absorbed, crit: crit[side].has(i) })
       if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
-      const guard = parried ? ` (${enemy} Parry ปัด ${dmg})` : warded ? ` (${enemy} Energy Surge Parry S)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
+      const guard = parried ? ` (${enemy} Parry ปัด ${dmg})` : absorbed ? ` (Shield กัน ${absorbed})` : ''
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}${guard}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
       if (ls > 0 && heal(state, side, ls) > 0) {
