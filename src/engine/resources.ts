@@ -38,8 +38,8 @@ export type ResourceDef = {
 
 /**
  * Assassin Energy Surge (Q 2026-10-17): with a full Energy bar at the start of the turn, the action you pick spends it all.
- * Charge → draw 1 more (even if the Charge is broken). Strike with no S card on your Field → enemy S cards deal 0 to you
- * this turn (not reflected). Block → heal SURGE_HEAL_PER_ENERGY per Energy. Works while Silenced (it's the class, not a card).
+ * Charge → draw 1 more (even if the Charge is broken). Strike → no Surge, the bar
+ * stays (Q 14:35Z removed the S Parry). Block → heal SURGE_HEAL_PER_ENERGY per Energy. Works while Silenced (it's the class, not a card).
  */
 export const SURGE_CHAMPION = 'AS'
 export const SURGE_CHARGE_DRAW = 1

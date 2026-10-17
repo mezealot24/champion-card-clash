@@ -39,22 +39,9 @@ describe('Energy Surge', () => {
     expect(s.players.p1.res).toBe(1)
   })
 
-  it('Strike with no S on the Field: enemy S cards deal 0, nothing reflected; P/K still hit', () => {
+  it('Strike: no Surge (removed by Q 2026-10-17), enemy S cards hit as normal', () => {
     const s = resolveTurn(game([card(2)], [card(10, 'S'), card(4, 'K')]), { p1: 'strike', p2: 'strike' })
-    expect(s.players.p1.hp).toBe(50 - 4)
-    expect(s.players.p2.hp).toBe(98)
-    expect(s.players.p1.res).toBe(1)
-  })
-
-  it('Strike with an S on the Field: no Surge, Energy kept for the S card', () => {
-    const s = resolveTurn(game([card(2, 'S')], [card(10, 'S')]), { p1: 'strike', p2: 'strike' })
-    expect(s.players.p1.hp).toBe(40)
+    expect(s.players.p1.hp).toBe(50 - 14)
     expect(s.log.some((l) => l.includes('Energy Surge'))).toBe(false)
-  })
-
-  it('Sonic Bliz: Overdrive and the S ward share the same full bar', () => {
-    const s = resolveTurn(game([card(1), card(1), card(1)], [card(10, 'S')], 3, 'AS:1'), { p1: 'strike', p2: 'strike' })
-    expect(s.players.p1.hp).toBe(50) // S card warded
-    expect(s.players.p2.hp).toBe(100 - 3 * 7) // Overdrive +6 per card
   })
 })
