@@ -147,3 +147,20 @@ describe('Tank cards', () => {
     expect(describeSpec(specs['TK-011'])).toBe('After action, if you play Strike and you take dmg from a hit this turn: Gain 10 HP')
   })
 })
+
+describe('0 HP stays down (Q 2026-10-17)', () => {
+  it('lethal hit then TK-001 / TK-013 self heals: Tank stays at 0 and loses', () => {
+    const s = resolveTurn(game([tk('TK-001'), tk('TK-013')], [plain(60)]), { p1: 'strike', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(0)
+    expect(s.winner).toBe('p2')
+    expect(s.log.some((l) => /TK-0(01|13): self ฮีล/.test(l))).toBe(false)
+  })
+
+  it('Second Wind does not revive a Tank at 0 HP', () => {
+    const g = game([tk('TK-001')], [plain(60)])
+    g.players.p1.style = 'TK:1'
+    const s = resolveTurn(g, { p1: 'strike', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(0)
+    expect(s.winner).toBe('p2')
+  })
+})

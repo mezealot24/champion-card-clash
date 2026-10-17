@@ -38,6 +38,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
       fire: (state, side) => {
         const p = state.players[side]
         const n = Math.floor(p.hp / 10)
+        if (p.hp <= 0 || n <= 0) return // a side at 0 HP stays down
         const before = p.hp
         p.hp = Math.min(p.maxHp, p.hp + n)
         if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })

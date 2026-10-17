@@ -309,8 +309,7 @@ function resolveStrikes(
       const guard = parried ? ` (${enemy} Parry: สะท้อน ${dmg} กลับ)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}${guard}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
-      if (ls > 0) {
-        heal(state, side, ls)
+      if (ls > 0 && heal(state, side, ls) > 0) {
         log(state, `${side} Omnivamp ฮีล ${ls}`)
       }
       // clean = some dmg got through Block, Parry and Shield (GDD)
