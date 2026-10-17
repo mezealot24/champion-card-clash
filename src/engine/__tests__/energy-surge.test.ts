@@ -17,31 +17,27 @@ function game(mine: CardInst[], theirs: CardInst[], res = 3, style?: string): Ga
 }
 
 describe('Energy Surge', () => {
-  it('Charge: spends all Energy, draws 1 more (2 cards); not with a bar short of full', () => {
-    let s = resolveTurn(game([], []), { p1: 'charge', p2: 'block' })
-    expect(s.players.p1.hand).toHaveLength(2)
+  it('Block (Wraith Step): hits past Block deal 1 each; spends the full bar', () => {
+    const s = resolveTurn(game([], [card(5), card(5), card(20), card(9)]), { p1: 'block', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(50 - 2)
     expect(s.players.p1.res).toBe(1) // spent, then +1 at the end of the turn
-    expect(s.log.some((l) => l.includes('Energy Surge'))).toBe(true)
-    s = resolveTurn(game([], [], 2), { p1: 'charge', p2: 'block' })
-    expect(s.players.p1.hand).toHaveLength(1)
-    expect(s.players.p1.res).toBe(3)
   })
 
-  it('Charge broken by a Strike still draws the extra card', () => {
-    const s = resolveTurn(game([card(1), card(1)], [card(1)]), { p1: 'charge', p2: 'strike' })
-    // lost slot 1 and drew 1 (Charge break) + 1 (Surge)
-    expect(s.players.p1.hand).toHaveLength(3)
+  it('no Surge with a bar short of full', () => {
+    const s = resolveTurn(game([], [card(5), card(5), card(20)], 2), { p1: 'block', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(30)
+    expect(s.log.some((l) => l.includes('Energy Surge'))).toBe(false)
   })
 
-  it('Block: spends all Energy, heals 3 per Energy', () => {
-    const s = resolveTurn(game([], []), { p1: 'block', p2: 'block' })
-    expect(s.players.p1.hp).toBe(59)
-    expect(s.players.p1.res).toBe(1)
+  it('Charge (Shroud): no Charge break, hits deal half, no extra draw', () => {
+    const s = resolveTurn(game([card(1), card(1)], [card(9), card(4)]), { p1: 'charge', p2: 'strike' })
+    expect(s.players.p1.hand).toHaveLength(3) // kept both, drew 1
+    expect(s.players.p1.hp).toBe(50 - 4 - 2)
   })
 
-  it('Strike: no Surge (removed by Q 2026-10-17), enemy S cards hit as normal', () => {
-    const s = resolveTurn(game([card(2)], [card(10, 'S'), card(4, 'K')]), { p1: 'strike', p2: 'strike' })
-    expect(s.players.p1.hp).toBe(50 - 14)
+  it('Strike: no Surge, Energy is kept', () => {
+    const s = resolveTurn(game([card(2)], [card(10, 'S')]), { p1: 'strike', p2: 'strike' })
+    expect(s.players.p1.hp).toBe(40)
     expect(s.log.some((l) => l.includes('Energy Surge'))).toBe(false)
   })
 })
