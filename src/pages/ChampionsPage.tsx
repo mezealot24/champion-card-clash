@@ -33,7 +33,7 @@ export function ChampionsPage() {
                 <td>{c.hp_start} / {c.hp_max}</td>
                 <td>{deck.reduce((n, card) => n + card.copies, 0)}</td>
                 <td>{deck.reduce((n, card) => n + card.dmg * card.copies, 0)}</td>
-                <td><Link to={`/champions/${c.id}`}>Edit</Link></td>
+                <td><Link to={`/admin/champions/${c.id}`}>Edit</Link></td>
               </tr>
             )
           })}

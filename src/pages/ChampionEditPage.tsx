@@ -21,7 +21,7 @@ export function ChampionEditPage() {
 
   return (
     <>
-      <p><Link to="/">← Champions</Link></p>
+      <p><Link to="/admin">← Champions</Link></p>
       {/* key remounts the form with fresh state after each save */}
       <ChampionForm key={data.champion.updated_at} champion={data.champion} styles={data.styles} onSaved={reload} />
       <DeckEditor championId={id} />

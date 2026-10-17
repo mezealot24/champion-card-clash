@@ -1,4 +1,4 @@
-import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { AuthProvider, useAuth } from './lib/auth'
 import { supabase } from './lib/supabase'
 import { RequireSuperAdmin } from './components/RequireSuperAdmin'
@@ -7,16 +7,20 @@ import { ChampionEditPage } from './pages/ChampionEditPage'
 import { ConfigPage } from './pages/ConfigPage'
 import { BattlePage } from './pages/BattlePage'
 
+// Players only see the game; admin links show for super_admin only
 function Header() {
   const { session, role } = useAuth()
+  const isAdmin = role === 'super_admin'
   return (
     <header>
-      <strong>Champion Card Clash · Admin</strong>
-      <nav>
-        <NavLink to="/" end>Champions</NavLink>
-        <NavLink to="/config">Config</NavLink>
-        <NavLink to="/battle">Battle</NavLink>
-      </nav>
+      <strong>Champion Card Clash{isAdmin ? ' · Admin' : ''}</strong>
+      {isAdmin && (
+        <nav>
+          <NavLink to="/" end>Battle</NavLink>
+          <NavLink to="/admin" end>Champions</NavLink>
+          <NavLink to="/admin/config">Config</NavLink>
+        </nav>
+      )}
       {session && (
         <span className="who">
           {session.user.email} <code>{role}</code>
@@ -34,20 +38,22 @@ export default function App() {
         <Header />
         <main>
           <Routes>
-            {/* Battle only reads public game data, so it needs no admin login */}
+            {/* Battle only reads public game data, so it needs no login */}
+            <Route path="/" element={<BattlePage />} />
             <Route path="/battle" element={<BattlePage />} />
             <Route
-              path="*"
+              path="/admin/*"
               element={
                 <RequireSuperAdmin>
                   <Routes>
-                    <Route path="/" element={<ChampionsPage />} />
-                    <Route path="/champions/:id" element={<ChampionEditPage />} />
-                    <Route path="/config" element={<ConfigPage />} />
+                    <Route index element={<ChampionsPage />} />
+                    <Route path="champions/:id" element={<ChampionEditPage />} />
+                    <Route path="config" element={<ConfigPage />} />
                   </Routes>
                 </RequireSuperAdmin>
               }
             />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
       </BrowserRouter>
