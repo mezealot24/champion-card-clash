@@ -18,6 +18,7 @@ function game(p1: CardInst[], p2: CardInst[], hp = 50): GameState {
   const s = createGame({ championId: 'AS', hpStart: hp, hpMax: 110, deck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 7 })
   s.players.p1.hand = p1
   s.players.p2.hand = p2
+  s.players.p1.res = 0 // no Energy Surge here: these tests are about the cards
   return s
 }
 const hand = (s: GameState) => s.players.p1.hand.length

@@ -32,7 +32,7 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
 /**
  * silence = your cards' effects don't fire this turn (Styles and combos still work)
  * shield = absorbs n dmg from hits before HP; lasts until used up or its turns run out
- * parry = the next n hits that get past your Block deal 0 and their dmg goes back to the attacker (this turn)
+ * parry = the next n hits that get past your Block are deflected and deal 0, nothing goes back (this turn; Q 2026-10-17: a Block is 2 Parries)
  */
 export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
@@ -59,7 +59,7 @@ export type PlayerState = {
   res?: number
   /** Chain cards whose cost couldn't be paid this turn: they hit, but their effects are off. */
   unpaid?: string[]
-  /** Times this side lost HP outside a hit this turn, by source: the opponent (their card effects, Parry, Death Mark)
+  /** Times this side lost HP outside a hit this turn, by source: the opponent (their card effects, Parry, Mark of Assassin)
    *  or itself (own drawbacks). Feeds Rage. */
   otherDmg?: { foe: number; self: number }
   /** Cards this side lost to a discard effect this turn (Charge break, Block streak, Guard Crush), for the UI. */

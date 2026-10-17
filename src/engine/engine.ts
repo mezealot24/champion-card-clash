@@ -1,7 +1,7 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, DEATH_MARK_PCT, lifestealPct } from './combos'
 import { getStyle } from './styles'
-import { addRes, baseDmgOf, gainRes, payChain, resourceOf } from './resources'
+import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_CHARGE_DRAW, SURGE_HEAL_PER_ENERGY } from './resources'
 import type { EffectSpec } from './effects/spec'
 import type { ChainCtx } from './effects/types'
 import { drawCards, effectOf, emit, heal, log, loseHp, markDiscarded, toDeckBottom } from './state'
@@ -20,6 +20,8 @@ type TurnEnv = {
   hitsTaken: Record<Side, number>
   /** Extra % dmg each side takes from hits this turn (Vulnerable statuses, read before they tick). */
   vulnPct: Record<Side, number>
+  /** Energy Surge on Strike: enemy S cards deal 0 to this side this turn. */
+  sWard: Record<Side, boolean>
 }
 
 export function legalActions(state: GameState, side: Side): Action[] {
@@ -53,7 +55,18 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const blockNow: Record<Side, number> = { p1: 0, p2: 0 }
   const hitsTaken: Record<Side, number> = { p1: 0, p2: 0 }
   const vulnPct: Record<Side, number> = { p1: 0, p2: 0 }
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct }
+  // Energy Surge (Assassin): a full bar at the start of the turn is spent by the action picked (see resources.ts)
+  const surge: Record<Side, number> = { p1: 0, p2: 0 }
+  const sWard: Record<Side, boolean> = { p1: false, p2: false }
+  for (const side of SIDES) {
+    const p = state.players[side]
+    const def = resourceOf(p.championId)
+    if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) continue
+    if (actions[side] === 'strike' && handAtStart[side].some((c) => c.def.type === 'S')) continue
+    surge[side] = p.res ?? 0
+    if (actions[side] === 'strike') sWard[side] = true
+  }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, sWard }
 
   // Silence: a side Silenced at the start of the turn has no card effects all turn
   for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
@@ -77,6 +90,14 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
 
   // runs every turn: Before action fires for held cards too (e.g. "if you played Charge"); After action ends it
   const cleanHits = resolveStrikes(state, actions, env, blockStops, trueDmg, guardBreak)
+
+  for (const side of SIDES) {
+    if (!surge[side]) continue
+    state.players[side].res = 0
+    const what = actions[side] === 'charge' ? `จั่วเพิ่ม ${SURGE_CHARGE_DRAW}` : actions[side] === 'block' ? `ฮีล ${surge[side] * SURGE_HEAL_PER_ENERGY}` : 'การ์ด S ของศัตรูทำ dmg 0'
+    log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
+    if (actions[side] === 'block') heal(state, side, surge[side] * SURGE_HEAL_PER_ENERGY)
+  }
 
   // Styles that react to this turn's hits
   for (const side of SIDES) {
@@ -113,6 +134,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     } else {
       drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))
     }
+    // Energy Surge on Charge: 1 more card, broken Charge or not
+    if (surge[side]) drawCards(state, side, SURGE_CHARGE_DRAW)
   }
 
   if (actions.p1 === 'block' && actions.p2 === 'block') {
@@ -261,7 +284,7 @@ function resolveStrikes(
   // Every hit's outcome is worked out now, in hit order: Block, then Parry, then Shield, then HP.
   // So dmg each side will take from hits this turn is known before any hit lands.
   const longest = Math.max(...strikers.map((s) => chains[s]!.length))
-  const outcome = new Map<string, { dealt: number; parried: boolean; absorbed: number }>()
+  const outcome = new Map<string, { dealt: number; parried: boolean; absorbed: number; warded: boolean }>()
   const sized = (side: Side, kind: 'shield' | 'parry') => state.players[side].statuses.filter((s) => s.kind === kind && (s.n ?? 0) > 0)
   for (let i = 0; i < longest; i++) {
     for (const side of strikers) {
@@ -269,6 +292,12 @@ function resolveStrikes(
       if (!card) continue
       const enemy = other(side)
       let dealt = dealtOf(side, i)
+      // Energy Surge parries every S hit (before Parry and Shield); a parry deflects, nothing goes back (Q 2026-10-17)
+      const warded = env.sWard[enemy] && card.def.type === 'S' && dealt > 0
+      if (warded) {
+        outcome.set(card.uid, { dealt: 0, parried: false, absorbed: 0, warded })
+        continue
+      }
       const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
       if (parry) parry.n = (parry.n ?? 1) - 1
       let absorbed = 0
@@ -281,7 +310,7 @@ function resolveStrikes(
       }
       if (parry) dealt = 0
       else dealt -= absorbed
-      outcome.set(card.uid, { dealt, parried: !!parry, absorbed })
+      outcome.set(card.uid, { dealt, parried: !!parry, absorbed, warded: false })
       hitDmgTaken[enemy] += dealt
     }
   }
@@ -299,13 +328,12 @@ function resolveStrikes(
       if (blocked) hitsBlocked[enemy]++
       const usedNext = card.growNext ?? 0
       const dmg = dmgOf(side, i)
-      const { dealt, parried, absorbed } = outcome.get(card.uid)!
-      if (!blocked && !parried) env.hitsTaken[enemy]++
+      const { dealt, parried, absorbed, warded } = outcome.get(card.uid)!
+      if (!blocked && !parried && !warded) env.hitsTaken[enemy]++
       emit(state, { k: 'hit', side, slot: i, uid: card.uid, type: card.def.type, dmg, dealt, blocked, parried, absorbed, crit: crit[side].has(i) })
       if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
-      if (parried && dmg > 0) loseHp(state, side, dmg)
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
-      const guard = parried ? ` (${enemy} Parry: สะท้อน ${dmg} กลับ)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
+      const guard = parried ? ` (${enemy} Parry ปัด ${dmg})` : warded ? ` (${enemy} Energy Surge Parry S)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}${guard}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
       if (ls > 0 && heal(state, side, ls) > 0) {
@@ -321,7 +349,7 @@ function resolveStrikes(
     }
   }
 
-  // Death Mark (Assassin combo): a Strike against a marked opponent bursts for 50% of the chain's total dmg,
+  // Mark of Assassin (Assassin combo): a Strike against a marked opponent bursts for 50% of the chain's total dmg,
   // whatever Block / Shield let through (Claude reading of Q 2026-10-16: total = every card's dmg in the chain).
   // Lost straight from HP. A mark placed by this turn's combo only counts from the next Strike.
   for (const side of strikers) {
@@ -331,7 +359,7 @@ function resolveStrikes(
     if (burst <= 0) continue
     loseHp(state, other(side), burst)
     hitDmgTaken[other(side)] += burst
-    log(state, `${side} 💀 Death Mark ระเบิด ${burst} (50% ของ dmg รวม ${total} ในสาย)`)
+    log(state, `${side} 💀 Mark of Assassin ระเบิด ${burst} (50% ของ dmg รวม ${total} ในสาย)`)
   }
 
   // Guard Crush is used up by this Strike: if the opponent Blocked it, they lose their 2 oldest Field cards.

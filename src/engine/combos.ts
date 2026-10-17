@@ -23,9 +23,9 @@ const foe = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1')
 const allClean = (h: ComboHit[]) => h.every((x) => x.clean)
 
 export const CONQUEROR_MAX = 6
-/** Death Mark lasts the rest of the game (statuses count down, so: a number no game reaches) */
+/** Mark of Assassin lasts the rest of the game (statuses count down, so: a number no game reaches) */
 export const DEATH_MARK_TURNS = 9999
-/** Death Mark burst: % of the chain's total dmg */
+/** Mark of Assassin burst: % of the chain's total dmg */
 export const DEATH_MARK_PCT = 50
 
 export const COMBOS: Record<string, ComboDef[]> = {
@@ -47,7 +47,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
     },
   ],
   /**
-   * Assassin · P > K > S, all clean: Death Mark on the opponent for the rest of the game (Q 2026-10-16, replaced True Damage).
+   * Assassin · P > K > S, all clean: Mark of Assassin on the opponent for the rest of the game (Q 2026-10-16, replaced True Damage).
    * Every later Strike against a marked opponent bursts for 50% of that chain's total dmg (engine.ts). Doesn't stack.
    */
   AS: [
@@ -59,7 +59,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
         const enemy = state.players[foe(side)]
         if (enemy.statuses.some((s) => s.kind === 'deathMark')) return
         enemy.statuses.push({ kind: 'deathMark', turns: DEATH_MARK_TURNS })
-        say(state, side, 'Combo P > K > S: 💀 Death Mark ติดบนศัตรูไปจนจบเกม')
+        say(state, side, 'Combo P > K > S: 💀 Mark of Assassin ติดบนศัตรูไปจนจบเกม')
       },
     },
   ],

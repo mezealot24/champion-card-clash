@@ -48,13 +48,13 @@ describe('Shield', () => {
 })
 
 describe('Parry', () => {
-  it('TK-007: the first hit past Block is parried back to the attacker', () => {
+  it('TK-007: the first hit past Block is parried (0 dmg, nothing goes back)', () => {
     const s = turn(game([tk('TK-007', 'P', 10)], [plain(5), plain(5), plain(7), plain(3)]), 'block', 'strike')
-    expect(hp(s)).toEqual([97, 93])
+    expect(hp(s)).toEqual([97, 100])
   })
 
   it('TK-012 protects a Charge; nothing without a Strike', () => {
-    expect(hp(turn(game([tk('TK-012')], [plain(9), plain(2)]), 'charge', 'strike'))).toEqual([98, 91])
+    expect(hp(turn(game([tk('TK-012')], [plain(9), plain(2)]), 'charge', 'strike'))).toEqual([98, 100])
     expect(turn(game([tk('TK-012')], []), 'charge', 'charge').players.p1.statuses).toEqual([])
   })
 })

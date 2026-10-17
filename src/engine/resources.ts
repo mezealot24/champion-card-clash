@@ -12,7 +12,7 @@ export type TurnSummary = {
   hitsTaken: number
   /** Your hits that dealt dmg past Block / Parry / Shield. */
   cleanHits: number
-  /** Times you lost HP outside a hit, caused by the opponent (their effects, Parry, Death Mark). */
+  /** Times you lost HP outside a hit, caused by the opponent (their effects, Mark of Assassin). */
   foeDmg: number
   /** Times you lost HP to your own cards' drawbacks. */
   selfDmg: number
@@ -36,6 +36,15 @@ export type ResourceDef = {
   gain?: (t: TurnSummary) => number
 }
 
+/**
+ * Assassin Energy Surge (Q 2026-10-17): with a full Energy bar at the start of the turn, the action you pick spends it all.
+ * Charge → draw 1 more (even if the Charge is broken). Strike with no S card on your Field → enemy S cards deal 0 to you
+ * this turn (not reflected). Block → heal SURGE_HEAL_PER_ENERGY per Energy. Works while Silenced (it's the class, not a card).
+ */
+export const SURGE_CHAMPION = 'AS'
+export const SURGE_CHARGE_DRAW = 1
+export const SURGE_HEAL_PER_ENERGY = 3
+
 /** HP below this % of Max HP = the red HP bar (same line as Coup de grâce). */
 export const RED_HP_PCT = 30
 
@@ -43,7 +52,7 @@ export const RESOURCES: Record<string, ResourceDef> = {
   // Mana: +1 when you Charge, +1 when you Block. Keeps between turns.
   MG: { name: 'Mana', cap: 5, start: 0, defaultCost: 2, gain: (t) => (t.action === 'strike' ? 0 : 1) },
   // Rage (Q 2026-10-16): +2 per hit you take and +2 each other time the opponent makes you lose HP (their effects,
-  // Parry, Death Mark); +1 each time your own drawbacks cost HP; +1 per clean hit you land.
+  // Mark of Assassin); +1 each time your own drawbacks cost HP; +1 per clean hit you land.
   // −1 on a quiet turn (nobody Strikes, you lost no HP), but not while your HP is red (below RED_HP_PCT).
   BR: {
     name: 'Rage',
