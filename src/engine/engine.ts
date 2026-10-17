@@ -24,6 +24,8 @@ type TurnEnv = {
   wraith: Record<Side, boolean>
   shroud: Record<Side, boolean>
   elusive: Record<Side, boolean>
+  /** Punch / Kick cards that hit clean this turn (Mage Mana). */
+  cleanPK: Record<Side, number>
 }
 
 export function legalActions(state: GameState, side: Side): Action[] {
@@ -71,7 +73,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
   }
   const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') } }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 } }
 
   // Styles that act on the action picked (Molten Shield), before statuses are read
   for (const side of SIDES) getStyle(state.players[side].style)?.actionStart?.(state, side, actions[side])
@@ -156,7 +158,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   // class resources fill at the end of the turn, so what you earn now is spent next turn
   for (const side of SIDES) {
     const p = state.players[side]
-    gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side], foeDmg: p.otherDmg?.foe ?? 0, selfDmg: p.otherDmg?.self ?? 0, hpPct: (100 * p.hp) / Math.max(1, p.maxHp) })
+    gainRes(state, side, { action: actions[side], enemyAction: actions[other(side)], hitsTaken: hitsTaken[side], cleanHits: cleanHits[side], cleanPK: env.cleanPK[side], foeDmg: p.otherDmg?.foe ?? 0, selfDmg: p.otherDmg?.self ?? 0, hpPct: (100 * p.hp) / Math.max(1, p.maxHp) })
     p.otherDmg = undefined
   }
   // Dual Strike Styles (Sonic Bliz Acceleration): after resources fill, so a full bar stays full
@@ -345,6 +347,7 @@ function resolveStrikes(
       // clean = some dmg got through Block, Parry and Shield (GDD)
       const clean = !blocked && dealt > 0
       if (clean) cleanHits[side]++
+      if (clean && card.def.type !== 'S') env.cleanPK[side]++
       hitResults.set(card.uid, { blocked, clean })
       // On hit: fires right here, between hits, so e.g. a heal lands before the next enemy hit (Q 2026-10-17)
       effectOf(state, side, card)?.onHit?.(ctxFor(side, i, blocked, clean))
