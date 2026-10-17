@@ -113,7 +113,7 @@ export function Battle({ data }: { data: BattleData }) {
             >
               {data.champions.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.id}) · HP {c.hp_start}/{c.hp_max} · {deckOf(c.id).length} ใบ
+                  {c.name} ({c.id}) · HP {c.hp_start}/{c.hp_max} · {deckOf(c.id).filter((d) => !d.styleOnly || d.styleOnly.startsWith('!')).length} ใบ
                   {missingOf(c.id) ? ` · ⚠ ${missingOf(c.id)} effect ยังไม่ทำงาน` : ''}
                 </option>
               ))}
