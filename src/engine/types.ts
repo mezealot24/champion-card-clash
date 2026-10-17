@@ -14,6 +14,8 @@ export type CardDef = {
   effectSpec?: EffectSpec | null // cards.effect_json; wins over code in effects/registry.ts
   /** Resource cost paid when it fires in a Strike chain (engine/resources.ts). Null on an S card = class default. */
   cost?: number | null
+  /** cards.style_only: "MG:1" = only under that Style, "!MG:1" = under every Style but that one, null = always (see inStyleDeck). */
+  styleOnly?: string | null
 }
 
 /** One physical card in a game. uid is unique even for copies. */
@@ -34,7 +36,8 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  * shield = absorbs n dmg from hits before HP; lasts until used up or its turns run out
  * parry = the next n hits that get past your Block are deflected and deal 0, nothing goes back (this turn; Q 2026-10-17: a Block is 2 Parries)
  */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark'
+/** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts */
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
 

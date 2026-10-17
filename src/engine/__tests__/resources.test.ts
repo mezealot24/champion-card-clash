@@ -112,7 +112,7 @@ describe('resources', () => {
 
   it('an S card with no cost set uses the class default; P / K are free', () => {
     const s = resolveTurn(game('MG', [c('P', 1, heal5), c('S', 1, heal5)], [], 2), { p1: 'strike', p2: 'charge' })
-    expect(s.players.p1.res).toBe(0) // Mage default 2
+    expect(s.players.p1.res).toBe(1) // Mage default 2, then +1 for the clean Punch
     expect(s.players.p1.hp).toBe(60)
   })
 
@@ -151,7 +151,7 @@ describe('wow building blocks', () => {
 
   it('Gain resource and the "N+ resource" condition', () => {
     const gain: EffectSpec = [{ hook: 'onResolve', do: [{ a: 'gainRes', who: 'self', n: 2 }] }]
-    expect(resolveTurn(game('MG', [c('P', 1, gain)]), { p1: 'strike', p2: 'charge' }).players.p1.res).toBe(2)
+    expect(resolveTurn(game('MG', [c('P', 1, gain)]), { p1: 'strike', p2: 'charge' }).players.p1.res).toBe(3) // +1 for the clean Punch
     const rich: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'res', who: 'self', n: 3 }], do: [{ a: 'heal', who: 'self', n: 5 }] }]
     expect(resolveTurn(game('MG', [c('P', 1, rich)], [], 3), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(55)
     expect(resolveTurn(game('MG', [c('P', 1, rich)], [], 2), { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(50)
@@ -165,5 +165,12 @@ describe('discard info for the UI', () => {
     const t = resolveTurn(g, { p1: 'strike', p2: 'charge' })
     expect(t.players.p2.discarded?.map((d) => [d.card.uid, d.slot, d.reason])).toEqual([[a.uid, 1, 'Charge break']])
     expect(resolveTurn(t, { p1: 'block', p2: 'block' }).players.p2.discarded).toEqual([])
+  })
+})
+
+describe('Mage Mana from Punch / Kick', () => {
+  it('+1 Mana per Punch / Kick that hits clean, none for a blocked one or a Skill', () => {
+    expect(resolveTurn(game('MG', [c('P', 1), c('K', 1), c('S', 1, undefined, 0)]), { p1: 'strike', p2: 'charge' }).players.p1.res).toBe(2)
+    expect(resolveTurn(game('MG', [c('P', 1), c('K', 1)]), { p1: 'strike', p2: 'block' }).players.p1.res).toBe(0)
   })
 })
