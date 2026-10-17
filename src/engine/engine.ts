@@ -277,12 +277,12 @@ function resolveStrikes(
     // Vulnerable: the side being hit takes N% more dmg from every hit
     return Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)])) / 100))
   }
-  // Before action combos (card types only), then Conqueror stacks
+  // Before action combos (card types only), then Momentum stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
   for (const side of strikers) getStyle(state.players[side].style)?.strikeStart?.(state, side, chains[side]!)
   for (const side of SIDES) applyConqueror(state, side, actions, bonus[side], mult[other(side)])
   // Guard Crush: a hit stopped by Block still deals half (rounded down)
-  // a blocked hit deals half under Guard Crush, or when a Style marked it Critical (Coup de grâce, Q 2026-10-16)
+  // a blocked hit deals half under Guard Crush, or when a Style marked it Critical (Fatal Rhythm, Q 2026-10-16)
   const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : guardBreak[side] || crit[side].has(i) ? Math.floor(dmgOf(side, i) / 2) : 0)
 
   // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
@@ -342,7 +342,7 @@ function resolveStrikes(
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}${guard}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
       if (ls > 0 && heal(state, side, ls) > 0) {
-        log(state, `${side} Omnivamp ฮีล ${ls}`)
+        log(state, `${side} Lifesteal ฮีล ${ls}`)
       }
       // clean = some dmg got through Block, Parry and Shield (GDD)
       const clean = !blocked && dealt > 0

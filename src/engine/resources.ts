@@ -49,7 +49,7 @@ export const SURGE_CHAMPION = 'AS'
 /** Which Surge actions are on: A = Block (Wraith Step), B = Charge (Shroud). Q 2026-10-17 picked A+B; C (Strike) is off. */
 export const SURGE_MODES = 'AB'
 
-/** HP below this % of Max HP = the red HP bar (same line as Coup de grâce). */
+/** HP below this % of Max HP = the red HP bar (same line as Fatal Rhythm). */
 export const RED_HP_PCT = 30
 
 export const RESOURCES: Record<string, ResourceDef> = {

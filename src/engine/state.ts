@@ -123,7 +123,7 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
 }
 
 /** Heal up to Max HP (Ignite cuts it by 25%); returns HP actually gained. A side already at 0 HP is down for good:
- *  heals later in the same turn (After action, Hold, combos, Omnivamp) can't bring it back (Q 2026-10-17). */
+ *  heals later in the same turn (After action, Hold, combos, Lifesteal) can't bring it back (Q 2026-10-17). */
 export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   if (p.hp <= 0) return 0

@@ -1,4 +1,4 @@
-// Assassin Styles: Sonic Bliz (AS:1) and Coup de grâce (AS:2).
+// Assassin Styles: Sonic Bliz (AS:1) and Fatal Rhythm (AS:2).
 import { describe, expect, it } from 'vitest'
 import { createGame, resolveTurn } from '../index'
 import type { CardDef, CardInst, GameState } from '../index'
@@ -36,7 +36,7 @@ describe('Sonic Bliz Acceleration', () => {
   })
 })
 
-describe('Coup de grâce', () => {
+describe('Fatal Rhythm', () => {
   it('the 4th attack is a Critical: 3x dmg, shown with its total dmg in the log', () => {
     const s = resolveTurn(game('AS:2', [hit(2), hit(2), hit(2), hit(4), hit(2)]), { p1: 'strike', p2: 'charge' })
     expect(s.players.p2.hp).toBe(100 - 8 - 12)

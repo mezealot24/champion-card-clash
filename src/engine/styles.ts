@@ -9,7 +9,7 @@ import { other } from './types'
 export const SONIC_DMG_PER_ENERGY = 2
 /** Sonic Bliz Overdrive: fewest cards in the chain that set it off (Q 2026-10-16: 3, was a full Field of 5). */
 export const OVERDRIVE_MIN_CHAIN = 3
-/** Coup de grâce: enemy HP below this % of Max HP (the red HP bar) → Critical x4 instead of x3. */
+/** Fatal Rhythm: enemy HP below this % of Max HP (the red HP bar) → Critical x4 instead of x3. */
 export const COUP_RED_HP_PCT = RED_HP_PCT
 
 /**
@@ -80,7 +80,7 @@ export type StyleDef = {
   beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[]) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
-  /** Strike chains only: right after Before action combos, before Conqueror and any hit (e.g. Juggernaut stacks) */
+  /** Strike chains only: right after Before action combos, before Momentum and any hit (e.g. Juggernaut stacks) */
   strikeStart?: (state: GameState, side: Side, chain: CardInst[]) => void
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
@@ -96,16 +96,16 @@ export type StyleDef = {
 
 const say = (state: GameState, side: Side, line: string) => state.log.push(`T${state.turn} ${side} ${line}`)
 const pctHp = (p: PlayerState) => (p.hp * 100) / p.maxHp
-/** Overgrowth: +1 dmg per 20 Max HP grown */
+/** Titan Bloom: +1 dmg per 20 Max HP grown */
 export const overgrowthDmg = (p: PlayerState) => Math.floor((p.styleData?.grown ?? 0) / 20)
 
 export const STYLES: Record<string, StyleDef> = {
   /**
-   * Tank · Second Wind: when hit while HP is red (below RED_HP_PCT = 30%), heal 4% of missing HP per hit landed this turn.
+   * Tank · Lifeline: when hit while HP is red (below RED_HP_PCT = 30%), heal 4% of missing HP per hit landed this turn.
    * Works only during the first stretch in the red: once HP is back in the green (30%+), it's off for the game (Q nerf 2026-10-16, was 60%).
    */
   'TK:1': {
-    name: 'Second Wind',
+    name: 'Lifeline',
     afterHits: (state, side, r) => {
       const p = state.players[side]
       if (p.styleData?.spent || r.hitsTaken === 0 || p.hp <= 0 || pctHp(p) >= RED_HP_PCT) return
@@ -114,7 +114,7 @@ export const STYLES: Record<string, StyleDef> = {
       p.hp = Math.min(p.maxHp, p.hp + n)
       if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
       p.styleData = { ...p.styleData, below: 1 }
-      say(state, side, `Second Wind: ฮีล ${n} (4% ของ HP ที่หายไป x ${r.hitsTaken} hit)`)
+      say(state, side, `Lifeline: ฮีล ${n} (4% ของ HP ที่หายไป x ${r.hitsTaken} hit)`)
     },
     endTurn: (state, side) => {
       const p = state.players[side]
@@ -122,19 +122,19 @@ export const STYLES: Record<string, StyleDef> = {
       if (pctHp(p) < RED_HP_PCT) p.styleData = { ...p.styleData, below: 1 }
       else if (p.styleData?.below) {
         p.styleData = { ...p.styleData, spent: 1 }
-        say(state, side, `Second Wind: HP กลับมาหลอดเขียว (${RED_HP_PCT}%+) ปิดถาวร`)
+        say(state, side, `Lifeline: HP กลับมาหลอดเขียว (${RED_HP_PCT}%+) ปิดถาวร`)
       }
     },
   },
 
   /**
-   * Tank · Overgrowth: starts with the Tank's normal HP / Max HP, same as Second Wind (Q 2026-10-16; was Max HP 210). Each time attacked: +1 per hit taken,
+   * Tank · Titan Bloom: starts with the Tank's normal HP / Max HP, same as Lifeline (Q 2026-10-16; was Max HP 210). Each time attacked: +1 per hit taken,
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
    * Q buff 2026-10-16: every 20 Max HP grown this way = +1 dmg on every card you strike with (Max HP lost later doesn't undo it).
    */
   'TK:2': {
-    name: 'Overgrowth',
+    name: 'Titan Bloom',
     afterHits: (state, side, r) => {
       if (!r.attacked) return
       const p = state.players[side]
@@ -142,18 +142,18 @@ export const STYLES: Record<string, StyleDef> = {
       if (gain <= 0) return
       p.maxHp += gain
       p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
-      say(state, side, `Overgrowth: Max HP +${gain} → ${p.maxHp}`)
+      say(state, side, `Titan Bloom: Max HP +${gain} → ${p.maxHp}`)
     },
     beforeHits: (state, side, bonus) => {
       const n = overgrowthDmg(state.players[side])
       if (!n) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += n
-      say(state, side, `Overgrowth: ทุกใบ +${n} dmg`)
+      say(state, side, `Titan Bloom: ทุกใบ +${n} dmg`)
     },
   },
 }
 
-/** Juggernaut: how many turns Tenacity lasts after the Conqueror stacks fill up. */
+/** Juggernaut: how many turns Tenacity lasts after the Momentum stacks fill up. */
 export const TENACITY_TURNS = 2
 
 const below50 = (state: GameState, side: Side) => pctHp(state.players[side]) < 50
@@ -169,8 +169,8 @@ Object.assign(STYLES, {
     },
   },
   /**
-   * Bruiser · Juggernaut (Q 2026-10-16, Conqueror + Tenacity merged; name by Claude).
-   * Every Strike: +1 Conqueror stack per card in the chain, before it hits (max 6; see applyConqueror in combos.ts).
+   * Bruiser · Juggernaut (Q 2026-10-16, Momentum + Tenacity merged; name by Claude).
+   * Every Strike: +1 Momentum stack per card in the chain, before it hits (max 6; see applyConqueror in combos.ts).
    * When the stacks reach max: Tenacity for the next 2 turns (a charge break can't throw away the slot 1 card).
    * Every turn you Block: −1 stack. Charge keeps the stacks (no gain, no loss; Q 2026-10-16 22:03Z).
    */
@@ -182,7 +182,7 @@ Object.assign(STYLES, {
       const n = Math.min(CONQUEROR_MAX, was + chain.length)
       if (n === was) return
       p.comboData = { ...p.comboData, conqueror: n }
-      say(state, side, `Juggernaut: Conqueror ${n}/${CONQUEROR_MAX}${n === CONQUEROR_MAX ? ' (Omnivamp)' : ''}`)
+      say(state, side, `Juggernaut: Momentum ${n}/${CONQUEROR_MAX}${n === CONQUEROR_MAX ? ' (Lifesteal)' : ''}`)
       if (n === CONQUEROR_MAX) {
         p.styleData = { ...p.styleData, tenacityFrom: state.turn }
         say(state, side, `Juggernaut: Tenacity ${TENACITY_TURNS} เทิร์น (ช่อง 1 ไม่โดนทิ้งจาก charge break)`)
@@ -197,7 +197,7 @@ Object.assign(STYLES, {
       const n = p.comboData?.conqueror ?? 0
       if (action !== 'block' || !n) return
       p.comboData = { ...p.comboData, conqueror: n - 1 }
-      say(state, side, `Juggernaut: Block, Conqueror ${n - 1}/${CONQUEROR_MAX}`)
+      say(state, side, `Juggernaut: Block, Momentum ${n - 1}/${CONQUEROR_MAX}`)
     },
   },
 } satisfies Record<string, StyleDef>)
@@ -227,11 +227,11 @@ Object.assign(STYLES, {
     // Acceleration (Q 2026-10-16, replaces Extra Hits): Strike meets Strike → Energy full + draw 2 at the end of the turn
     dualStrike: { draw: 2, fillRes: true },
   },
-  /** Assassin · Coup de grâce: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg,
+  /** Assassin · Fatal Rhythm: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg,
    *  4x while the enemy's HP is in the red (below 30% of Max HP at the start of the Strike, like the HP bar).
    *  A blocked Critical still deals 50% (engine dealtOf). */
   'AS:2': {
-    name: 'Coup de grâce',
+    name: 'Fatal Rhythm',
     beforeHits: (state, side, _bonus, mult, crit) => {
       const p = state.players[side]
       const enemy = state.players[side === 'p1' ? 'p2' : 'p1']
@@ -241,7 +241,7 @@ Object.assign(STYLES, {
         if ((before + i + 1) % 4 === 0) {
           mult[i] *= x
           crit.add(i)
-          say(state, side, `Coup de grâce Critical: ช่อง ${i + 1} (ตีครั้งที่ ${before + i + 1}) dmg x${x}`)
+          say(state, side, `Fatal Rhythm Critical: ช่อง ${i + 1} (ตีครั้งที่ ${before + i + 1}) dmg x${x}`)
         }
       })
       p.styleData = { ...p.styleData, attacks: before + mult.length }

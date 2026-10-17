@@ -1,4 +1,4 @@
-// Tank Styles: Second Wind (TK:1) and Overgrowth (TK:2).
+// Tank Styles: Lifeline (TK:1) and Titan Bloom (TK:2).
 import { describe, expect, it } from 'vitest'
 import { createGame, resolveTurn } from '../index'
 import type { CardDef, CardInst, GameState } from '../index'
@@ -12,7 +12,7 @@ function game(style: string, hp: number, maxHp = 100): GameState {
   return createGame({ championId: 'TK', hpStart: hp, hpMax: maxHp, deck, style }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1 })
 }
 
-describe('Second Wind', () => {
+describe('Lifeline', () => {
   it('heals 4% of missing HP per hit taken while HP is red (below 30%)', () => {
     const s = game('TK:1', 30)
     s.players.p2.hand = [hit(10), hit(10)]
@@ -42,8 +42,8 @@ describe('Second Wind', () => {
   })
 })
 
-describe('Overgrowth', () => {
-  it("starts at the Tank's normal HP / Max HP, same as Second Wind", () => {
+describe('Titan Bloom', () => {
+  it("starts at the Tank's normal HP / Max HP, same as Lifeline", () => {
     const s = game('TK:2', 210, 300)
     expect([s.players.p1.hp, s.players.p1.maxHp]).toEqual([210, 300])
   })
@@ -80,7 +80,7 @@ describe('Bruiser Styles', () => {
     expect(resolveTurn(ok, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(97)
   })
 
-  it('Juggernaut: +1 Conqueror per chain card before it hits; +1 dmg per stack', () => {
+  it('Juggernaut: +1 Momentum per chain card before it hits; +1 dmg per stack', () => {
     const s = br('BR:2', 90)
     s.players.p1.hand = [hit(10), hit(10)]
     const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
@@ -116,7 +116,7 @@ describe('Bruiser Styles', () => {
   })
 })
 
-describe('Overgrowth dmg (Q buff 2026-10-16)', () => {
+describe('Titan Bloom dmg (Q buff 2026-10-16)', () => {
   it('every 20 Max HP grown = +1 dmg on every card you strike with', () => {
     const s = game('TK:2', 210, 300)
     s.players.p1.styleData = { grown: 45 } // +2

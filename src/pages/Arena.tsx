@@ -32,7 +32,7 @@ const ACTIONS: { action: Action; label: string; beats: string }[] = [
 ]
 const SPEEDS = [1, 1.5, 2]
 /** Banner text per signature combo (champion · pattern). */
-/** Juggernaut: Conqueror stacks full (6) lights the fighter up. */
+/** Juggernaut: Momentum stacks full (6) lights the fighter up. */
 const conqMax = (g: GameState, s: Side) => (g.players[s].comboData?.conqueror ?? 0) >= 6
 const COMBO_TEXT: Record<string, [string, string]> = {
   'TK:P > K > P': ['SECOND HELPING', 'Heal 10% of your HP'],
@@ -665,7 +665,7 @@ function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side
     ...p.statuses.map((s) =>
       s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? 'No Strike' : s.kind === 'noCharge' ? 'No Charge' : s.kind === 'deathMark' ? '💀 Mark of Assassin' : s.kind === 'ignite' ? `🔥 Ignite ${s.n ?? 1}` : s.kind,
     ),
-    ...(p.comboData?.conqueror ? [p.comboData.conqueror >= 6 ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/6`] : []),
+    ...(p.comboData?.conqueror ? [p.comboData.conqueror >= 6 ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/6`] : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
     ...(overdriveAdd(game, side) ? [`⚡ Overdrive +${overdriveAdd(game, side)}`] : []),
   ]
