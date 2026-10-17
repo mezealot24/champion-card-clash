@@ -95,21 +95,17 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (actions[side] !== 'charge') continue
     const p = state.players[side]
     if (actions[other(side)] === 'strike') {
-      // Strike > Charge: Charge break (Q 2026-10-16). The oldest card goes to the bottom of the deck and a new one is
-      // drawn in its place, even if it was the only card. A Style like Tenacity can keep the first slots safe:
-      // the next card goes instead, and with no card beyond the safe slots nothing is lost.
+      // Strike > Charge: Charge break (Q 2026-10-16). The oldest card goes to the bottom of the deck, the cards behind
+      // it move up a slot (2-3-4 become 1-2-3) and 1 new card is drawn onto the end (Q 2026-10-17), even if it was the
+      // only card. A Style like Tenacity can keep the first slots safe: the next card goes instead, and with no card
+      // beyond the safe slots nothing is lost.
       const safe = getStyle(p.style)?.chargeBreakSafe?.(state, side) ?? 0
       if (p.hand.length > safe) {
         const lost = p.hand.splice(safe, 1)[0]
         markDiscarded(state, side, [{ card: lost, slot: safe + 1, reason: 'Charge break' }])
         toDeckBottom(state, side, [lost])
-        log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge) → ลงใต้กอง จั่วใบใหม่แทน`)
-        // the replacement takes the lost card's slot (Q 2026-10-16), not the end of the Field
-        if (drawCards(state, side, 1)) {
-          p.hand.splice(safe, 0, p.hand.pop()!)
-          const ev = state.events?.findLast((e) => e.k === 'draw' && e.side === side)
-          if (ev?.k === 'draw') ev.slot = safe
-        }
+        log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge) → ลงใต้กอง จั่วใบใหม่ต่อท้าย`)
+        drawCards(state, side, 1)
       }
     } else {
       drawCards(state, side, state.rules.chargeDraw + (getStyle(p.style)?.chargeDraw ?? 0))

@@ -13,6 +13,7 @@ export function pickAiAction(state: GameState, side: Side, rand: () => number = 
   if (foe.hand.length === 0) weights.charge += 4 // foe cannot hurt us this turn
   if (foe.hand.length >= state.rules.handMax) weights.block += 3 // big chain incoming
   if (me.hand.length >= state.rules.handMax) weights.strike += 3 // full hand, Charge is wasted
+  if (me.hand.length >= state.rules.handMax) weights.charge = 0
 
   const legal = legalActions(state, side)
   const options = legal.map((a) => [a, weights[a]] as const).filter(([, w]) => w > 0)
@@ -142,9 +143,17 @@ function solve(m: number[][], iters = 300): { mix: number[]; value: number } {
   return { mix: row, value }
 }
 
+/** The AI's own choices: with a full Field it only Strikes or Blocks (Q 2026-10-17), Charge would draw nothing. */
+export function aiActions(state: GameState, side: Side): Action[] {
+  const legal = legalActions(state, side)
+  if (state.players[side].hand.length < state.rules.handMax) return legal
+  const noCharge = legal.filter((a) => a !== 'charge')
+  return noCharge.length ? noCharge : legal
+}
+
 /** Payoff table for `side`: every (my action, their action) pair played out, scored `depth` turns ahead. */
 function payoff(state: GameState, side: Side, w: AiWeights, depth: number): { mine: Action[]; table: number[][] } {
-  const mine = legalActions(state, side)
+  const mine = aiActions(state, side)
   const theirs = legalActions(state, other(side))
   const table = mine.map((a) =>
     theirs.map((b) => {
@@ -164,7 +173,8 @@ export function pickSmartAction(
   weights: Partial<AiWeights> = {},
 ): Action {
   const w = { ...AI_WEIGHTS, ...weights }
-  if (legalActions(state, side).length === 1) return legalActions(state, side)[0]
+  const choices = aiActions(state, side)
+  if (choices.length === 1) return choices[0]
   const { mine, table } = payoff(state, side, w, w.depth)
   const mixed = solve(table).mix
   // a little noise so the AI never becomes a pure function of the board

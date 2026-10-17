@@ -1,6 +1,13 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { buildDeck, createGame, isEffectMissing, pickSmartAction, STYLES, resolveTurn, type Action, type CardRowLike, type GameState, type Side } from '../engine'
+import { capability, type Sample } from '../online/claude'
+import type { Seat } from '../online/match'
+import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
+import { Online } from './Online'
+
+/** Who you play against: the built-in AI, Claude as ตุ๊กตา (Artifact `sample`), or a person online (Artifact `db`). */
+type Foe = 'ai' | 'tuktah' | 'online'
 
 export type Champ = { id: string; name: string; hp_start: number; hp_max: number }
 export type Row = CardRowLike & { champion_id: string }
@@ -17,33 +24,86 @@ export function Battle({ data }: { data: BattleData }) {
   const [game, setGame] = useState<GameState | null>(null)
   // a resolved turn the arena is still playing back; game moves to turn.next when it's done
   const [turn, setTurn] = useState<Turn | null>(null)
+  const [foe, setFoe] = useState<Foe>('ai')
+  const [online, setOnline] = useState(false)
+  const [sample, setSample] = useState<Sample | null>(null)
+  const [hasDb, setHasDb] = useState(false)
+  const [thinking, setThinking] = useState(false)
+  const [line, setLine] = useState('')
+  const [history, setHistory] = useState<{ mine: Action; theirs: Action }[]>([])
+
+  useEffect(() => {
+    capability<Sample>('sample').then(setSample)
+    capability('db').then((d) => setHasDb(!!d))
+  }, [])
 
   const deckOf = (id: string) => buildDeck(data.cards.filter((c) => c.champion_id === id))
   const missingOf = (id: string) =>
     data.cards.filter((c) => c.champion_id === id && c.in_deck !== false && isEffectMissing(c.id, c.effect, c.effect_json)).length
 
+  const setup = (id: string) => {
+    const c = data.champions.find((x) => x.id === id)!
+    return { championId: id, hpStart: c.hp_start, hpMax: c.hp_max, deck: deckOf(id) }
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const seatSetup = useCallback((s: Seat) => ({ ...setup(s.champ), style: s.style || undefined }), [data])
+  const styleText = Object.fromEntries((data.styles ?? []).map((s) => [`${s.champion_id}:${s.slot}`, s.effect]))
+
   function start() {
-    const setup = (id: string) => {
-      const c = data.champions.find((x) => x.id === id)!
-      return { championId: id, hpStart: c.hp_start, hpMax: c.hp_max, deck: deckOf(id) }
-    }
+    if (foe === 'online') return setOnline(true)
     setTurn(null)
+    setLine('')
+    setHistory([])
     setGame(createGame({ ...setup(picks.p1), style: styleKey('p1') || undefined }, { ...setup(picks.p2), style: styleKey('p2') || undefined }))
   }
 
-  function play(action: Action) {
-    if (!game || turn) return
-    const actions = { p1: action, p2: pickSmartAction(game, 'p2') }
+  async function play(action: Action) {
+    if (!game || turn || thinking) return
+    let p2 = pickSmartAction(game, 'p2')
+    if (foe === 'tuktah' && sample) {
+      // Claude picks from the board alone; the player's pick stays here until both are locked
+      setThinking(true)
+      const move = await askTuktah(sample, game, 'p2', history, styleText)
+      setThinking(false)
+      if (move) p2 = move.action
+      setLine(move?.line || (move ? '' : 'ตุ๊กตาหลุดไปแป๊บ ให้ AI เล่นแทนเทิร์นนี้นะคะ'))
+    }
+    const actions = { p1: action, p2 }
+    setHistory((h) => [...h, { mine: p2, theirs: action }])
     setTurn({ prev: game, next: resolveTurn(game, actions), actions })
+  }
+
+  if (online) {
+    return (
+      <Online
+        mine={{ champ: picks.p1, style: styleKey('p1') }}
+        setupOf={seatSetup}
+        champName={(id) => data.champions.find((c) => c.id === id)?.name ?? id}
+        styleName={(key) => (key ? (STYLES[key]?.name ?? key) : '')}
+        onQuit={() => setOnline(false)}
+      />
+    )
   }
 
   if (!game) {
     return (
       <div className="panel narrow-wide">
-        <h2>Battle vs AI</h2>
-        {(['p1', 'p2'] as const).map((side) => (
+        <h2>Battle</h2>
+        <label>
+          Opponent
+          <select value={foe} onChange={(e) => setFoe(e.target.value as Foe)}>
+            <option value="ai">AI</option>
+            <option value="tuktah" disabled={!sample}>
+              ตุ๊กตา (Claude){sample ? '' : ' · open on claude.ai'}
+            </option>
+            <option value="online" disabled={!hasDb}>
+              Online 1v1{hasDb ? '' : ' · open on claude.ai'}
+            </option>
+          </select>
+        </label>
+        {(['p1', 'p2'] as const).filter((side) => side === 'p1' || foe !== 'online').map((side) => (
           <label key={side}>
-            {side === 'p1' ? 'Champion ของคุณ' : 'Champion ของ AI'}
+            {side === 'p1' ? 'Your Champion' : `${foe === 'tuktah' ? 'ตุ๊กตา' : 'AI'}'s Champion`}
             <select
               value={picks[side]}
               onChange={(e) => {
@@ -75,7 +135,7 @@ export function Battle({ data }: { data: BattleData }) {
             )}
           </label>
         ))}
-        <button onClick={start}>เริ่มเกม</button>
+        <button onClick={start}>{foe === 'online' ? 'Find a match' : 'Start'}</button>
       </div>
     )
   }
@@ -93,6 +153,10 @@ export function Battle({ data }: { data: BattleData }) {
       names={{ p1: champName('p1'), p2: champName('p2') }}
       styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
       onAction={play}
+      foe={foe === 'tuktah' ? 'ตุ๊กตา' : 'AI'}
+      busy={thinking}
+      banner={thinking ? 'ตุ๊กตากำลังคิด…' : line || undefined}
+      bannerFades={!thinking}
       onDone={() => {
         if (turn) setGame(turn.next)
         setTurn(null)

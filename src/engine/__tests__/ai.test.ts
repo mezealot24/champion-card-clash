@@ -1,7 +1,7 @@
 // AI v2 scoring: combo potential is read from the COMBOS table.
 import { describe, expect, it } from 'vitest'
-import { createGame, legalActions, pickSmartAction } from '../index'
-import { comboPotential } from '../ai'
+import { createGame, legalActions, pickAiAction, pickSmartAction } from '../index'
+import { aiActions, comboPotential } from '../ai'
 import type { CardDef, CardInst, CardType, GameState } from '../index'
 
 let uid = 0
@@ -34,5 +34,19 @@ describe('pickSmartAction', () => {
   it('always returns a legal action', () => {
     const s = game('MG', [c('S'), c('S')], 'S')
     for (let i = 0; i < 20; i++) expect(legalActions(s, 'p1')).toContain(pickSmartAction(s, 'p1', () => i / 20))
+  })
+})
+
+describe('AI with a full Field (Q 2026-10-17)', () => {
+  it('only Strikes or Blocks, never Charges', () => {
+    const s = game('MG', [c('S'), c('S'), c('P'), c('K'), c('P')])
+    expect(aiActions(s, 'p1')).toEqual(['strike', 'block'])
+    for (let i = 0; i < 20; i++) expect(pickSmartAction(s, 'p1', () => i / 20)).not.toBe('charge')
+    for (let i = 0; i < 20; i++) expect(pickAiAction(s, 'p1', () => i / 20)).not.toBe('charge')
+  })
+  it('still Charges when Charge is the only choice left', () => {
+    const s = game('MG', [c('P'), c('P'), c('P'), c('P'), c('P')])
+    s.players.p1.statuses = [{ kind: 'noStrike', turns: 1 }, { kind: 'noBlock', turns: 1 }]
+    expect(aiActions(s, 'p1')).toEqual(['charge'])
   })
 })
