@@ -85,7 +85,7 @@ export function describeAct(a: ActSpec, now = false): string {
         return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops ${signed(n)} hit${Math.abs(n) === 1 ? '' : 's'} ${turns}`
       }
       if (a.kind === 'shield') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Shield ${a.n ?? 1}${per(a.per)} (absorbs hit dmg, lasts ${turns === 'this turn' || turns === 'this turn only' ? turns : turns === 'next turn' ? 'through next turn' : turns})`
-      if (a.kind === 'parry') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Parry ${a.n ?? 1} ${turns} (the first ${a.n ?? 1} hit${(a.n ?? 1) === 1 ? '' : 's'} past Block deal 0 and go back to the attacker)`
+      if (a.kind === 'parry') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Parry ${a.n ?? 1} ${turns} (the first ${a.n ?? 1} hit${(a.n ?? 1) === 1 ? '' : 's'} past Block are parried: 0 dmg)`
       if (a.kind === 'vulnerable') return `${a.who === 'self' ? 'you take' : `${WHO[a.who]} takes`} ${a.n ?? 1}% more dmg from hits ${turns}`
       return `${WHO[a.who]} ${STATUS[a.kind]} ${turns}`
     }

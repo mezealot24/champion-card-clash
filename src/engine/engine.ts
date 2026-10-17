@@ -292,7 +292,7 @@ function resolveStrikes(
       if (!card) continue
       const enemy = other(side)
       let dealt = dealtOf(side, i)
-      // Energy Surge ward: an S card's hit is stopped outright (before Parry and Shield, nothing reflected)
+      // Energy Surge parries every S hit (before Parry and Shield); a parry deflects, nothing goes back (Q 2026-10-17)
       const warded = env.sWard[enemy] && card.def.type === 'S' && dealt > 0
       if (warded) {
         outcome.set(card.uid, { dealt: 0, parried: false, absorbed: 0, warded })
@@ -332,9 +332,8 @@ function resolveStrikes(
       if (!blocked && !parried && !warded) env.hitsTaken[enemy]++
       emit(state, { k: 'hit', side, slot: i, uid: card.uid, type: card.def.type, dmg, dealt, blocked, parried, absorbed, crit: crit[side].has(i) })
       if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
-      if (parried && dmg > 0) loseHp(state, side, dmg)
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
-      const guard = parried ? ` (${enemy} Parry: สะท้อน ${dmg} กลับ)` : warded ? ` (${enemy} Energy Surge กัน S)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
+      const guard = parried ? ` (${enemy} Parry ปัด ${dmg})` : warded ? ` (${enemy} Energy Surge Parry S)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}${guard}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
       if (ls > 0 && heal(state, side, ls) > 0) {
