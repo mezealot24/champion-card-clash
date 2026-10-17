@@ -39,6 +39,10 @@ export type CondSpec =
   | { c: 'prevIs'; type: CardType }
   | { c: 'facingIs'; type: CardType }
   | { c: 'fieldHas'; who: 'self' | 'enemy'; type: CardType; n: number }
+  // Tank heal rework (2026-10-17)
+  | { c: 'enteredAt'; n: number }
+  | { c: 'hitBy'; n: number; type?: CardType }
+  | { c: 'blockedType'; n: number; type?: CardType }
 
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
@@ -88,6 +92,9 @@ function cond(s: CondSpec): Cond {
     case 'prevIs': return P.prevIs(s.type)
     case 'facingIs': return P.facingIs(s.type)
     case 'fieldHas': return P.fieldHas(s.who, s.type, s.n)
+    case 'enteredAt': return P.enteredAt(s.n)
+    case 'hitBy': return P.hitBy(s.n, s.type)
+    case 'blockedType': return P.blockedType(s.n, s.type)
     // a condition this build doesn't know never passes (old builds reading newer DB rows)
     default: return () => false
   }

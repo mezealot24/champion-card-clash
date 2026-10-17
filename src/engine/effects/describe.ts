@@ -56,6 +56,9 @@ export function describeCond(c: CondSpec): string {
     case 'res': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.n}+ resource`
     case 'chainHas': return `${c.who === 'self' ? 'your' : "opponent's"} chain has ${c.n}+ ${TYPE[c.type]}`
     case 'prevIs': return `the card before this one is a ${TYPE[c.type]}`
+    case 'enteredAt': return `this card was drawn into slot ${c.n}`
+    case 'hitBy': return `you've been hit by ${c.n === 1 ? 'a' : `${c.n}+`} ${c.type ? TYPE[c.type] : 'card'}${c.n > 1 ? 's' : ''} this turn`
+    case 'blockedType': return `you Blocked ${c.n === 1 ? 'a' : `${c.n}+`} ${c.type ? TYPE[c.type] : 'hit'}${c.n > 1 ? 's' : ''} this turn`
     case 'facingIs': return `facing card is a ${TYPE[c.type]}`
     case 'fieldHas': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.n}+ ${TYPE[c.type]} on the Field`
     default: return '(unknown condition)'

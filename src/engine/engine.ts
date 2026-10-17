@@ -3,7 +3,7 @@ import { applyConqueror, checkCombos, DEATH_MARK_PCT, lifestealPct } from './com
 import { getStyle } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
 import type { EffectSpec } from './effects/spec'
-import type { ChainCtx } from './effects/types'
+import type { ChainCtx, HitIn } from './effects/types'
 import { drawCards, effectOf, emit, heal, log, loseHp, markDiscarded, toDeckBottom } from './state'
 import type { Action, CardDef, CardInst, CardType, GameState, Side } from './types'
 import { other } from './types'
@@ -24,6 +24,8 @@ type TurnEnv = {
   wraith: Record<Side, boolean>
   shroud: Record<Side, boolean>
   elusive: Record<Side, boolean>
+  /** Enemy hits each side received this turn, by slot and type (filled once hit outcomes are known). */
+  hitsIn: Record<Side, HitIn[]>
 }
 
 export function legalActions(state: GameState, side: Side): Action[] {
@@ -57,6 +59,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const blockNow: Record<Side, number> = { p1: 0, p2: 0 }
   const hitsTaken: Record<Side, number> = { p1: 0, p2: 0 }
   const vulnPct: Record<Side, number> = { p1: 0, p2: 0 }
+  const hitsIn: Record<Side, HitIn[]> = { p1: [], p2: [] }
   // Energy Surge (Assassin): a full bar at the start of the turn is spent by the action picked (see resources.ts)
   const surge: Record<Side, number> = { p1: 0, p2: 0 }
   for (const side of SIDES) {
@@ -71,7 +74,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
   }
   const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') } }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, hitsIn, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') } }
 
   // Silence: a side Silenced at the start of the turn has no card effects all turn
   for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
@@ -220,7 +223,8 @@ function resolveStrikes(
   }
 
   // held = a card in the hand of a side that didn't Strike (it has no chain of its own)
-  const ctxFor = (side: Side, slot: number, blocked: boolean, clean = false, held = false): ChainCtx => {
+  // upTo = On hit only: "you've been hit by" counts enemy hits up to this card's slot
+  const ctxFor = (side: Side, slot: number, blocked: boolean, clean = false, held = false, upTo?: number): ChainCtx => {
     const enemy = other(side)
     return {
       state,
@@ -236,6 +240,8 @@ function resolveStrikes(
       handAtStart,
       hitsBlocked,
       hitDmgTaken,
+      hitsIn: env.hitsIn,
+      hitsUpTo: upTo,
       blockNow: env.blockNow,
       bonus: held ? [] : bonus[side]!,
       enemyBonus: bonus[enemy] ?? null,
@@ -304,6 +310,7 @@ function resolveStrikes(
       if (parry) dealt = 0
       else dealt -= absorbed
       outcome.set(card.uid, { dealt, parried: !!parry, absorbed })
+      env.hitsIn[enemy].push({ slot: i, type: card.def.type, blocked: isBlocked(side, i), landed: !isBlocked(side, i) && !parry })
       hitDmgTaken[enemy] += dealt
     }
   }
@@ -337,7 +344,7 @@ function resolveStrikes(
       if (clean) cleanHits[side]++
       hitResults.set(card.uid, { blocked, clean })
       // On hit: fires right here, between hits, so e.g. a heal lands before the next enemy hit (Q 2026-10-17)
-      effectOf(state, side, card)?.onHit?.(ctxFor(side, i, blocked, clean))
+      effectOf(state, side, card)?.onHit?.(ctxFor(side, i, blocked, clean, false, i))
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
   }
@@ -438,6 +445,7 @@ function resolveHeld(
         handAtStart,
         hitsBlocked,
         hitDmgTaken,
+        hitsIn: env.hitsIn,
         blockNow,
         bonus: [],
         enemyBonus: null,

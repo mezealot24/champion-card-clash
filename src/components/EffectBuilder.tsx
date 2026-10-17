@@ -31,6 +31,9 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   prevIs: { c: 'prevIs', type: 'P' },
   facingIs: { c: 'facingIs', type: 'K' },
   fieldHas: { c: 'fieldHas', who: 'enemy', type: 'K', n: 2 },
+  enteredAt: { c: 'enteredAt', n: 1 },
+  hitBy: { c: 'hitBy', n: 1, type: 'K' },
+  blockedType: { c: 'blockedType', n: 1, type: 'K' },
 }
 const COND_LABEL: Record<CondSpec['c'], string> = {
   hitResult: 'Hit result is…',
@@ -57,6 +60,9 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   prevIs: 'Card before this one is…',
   facingIs: 'Facing card is…',
   fieldHas: 'You / opponent has N+ Punch / Kick / Skill on the Field',
+  enteredAt: 'This card was drawn into slot N',
+  hitBy: "You've been hit by N+ Punch / Kick / Skill this turn",
+  blockedType: 'You Blocked N+ Punch / Kick / Skill this turn',
 }
 const ACT_DEFAULTS: Record<string, ActSpec> = {
   draw: { a: 'draw', who: 'self', n: 1 },
@@ -230,6 +236,9 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
       )}
       {(value.c === 'chainAll' || value.c === 'chainHas' || value.c === 'prevIs' || value.c === 'facingIs' || value.c === 'fieldHas') && (
         <TypeSelect value={value.type} onChange={(type) => onChange({ ...value, type: type! })} />
+      )}
+      {(value.c === 'hitBy' || value.c === 'blockedType') && (
+        <TypeSelect value={value.type} allowAny onChange={(type) => onChange({ ...value, type })} />
       )}
     </>
   )
