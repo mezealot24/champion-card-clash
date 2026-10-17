@@ -16,10 +16,10 @@ describe('Mana Flow', () => {
   it('Charge draws 2', () => {
     expect(resolveTurn(game('MG:1'), { p1: 'charge', p2: 'block' }).players.p1.hand).toHaveLength(2)
   })
-  it('a broken Charge draws nothing', () => {
+  it('a broken Charge on an empty Field draws 1, not 2', () => {
     const s = game('MG:1')
     s.players.p2.hand = [hit(1)]
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hand).toHaveLength(0)
+    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hand).toHaveLength(1)
   })
 })
 

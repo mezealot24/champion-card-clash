@@ -45,3 +45,10 @@ describe('turn events for the battle screen', () => {
     expect(b.events).toEqual([])
   })
 })
+
+describe('charge break on an empty Field (Q 2026-10-17)', () => {
+  it('the Charge still draws 1 card', () => {
+    const n = resolveTurn(setup([vanilla(3)], []), { p1: 'strike', p2: 'charge' })
+    expect(n.players.p2.hand).toHaveLength(1)
+  })
+})

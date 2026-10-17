@@ -98,13 +98,16 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       // Strike > Charge: Charge break (Q 2026-10-16). The oldest card goes to the bottom of the deck, the cards behind
       // it move up a slot (2-3-4 become 1-2-3) and 1 new card is drawn onto the end (Q 2026-10-17), even if it was the
       // only card. A Style like Tenacity can keep the first slots safe: the next card goes instead, and with no card
-      // beyond the safe slots nothing is lost.
+      // beyond the safe slots nothing is lost. An empty Field loses nothing and still draws 1.
       const safe = getStyle(p.style)?.chargeBreakSafe?.(state, side) ?? 0
       if (p.hand.length > safe) {
         const lost = p.hand.splice(safe, 1)[0]
         markDiscarded(state, side, [{ card: lost, slot: safe + 1, reason: 'Charge break' }])
         toDeckBottom(state, side, [lost])
         log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge) → ลงใต้กอง จั่วใบใหม่ต่อท้าย`)
+        drawCards(state, side, 1)
+      } else if (p.hand.length === 0) {
+        // empty Field: nothing to lose, the Charge still draws 1 (Q 2026-10-17)
         drawCards(state, side, 1)
       }
     } else {
