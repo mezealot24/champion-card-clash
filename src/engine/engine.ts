@@ -305,14 +305,15 @@ function resolveStrikes(
       const guard = parried ? ` (${enemy} Parry: สะท้อน ${dmg} กลับ)` : absorbed ? ` (Shield กัน ${absorbed})` : ''
       log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}${guard}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
-      if (ls > 0) {
-        heal(state, side, ls)
+      if (ls > 0 && heal(state, side, ls) > 0) {
         log(state, `${side} Omnivamp ฮีล ${ls}`)
       }
       // clean = some dmg got through Block, Parry and Shield (GDD)
       const clean = !blocked && dealt > 0
       if (clean) cleanHits[side]++
       hitResults.set(card.uid, { blocked, clean })
+      // On hit: fires right here, between hits, so e.g. a heal lands before the next enemy hit (Q 2026-10-17)
+      effectOf(state, side, card)?.onHit?.(ctxFor(side, i, blocked, clean))
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
   }

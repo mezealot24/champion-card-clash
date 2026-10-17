@@ -112,11 +112,15 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
   }
 }
 
-export function heal(state: GameState, side: Side, n: number) {
+/** Heal up to Max HP; returns HP actually gained. A side already at 0 HP is down for good:
+ *  heals later in the same turn (After action, Hold, combos, Omnivamp) can't bring it back (Q 2026-10-17). */
+export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
+  if (p.hp <= 0) return 0
   const before = p.hp
   p.hp = Math.min(p.maxHp, p.hp + n)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
+  return p.hp - before
 }
 
 /** from: 'hit' = a Strike chain card's hit; 'foe' / 'self' = any other HP loss, counted for Bruiser Rage (Q 2026-10-16). */

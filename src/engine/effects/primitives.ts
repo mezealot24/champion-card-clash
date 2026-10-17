@@ -64,7 +64,10 @@ export const heal =
   (ctx) => {
     const n = Math.floor(base * perCount(ctx, per))
     if (n <= 0) return
-    for (const s of sides(ctx, who)) healHp(ctx.state, s, n)
+    // a side at 0 HP can't be healed, so skip it (and the log line) entirely
+    const live = sides(ctx, who).filter((s) => ctx.state.players[s].hp > 0)
+    if (!live.length) return
+    for (const s of live) healHp(ctx.state, s, n)
     log(ctx.state, `${ctx.card.def.id}: ${who} ฮีล ${n}`)
   }
 
