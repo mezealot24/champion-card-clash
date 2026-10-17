@@ -22,8 +22,8 @@ export const IGNITE_TURNS = 3
 export const IGNITE_HEAL_CUT_PCT = 25
 /** Pyromancer: Mana spent to Ignite with a Strike that has a Skill card. */
 export const PYRO_IGNITE_COST = 1
-/** Molten Shield: most Mana a Block spends, and Shield per Mana spent. */
-export const MOLTEN_MAX_MANA = 3
+/** Molten Shield: most Mana a Block spends, and Shield per Mana spent. 1 (Q: "ใช้มานา 1 หน่วย"); spending up to 3 left S cards unpaid, sim 20% vs 26%. */
+export const MOLTEN_MAX_MANA = 1
 export const MOLTEN_SHIELD_PER_MANA = 5
 
 export const igniteStacks = (p: PlayerState) => p.statuses.find((s) => s.kind === 'ignite')?.n ?? 0
@@ -254,7 +254,7 @@ Object.assign(STYLES, {
    * Mage · Pyromancer (Q 2026-10-17, replaces Mana Flow).
    * Strike with 1+ Skill card in the chain and Mana left after paying the chain → spend 1 Mana, opponent gains 1 Ignite
    * (before any hit, so it lands even when the chain is Blocked; Claude default).
-   * Molten Shield: when you Block with Mana, spend all of it up to 3 → Shield 5 per Mana this turn only,
+   * Molten Shield: when you Block with Mana, spend 1 (MOLTEN_MAX_MANA) → Shield 5 per Mana this turn only,
    * and the attacker gains 1 Ignite per hit your Block stopped.
    */
   'MG:1': {

@@ -52,13 +52,13 @@ describe('Pyromancer', () => {
     s.players.p2.statuses.push({ kind: 'ignite', turns: 3, n: 1 })
     expect(heal(s, 'p2', 20)).toBe(15)
   })
-  it('Molten Shield: Block spends up to 3 Mana for Shield 5 each, and each blocked hit Ignites the attacker', () => {
+  it('Molten Shield: Block spends 1 Mana for Shield 5, and each blocked hit Ignites the attacker', () => {
     const s = game('MG:1')
     s.players.p1.res = 4
     s.players.p2.hand = [hit(10), hit(10), hit(12)]
     const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
-    expect(n.players.p1.hp).toBe(100) // 3rd hit 12 soaked by Shield 15
-    expect(n.players.p1.res).toBe(2) // 4 − 3 + 1 for Blocking
+    expect(n.players.p1.hp).toBe(93) // 3rd hit 12, Shield 5 soaks 5
+    expect(n.players.p1.res).toBe(4) // 4 − 1 + 1 for Blocking
     expect(ignite(n)?.n).toBe(2)
     expect(shield(n)).toBe(0) // this turn only
   })

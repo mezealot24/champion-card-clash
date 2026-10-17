@@ -4,7 +4,7 @@
 alter table public.cards add column if not exists style_only text;
 comment on column public.cards.style_only is '"MG:1" = only in the deck under that Style; "!MG:1" = under every Style but that one; null = always';
 
-update public.champion_styles set name = 'Pyromancer', effect = 'Strike with a Skill card in your chain and 1 Mana left after paying: spend 1 Mana, opponent gains 1 Ignite (1% Max HP burn per stack each turn, heals −25%, 3 turns, max 4 stacks). Molten Shield: when you Block, spend up to 3 Mana for Shield 5 per Mana this turn; every hit your Block stops gives the attacker 1 Ignite.'
+update public.champion_styles set name = 'Pyromancer', effect = 'Strike with a Skill card in your chain and 1 Mana left after paying: spend 1 Mana, opponent gains 1 Ignite (1% Max HP burn per stack each turn, heals −25%, 3 turns, max 4 stacks). Molten Shield: when you Block with Mana, spend 1 Mana for Shield 5 this turn; every hit your Block stops gives the attacker 1 Ignite.'
 where champion_id = 'MG' and slot = 1;
 
 update public.cards set style_only = '!MG:1' where id in ('MG-001', 'MG-018', 'MG-007', 'MG-008', 'MG-025', 'MG-021', 'MG-016');
