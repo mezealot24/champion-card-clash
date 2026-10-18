@@ -1,6 +1,6 @@
 // Admin tuning (engine/tuning.ts): DB overrides change the numbers a game runs on; no overrides = the game as designed.
 import { describe, expect, it } from 'vitest'
-import { cleanParams, createGame, DEFAULT_TUNING, resolveTurn, resolveTuning, rulesFromConfig, TUNING_FIELDS, tuningErrors, tuningFromRows } from '../index'
+import { cleanParams, createGame, fillText, unknownPlaceholders, DEFAULT_TUNING, resolveTurn, resolveTuning, rulesFromConfig, TUNING_FIELDS, tuningErrors, tuningFromRows } from '../index'
 import type { CardDef, CardInst, GameState, TuningOverrides } from '../index'
 
 let uid = 0
@@ -91,5 +91,19 @@ describe('rules + Admin helpers', () => {
     expect(tuningErrors('MG:2', { shatterPct: 120 })).toHaveLength(1)
     expect(tuningErrors('MG:2', { chillMax: 2.5 })).toHaveLength(1)
     expect(tuningErrors('AS:2', { critMult: 2.5 })).toHaveLength(0)
+  })
+})
+
+describe('text linked to the numbers', () => {
+  it('fills {key} from its own group, {GROUP.key} from any, |ord, extras', () => {
+    const t = resolveTuning({ 'MG:2': { shatterPct: 20 }, 'AS:2': { every: 3 } })
+    expect(fillText('Shatter takes {shatterPct}% (cap {MG.cap})', 'MG:2', t)).toBe('Shatter takes 20% (cap 5)')
+    expect(fillText('Every {every|ord} attack', 'AS:2', t)).toBe('Every 3rd attack')
+    expect(fillText('HP {hpStart}', 'TK:2', t, { hpStart: 250 })).toBe('HP 250')
+    expect(fillText('{nope} stays', 'MG:2', t)).toBe('{nope} stays')
+  })
+
+  it('lists unknown placeholders', () => {
+    expect(unknownPlaceholders('{shatterPct} {nope} {MG.cap} {hpStart}', 'MG:2', ['hpStart'])).toEqual(['{nope}'])
   })
 })

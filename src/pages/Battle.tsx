@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildDeck, createGame, isEffectMissing, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, tuningFromRows, type Action, type CardRowLike, type GameState, type Side } from '../engine'
+import { buildDeck, createGame, fillText, isEffectMissing, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, tuningFromRows, type Action, type CardRowLike, type GameState, type Side } from '../engine'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
@@ -50,7 +50,18 @@ export function Battle({ data }: { data: BattleData }) {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const seatSetup = useCallback((s: Seat) => ({ ...setup(s.champ), style: s.style || undefined }), [data])
-  const styleText = Object.fromEntries((data.styles ?? []).map((s) => [`${s.champion_id}:${s.slot}`, s.effect]))
+  // Style text with its {numbers} filled from the tuning (Admin), as players see it
+  const tuning = useMemo(() => resolveTuning(gameOpts.tuning), [gameOpts])
+  const styleText: Record<string, string> = useMemo(
+    () =>
+      Object.fromEntries(
+        (data.styles ?? []).map((s) => {
+          const c = data.champions.find((x) => x.id === s.champion_id)
+          return [`${s.champion_id}:${s.slot}`, fillText(s.effect, `${s.champion_id}:${s.slot}`, tuning, c ? { hpStart: c.hp_start, hpMax: c.hp_max } : {})]
+        }),
+      ),
+    [data, tuning],
+  )
 
   function start() {
     if (foe === 'online') return setOnline(true)
@@ -135,7 +146,7 @@ export function Battle({ data }: { data: BattleData }) {
               })}
             </select>
             {stylesOf(picks[side]).find((s) => `${s.champion_id}:${s.slot}` === styleKey(side)) && (
-              <span className="muted">{stylesOf(picks[side]).find((s) => `${s.champion_id}:${s.slot}` === styleKey(side))!.effect}</span>
+              <span className="muted">{styleText[styleKey(side)]}</span>
             )}
           </label>
         ))}

@@ -5,8 +5,8 @@ import { must, useAsync } from '../lib/useAsync'
 import type { ChampionRow, ChampionStyleRow } from '../lib/database.types'
 import { DeckEditor } from '../components/DeckEditor'
 import { SaveButton } from '../components/SaveButton'
-import { TuningFields } from '../components/TuningFields'
-import { cleanParams, isTuningGroup, STYLES, tuningErrors } from '../engine'
+import { TextPreview, TuningFields } from '../components/TuningFields'
+import { cleanParams, isTuningGroup, resolveTuning, STYLES, tuningErrors, unknownPlaceholders } from '../engine'
 
 export function ChampionEditPage() {
   const { id = '' } = useParams()
@@ -52,7 +52,17 @@ function ChampionForm(props: { champion: ChampionRow; styles: ChampionStyleRow[]
       return g ? tuningErrors(g, s.params ?? {}) : []
     }),
   ]
-  const invalid = champion.hp_max < champion.hp_start ? 'HP max must be ≥ HP start' : tuningErr[0] ?? null
+  // the numbers as this draft would play them, for the text previews ({shatterPct} → 15)
+  const draftTuning = resolveTuning({ [champion.id]: champion.params ?? {}, ...Object.fromEntries(styles.map((s) => [`${s.champion_id}:${s.slot}`, s.params ?? {}])) })
+  const extra = { hpStart: champion.hp_start, hpMax: champion.hp_max }
+  const textErr = [
+    ...unknownPlaceholders(champion.signature_combo, champion.id, Object.keys(extra)),
+    ...styles.flatMap((s) => unknownPlaceholders(s.effect, `${s.champion_id}:${s.slot}`, Object.keys(extra))),
+  ]
+  const invalid =
+    champion.hp_max < champion.hp_start
+      ? 'HP max must be ≥ HP start'
+      : (tuningErr[0] ?? (textErr.length ? `Unknown number in text: ${textErr.join(' ')}` : null))
 
   async function save() {
     const { id, name, archetype, hp_start, hp_max, identity, signature_combo } = champion
@@ -78,7 +88,8 @@ function ChampionForm(props: { champion: ChampionRow; styles: ChampionStyleRow[]
         <label>HP max<input type="number" min={1} value={champion.hp_max} onChange={(e) => set('hp_max', Number(e.target.value))} /></label>
       </div>
       <label>Identity<textarea rows={2} value={champion.identity} onChange={(e) => set('identity', e.target.value)} /></label>
-      <label>Signature combo<input value={champion.signature_combo} onChange={(e) => set('signature_combo', e.target.value)} /></label>
+      <label>Signature combo<textarea rows={2} value={champion.signature_combo} onChange={(e) => set('signature_combo', e.target.value)} /></label>
+      <TextPreview text={champion.signature_combo} group={champion.id} tuning={draftTuning} extra={extra} />
 
       {classGroup && (
         <>
@@ -95,12 +106,13 @@ function ChampionForm(props: { champion: ChampionRow; styles: ChampionStyleRow[]
           <div key={s.slot}>
             <div className="grid style-row">
               <label>Style {s.slot} name<input value={s.name} onChange={(e) => setStyle(s.slot, { name: e.target.value })} /></label>
-              <label className="wide">Effect<textarea rows={2} value={s.effect} onChange={(e) => setStyle(s.slot, { effect: e.target.value })} /></label>
+              <label className="wide">Effect<textarea rows={3} value={s.effect} onChange={(e) => setStyle(s.slot, { effect: e.target.value })} /></label>
             </div>
+            <TextPreview text={s.effect} group={`${s.champion_id}:${s.slot}`} tuning={draftTuning} extra={extra} />
             {g && (
               <details open={Object.keys(s.params ?? {}).length > 0}>
                 <summary>{STYLES[g]?.name ?? s.name} numbers</summary>
-                <p className="muted">The Effect text above is not updated for you: edit it to match new numbers.</p>
+                <p className="muted">Write numbers in the Effect text as {'{key}'} (e.g. {'{shatterPct}'}) and the text follows these values.</p>
                 <TuningFields group={g} params={s.params ?? {}} onChange={(p) => setStyle(s.slot, { params: p })} />
               </details>
             )}

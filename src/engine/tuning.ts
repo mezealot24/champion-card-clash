@@ -199,3 +199,38 @@ export function cleanParams(group: TuningGroup, params: TuningParams): TuningPar
   const defs = new Map((TUNING_FIELDS[group] as readonly TuneField[]).map((f) => [f.key, f.def]))
   return Object.fromEntries(Object.entries(params).filter(([k, v]) => defs.has(k) && v !== defs.get(k)))
 }
+
+// ---- Text linked to the numbers (Q 2026-10-18) ----
+// Style effect text and signature combo text can say {key} (a number of that text's own group, e.g. {shatterPct}
+// in the Cryomancer text), {GROUP.key} (any group, e.g. {MG.cap}) or {key|ord} for 1st / 2nd / 3rd / 4th.
+// Extra values (e.g. hpStart / hpMax of the Champion) can be passed in. Unknown placeholders stay as typed.
+
+const PLACEHOLDER = /\{(?:([A-Z]{2}(?::\d)?)\.)?([a-zA-Z]+)(\|ord)?\}/g
+
+const fmt = (n: number) => String(Math.round(n * 100) / 100)
+const ord = (n: number) => {
+  const s = fmt(n)
+  if (!Number.isInteger(n)) return s
+  const t = n % 100
+  return s + (t >= 11 && t <= 13 ? 'th' : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th')
+}
+
+function lookup(t: Tuning, group: string, g: string | undefined, key: string, extra: Record<string, number>): number | undefined {
+  if (!g && key in extra) return extra[key]
+  const grp = (t as Record<string, Record<string, number>>)[g ?? group]
+  return grp?.[key]
+}
+
+/** Text with its {placeholders} filled from the tuning (see above). */
+export function fillText(text: string, group: string, t: Tuning = DEFAULT_TUNING, extra: Record<string, number> = {}): string {
+  return (text ?? '').replace(PLACEHOLDER, (whole, g: string | undefined, key: string, o: string | undefined) => {
+    const v = lookup(t, group, g, key, extra)
+    return v === undefined ? whole : o ? ord(v) : fmt(v)
+  })
+}
+
+/** Placeholders in the text that don't name a number (shown as an error in Admin). */
+export function unknownPlaceholders(text: string, group: string, extraKeys: string[] = []): string[] {
+  const extra = Object.fromEntries(extraKeys.map((k) => [k, 0]))
+  return [...(text ?? '').matchAll(PLACEHOLDER)].filter((m) => lookup(DEFAULT_TUNING, group, m[1], m[2], extra) === undefined).map((m) => m[0])
+}

@@ -1,6 +1,6 @@
 // Number form for one tuning group (engine/tuning.ts): a Champion's class numbers or one Style's.
 // params keeps only the numbers that differ from the default, so an untouched field follows the code default.
-import { TUNING_FIELDS, type TuneField, type TuningGroup, type TuningParams as Params } from '../engine'
+import { fillText, isTuningGroup, TUNING_FIELDS, unknownPlaceholders, type Tuning, type TuneField, type TuningGroup, type TuningParams as Params } from '../engine'
 
 export function TuningFields({ group, params, onChange }: { group: TuningGroup; params: Params; onChange: (p: Params) => void }) {
   const fields = TUNING_FIELDS[group] as readonly TuneField[]
@@ -55,6 +55,34 @@ export function TuningFields({ group, params, onChange }: { group: TuningGroup; 
           )
         })}
       </div>
+    </div>
+  )
+}
+
+/** Under a Style / combo text box: the text as players see it (placeholders filled) and the placeholders it can use. */
+export function TextPreview({ text, group, tuning, extra }: { text: string; group: string; tuning: Tuning; extra: Record<string, number> }) {
+  const fields = isTuningGroup(group) ? (TUNING_FIELDS[group] as readonly TuneField[]) : []
+  const bad = unknownPlaceholders(text, group, Object.keys(extra))
+  const filled = fillText(text, group, tuning, extra)
+  return (
+    <div className="text-preview">
+      {filled !== text && (
+        <p>
+          <span className="muted">Players see: </span>
+          {filled}
+        </p>
+      )}
+      {bad.length > 0 && <p className="error">Unknown: {bad.join(' ')}</p>}
+      <details>
+        <summary className="muted">Numbers you can put in the text</summary>
+        <p className="muted">
+          {[...fields.map((f) => [f.key, f.label] as const), ...Object.keys(extra).map((k) => [k, k] as const)].map(([k, label]) => (
+            <code key={k} title={label}>{`{${k}}`} </code>
+          ))}
+          <br />
+          {'{key|ord}'} = 1st / 2nd / 3rd / 4th · another group: {'{MG.cap}'}, {'{BR:2.conquerorMax}'}
+        </p>
+      </details>
     </div>
   )
 }
