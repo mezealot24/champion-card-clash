@@ -29,10 +29,10 @@ export const CHILL_TURNS = 3
 export const CHILL_DMG_CUT_PER_STACK = 10
 /** Frozen Tomb (Q 2026-10-18, replaces Frost Barrier): once a game, a hit that leaves the Cryomancer below this % of Max HP
  *  (or would kill them: they stay on 1 HP) seals them in ice: Frost Armor's Shield comes back, next turn they can only Block. */
-export const TOMB_HP_PCT = 40
+export const TOMB_HP_PCT = RED_HP_PCT // Q 2026-10-18: 30% (the red HP bar), was 40
 /** Frozen Tomb heal at the end of the Block-only turn: TOMB_HEAL + TOMB_HEAL_PER_MANA × Mana (all of it is spent) */
 export const TOMB_HEAL = 10
-export const TOMB_HEAL_PER_MANA = 10
+export const TOMB_HEAL_PER_MANA = 5 // Q 2026-10-18 nerf, was 10 (sim 68%)
 /** Deep Freeze: Mana a Strike with a Skill card in it spends for 1 Chill */
 export const DEEP_FREEZE_MANA = 1
 /** Frost Armor (Q 2026-10-18, Frostbinder's start Shield back): Shield the game starts with; every hit it soaks gives the attacker 1 Chill */
@@ -343,9 +343,9 @@ Object.assign(STYLES, {
    * Mage · Cryomancer (Q 2026-10-18, from a Gemini draft; replaces Frostbinder).
    * Frost Armor: start the game with Shield 40; every hit a Shield soaks gives the attacker 1 Chill.
    * Deep Freeze: a Strike with any Skill card in it spends 1 more Mana (after the chain) to give the opponent 1 Chill.
-   * Frozen Tomb (Q 2026-10-18, replaces Frost Barrier), once a game: HP loss that leaves you below 40% Max HP, or would
+   * Frozen Tomb (Q 2026-10-18, replaces Frost Barrier), once a game: HP loss that leaves you below 30% Max HP (the red bar), or would
    * kill you (you stay on 1 HP, and can't drop below 1 for the rest of that turn), brings Frost Armor's Shield 40 back.
-   * Next turn you can only Block; at its end heal 10 + 10 per Mana, spending all Mana. The turn after, the Shield
+   * Next turn you can only Block; at its end heal 10 + 5 per Mana, spending all Mana. The turn after, the Shield
    * left melts: half of it comes back as HP. (Turn order and the Mana spend are Claude defaults.)
    * Chill: each stack makes that side's hits deal 10% less (3 turns, refreshed). At 4 stacks it is Frozen:
    * Chill clears, Shatter takes 15% of its Max HP and it can't Strike next turn (Absolute Zero freezes without Shatter).

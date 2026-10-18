@@ -140,24 +140,31 @@ describe('Cryomancer', () => {
     const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     expect(legalActions(n, 'p2')).toEqual(['charge'])
   })
-  it('Frozen Tomb: a hit below 40% HP brings Frost Armor back, then Block only, heal 10 + 10 per Mana, then half the Shield', () => {
+  it('Frozen Tomb: a hit below 30% HP brings Frost Armor back, then Block only, heal 10 + 5 per Mana, then half the Shield', () => {
     const s = fresh()
     s.players.p1.res = 2
-    s.players.p2.hand = [hit(65)]
+    s.players.p2.hand = [hit(75)]
     const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-    expect(n.players.p1.hp).toBe(35)
+    expect(n.players.p1.hp).toBe(25)
     expect(shield(n)).toBe(40)
     expect(legalActions(n, 'p1')).toEqual(['block'])
     expect(n.players.p1.statuses.some((x) => x.kind === 'frozenTomb')).toBe(true)
     n.players.p2.hand = [hit(15)]
     const t2 = resolveTurn(n, { p1: 'block', p2: 'strike' }) // Charge gave +1 Mana (3), Block +1 more = 4
     expect(shield(t2)).toBe(40) // the hit was blocked
-    expect(t2.players.p1.hp).toBe(35 + 10 + 10 * 4)
+    expect(t2.players.p1.hp).toBe(25 + 10 + 5 * 4)
     expect(t2.players.p1.res).toBe(0)
     expect(legalActions(t2, 'p1')).toContain('strike')
     const t3 = resolveTurn(t2, { p1: 'charge', p2: 'charge' })
     expect(shield(t3)).toBe(0)
-    expect(t3.players.p1.hp).toBe(100) // 85 + 20, capped at Max HP
+    expect(t3.players.p1.hp).toBe(55 + 20)
+  })
+  it('Frozen Tomb waits for the red bar: 35% HP does nothing', () => {
+    const s = fresh()
+    s.players.p2.hand = [hit(65)]
+    const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect(shield(n)).toBe(0)
+    expect(legalActions(n, 'p1')).toContain('charge')
   })
   it('Frozen Tomb saves you once from a lethal hit, and the rest of that turn too', () => {
     const s = fresh()
