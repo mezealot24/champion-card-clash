@@ -4,6 +4,15 @@
 // Kept free of state.ts imports (like styles.ts).
 import type { Action, CardType, GameState, Side } from './types'
 
+/** Freeze a side: Chill clears and it can't Strike next turn. `frozen` outlasts noStrike by a turn so cards can read it that turn. */
+export function freeze(state: GameState, side: Side, why: string) {
+  const p = state.players[side]
+  p.statuses = p.statuses.filter((s) => s.kind !== 'chill' && s.kind !== 'frozen')
+  if (!p.statuses.some((s) => s.kind === 'noStrike')) p.statuses.push({ kind: 'noStrike', turns: 1 })
+  p.statuses.push({ kind: 'frozen', turns: 2 })
+  state.log.push(`T${state.turn} ${side} 🧊 Frozen: ${why} → Strike ไม่ได้เทิร์นหน้า`)
+}
+
 /** One slot of the chain. Before hits, blocked/clean are both false. */
 export type ComboHit = { type: CardType; blocked: boolean; clean: boolean }
 
@@ -63,7 +72,11 @@ export const COMBOS: Record<string, ComboDef[]> = {
       },
     },
   ],
-  /** Mage · S + S + S, all clean: the opponent can't Block next turn. */
+  /**
+   * Mage · S + S + S, all clean: the opponent can't Block next turn.
+   * Under Cryomancer it is Absolute Zero (Q 2026-10-18): the opponent is also Frozen, whatever its Chill,
+   * so it can't Strike or Block next turn and is left with Charge.
+   */
   MG: [
     {
       name: 'S + S + S',
@@ -71,7 +84,10 @@ export const COMBOS: Record<string, ComboDef[]> = {
       ok: allClean,
       fire: (state, side) => {
         state.players[foe(side)].statuses.push({ kind: 'noBlock', turns: 1 })
-        say(state, side, 'Combo S + S + S: ศัตรู Block ไม่ได้เทิร์นหน้า')
+        if (state.players[side].style === 'MG:2') {
+          say(state, side, 'Combo Absolute Zero: ศัตรู Block ไม่ได้เทิร์นหน้า')
+          freeze(state, foe(side), 'Absolute Zero')
+        } else say(state, side, 'Combo S + S + S: ศัตรู Block ไม่ได้เทิร์นหน้า')
       },
     },
   ],

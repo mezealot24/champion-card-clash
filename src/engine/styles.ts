@@ -1,6 +1,7 @@
 // Champion Styles (passives). Code registry keyed by "CHAMP:slot" (champion_styles.slot).
 // Kept free of state.ts imports so createGame can call setup without an import cycle.
-import { CONQUEROR_MAX } from './combos'
+import { CONQUEROR_MAX, freeze } from './combos'
+export { freeze }
 import { RED_HP_PCT } from './resources'
 import type { Action, CardInst, GameState, PlayerState, Side } from './types'
 import { other } from './types'
@@ -22,8 +23,43 @@ export const IGNITE_TURNS = 3
 export const IGNITE_FLAT_PER_STACK = 2 // Q asked 3; sim 3 = 65% win, 2 = 47%, 1 = 39% (Claude pick)
 export const IGNITE_HEAL_CUT_PER_STACK = 25
 export const IGNITE_HEAL_CUT_MAX = 50
-/** Molten Shield: Shield a Block always gets. */
-export const MOLTEN_SHIELD = 5
+// Cryomancer (Mage Style 2, Q 2026-10-18 from a Gemini draft; replaces Frostbinder): numbers are Q's (picked A)
+export const CHILL_MAX = 4 // reaching this many stacks freezes
+export const CHILL_TURNS = 3
+export const CHILL_DMG_CUT_PER_STACK = 10
+/** Frost Barrier: a Block with Mana spends this much for Shield FROST_BARRIER_SHIELD */
+export const FROST_BARRIER_MANA = 1
+export const FROST_BARRIER_SHIELD = 5
+/** Deep Freeze: Mana a Strike with a Skill card in it spends for 1 Chill */
+export const DEEP_FREEZE_MANA = 1
+/** Frost Armor (Q 2026-10-18, Frostbinder's start Shield back): Shield the game starts with; every hit it soaks gives the attacker 1 Chill */
+export const FROST_ARMOR_SHIELD = 40
+/** Shatter: a side frozen by Chill loses this % of its Max HP (Q 2026-10-18; sim 240 games: none 8%, 15% = 59% win) */
+export const SHATTER_PCT = 15
+export const chillStacks = (p: PlayerState) => p.statuses.find((s) => s.kind === 'chill')?.n ?? 0
+/** % the chilled side's hits lose */
+export const chillCut = (p: PlayerState) => chillStacks(p) * CHILL_DMG_CUT_PER_STACK
+
+/** Add n Chill stacks to a side and reset its timer. Reaching CHILL_MAX freezes it and Shatter takes SHATTER_PCT of its Max HP. Returns the stacks it has now (0 after a freeze). */
+export function addChill(state: GameState, side: Side, n: number): number {
+  const p = state.players[side]
+  const cur = p.statuses.find((s) => s.kind === 'chill')
+  if (!cur && n <= 0) return 0
+  const stacks = Math.min(CHILL_MAX, (cur?.n ?? 0) + n)
+  p.statuses = p.statuses.filter((s) => s.kind !== 'chill')
+  if (stacks >= CHILL_MAX) {
+    const lost = Math.floor((p.maxHp * SHATTER_PCT) / 100)
+    p.hp = Math.max(0, p.hp - lost)
+    freeze(state, side, `Chill ครบ ${CHILL_MAX}, Shatter เสีย ${lost} HP`)
+    return 0
+  }
+  p.statuses.push({ kind: 'chill', turns: CHILL_TURNS, n: stacks })
+  return stacks
+}
+
+/** Molten Shield: a Block spends up to MOLTEN_MAX_MANA Mana for Shield MOLTEN_SHIELD_PER_MANA each. */
+export const MOLTEN_MAX_MANA = 3
+export const MOLTEN_SHIELD_PER_MANA = 5
 
 export const igniteStacks = (p: PlayerState) => p.statuses.find((s) => s.kind === 'ignite')?.n ?? 0
 /** HP one end-of-turn burn takes. */
@@ -53,6 +89,7 @@ export type HitReport = {
   attacked: boolean // the opponent Struck
   hitsTaken: number // hits that landed (not stopped by Block)
   hitsBlocked: number // hits this side's Block stopped
+  shieldHits: number // hits a Shield on this side soaked dmg from
   facing: number // card pairs face to face (opponent's chain vs this side's Field)
 }
 
@@ -62,6 +99,7 @@ export type ChainReport = {
   cleanHits: number
   enemyField: number // cards on the opponent's Field when actions were revealed
   paidSkillClean: number // Skill cards in the chain whose cost was paid and that hit clean
+  skills: number // Skill cards in the chain
 }
 
 export type StyleDef = {
@@ -253,8 +291,8 @@ Object.assign(STYLES, {
   /**
    * Mage · Pyromancer (Q 2026-10-17, replaces Mana Flow; reworked the same day so it costs no extra Mana).
    * Touch of Flame: every Skill card you paid for that hits clean gives the opponent 1 Ignite (after your chain).
-   * Molten Shield: every Block gets Shield 5 this turn; with 1+ Mana (not spent), each hit your Block stops
-   * gives the attacker 1 Ignite.
+   * Molten Shield (first version, Q asked it back): a Block with Mana spends up to 3 of it for Shield 5 per Mana
+   * this turn, and each hit that Block stops gives the attacker 1 Ignite. No Mana, no Molten Shield.
    */
   'MG:1': {
     name: 'Pyromancer',
@@ -266,12 +304,14 @@ Object.assign(STYLES, {
     },
     actionStart: (state, side, action) => {
       const p = state.players[side]
-      if (action !== 'block') return
+      // Molten Shield v1 (Q asked it back 2026-10-17): Block spends up to 3 Mana, Shield 5 per Mana
+      if (action !== 'block' || !state.rules.resources || (p.res ?? 0) <= 0) return
+      const spent = Math.min(MOLTEN_MAX_MANA, p.res ?? 0)
+      p.res = (p.res ?? 0) - spent
       // turns 1: an old-shield tick at the end of this turn removes it
-      p.statuses.push({ kind: 'shield', turns: 1, n: MOLTEN_SHIELD })
-      const hot = !state.rules.resources || (p.res ?? 0) >= 1
-      p.styleData = { ...p.styleData, molten: hot ? 1 : 0 }
-      say(state, side, `Molten Shield: Shield ${MOLTEN_SHIELD} เทิร์นนี้${hot ? ' + hit ที่ Block ได้จุด Ignite' : ''}`)
+      p.statuses.push({ kind: 'shield', turns: 1, n: spent * MOLTEN_SHIELD_PER_MANA })
+      p.styleData = { ...p.styleData, molten: 1 }
+      say(state, side, `Molten Shield: ใช้ Mana ${spent} → Shield ${spent * MOLTEN_SHIELD_PER_MANA} เทิร์นนี้ + hit ที่ Block ได้จุด Ignite`)
     },
     afterHits: (state, side, r) => {
       const p = state.players[side]
@@ -285,22 +325,55 @@ Object.assign(STYLES, {
     },
   },
   /**
-   * Mage · Mana Barrier: start the game with Shield 30 (lasts until used up).
-   * Each turn you play Block, your Shield is topped up to 8 if lower; that top-up lasts 2 turns.
+   * Mage · Cryomancer (Q 2026-10-18, from a Gemini draft; replaces Frostbinder).
+   * Frost Armor: start the game with Shield 40; every hit a Shield soaks gives the attacker 1 Chill.
+   * Deep Freeze: a Strike with any Skill card in it spends 1 more Mana (after the chain) to give the opponent 1 Chill.
+   * Frost Barrier: a Block with Mana spends 1 for Shield 5 this turn; each hit it stops gives the attacker 1 Chill.
+   * Chill: each stack makes that side's hits deal 10% less (3 turns, refreshed). At 4 stacks it is Frozen:
+   * Chill clears, Shatter takes 15% of its Max HP and it can't Strike next turn (Absolute Zero freezes without Shatter).
+   * Arcane Sub-Zero (card) leaves a subZero status: the next Strike's clean hits each give 1 Chill.
    */
   'MG:2': {
-    name: 'Mana Barrier',
+    name: 'Cryomancer',
     setup: (p) => {
-      p.statuses.push({ kind: 'shield', turns: 9999, n: 30 })
+      p.statuses.push({ kind: 'shield', turns: 9999, n: FROST_ARMOR_SHIELD })
     },
-    endTurn: (state, side, action) => {
-      if (action !== 'block') return
+    actionStart: (state, side, action) => {
       const p = state.players[side]
-      const now = p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
-      if (now >= 8) return
-      p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
-      p.statuses.push({ kind: 'shield', turns: 2, n: 8 })
-      say(state, side, 'Mana Barrier: Shield 8')
+      // subZero is read here, before statuses tick (it was put on last turn)
+      if (action === 'strike' && p.statuses.some((s) => s.kind === 'subZero')) p.styleData = { ...p.styleData, subZero: 1 }
+      if (action !== 'block' || !state.rules.resources || (p.res ?? 0) < FROST_BARRIER_MANA) return
+      p.res = (p.res ?? 0) - FROST_BARRIER_MANA
+      // turns 1: an old-shield tick at the end of this turn removes it
+      p.statuses.push({ kind: 'shield', turns: 1, n: FROST_BARRIER_SHIELD })
+      p.styleData = { ...p.styleData, barrier: 1 }
+      say(state, side, `Frost Barrier: ใช้ Mana ${FROST_BARRIER_MANA} → Shield ${FROST_BARRIER_SHIELD} เทิร์นนี้ + hit ที่ Block ได้ให้ Chill`)
+    },
+    afterChain: (state, side, r) => {
+      const p = state.players[side]
+      if (p.styleData?.subZero && r.cleanHits) {
+        const n = addChill(state, other(side), r.cleanHits)
+        say(state, side, `Arcane Sub-Zero: เข้า clean ${r.cleanHits} hit → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+      }
+      if (r.skills && state.rules.resources && (p.res ?? 0) >= DEEP_FREEZE_MANA) {
+        p.res = (p.res ?? 0) - DEEP_FREEZE_MANA
+        const n = addChill(state, other(side), 1)
+        say(state, side, `Deep Freeze: ใช้ Mana ${DEEP_FREEZE_MANA} → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+      }
+      return 0
+    },
+    afterHits: (state, side, r) => {
+      if (r.shieldHits) {
+        const n = addChill(state, other(side), r.shieldHits)
+        say(state, side, `Frost Armor: Shield รับ ${r.shieldHits} hit → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+      }
+      if (!state.players[side].styleData?.barrier || !r.hitsBlocked) return
+      const n = addChill(state, other(side), r.hitsBlocked)
+      say(state, side, `Frost Barrier: Block ได้ ${r.hitsBlocked} hit → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+    },
+    endTurn: (state, side) => {
+      const p = state.players[side]
+      if (p.styleData?.barrier || p.styleData?.subZero) p.styleData = { ...p.styleData, barrier: 0, subZero: 0 }
     },
   },
 } satisfies Record<string, StyleDef>)

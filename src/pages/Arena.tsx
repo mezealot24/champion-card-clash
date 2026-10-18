@@ -662,8 +662,9 @@ function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side
     </span>
   )
   const chips = [
-    ...p.statuses.map((s) =>
-      s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? 'No Strike' : s.kind === 'noCharge' ? 'No Charge' : s.kind === 'deathMark' ? '💀 Mark of Assassin' : s.kind === 'ignite' ? `🔥 Ignite ${s.n ?? 1}` : s.kind,
+    // frozen is only a marker for cards (the No Strike chip shows the freeze)
+    ...p.statuses.filter((s) => s.kind !== 'frozen').map((s) =>
+      s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? (p.statuses.some((x) => x.kind === 'frozen') ? '🧊 Frozen' : 'No Strike') : s.kind === 'noCharge' ? 'No Charge' : s.kind === 'deathMark' ? '💀 Mark of Assassin' : s.kind === 'ignite' ? `🔥 Ignite ${s.n ?? 1}` : s.kind === 'chill' ? `❄ Chill ${s.n ?? 1}` : s.kind === 'skillSilence' ? 'Skill effects off' : s.kind === 'subZero' ? '❄ Sub-Zero' : s.kind,
     ),
     ...(p.comboData?.conqueror ? [p.comboData.conqueror >= 6 ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/6`] : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming

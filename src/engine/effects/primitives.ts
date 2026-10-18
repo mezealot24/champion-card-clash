@@ -2,7 +2,7 @@
 // รวมกันเป็น effect ใน registry.ts เช่น when(enemyHandAtLeast(2), heal('self', 10))
 import { addRes, resourceOf } from '../resources'
 import { drawCards, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
-import { addIgnite, igniteBurn, igniteStacks } from '../styles'
+import { addChill, addIgnite, chillStacks, igniteBurn, igniteStacks } from '../styles'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond } from './types'
 
@@ -14,7 +14,7 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
 }
 
 /** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
-export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'maxHpPct' | 'missingHpPct' | 'enemyIgnite'
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'maxHpPct' | 'missingHpPct' | 'enemyIgnite' | 'enemyChill'
 
 export function perCount(ctx: BaseCtx, per?: Per): number {
   if (!per) return 1
@@ -41,6 +41,7 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
     }
     // Ignite stacks on the opponent (Pyromancer)
     case 'enemyIgnite': return igniteStacks(ctx.state.players[ctx.enemy])
+    case 'enemyChill': return chillStacks(ctx.state.players[ctx.enemy])
     // a "per" this build doesn't know counts 0 (old builds reading newer DB rows)
     default: return 0
   }
@@ -230,6 +231,18 @@ export const ignite =
     }
   }
 
+/** Chill (Cryomancer): add n stacks (× per); at CHILL_MAX the side is Frozen (can't Strike next turn, Chill clears). */
+export const chill =
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
+  (ctx) => {
+    const n = Math.floor(base * perCount(ctx, per))
+    if (n <= 0) return
+    for (const s of sides(ctx, who)) {
+      const now = addChill(ctx.state, s, n)
+      if (now) log(ctx.state, `${ctx.card.def.id}: ${s} ❄ Chill ${now} stack`)
+    }
+  }
+
 /** Clear Ignite. burn = it explodes: every burn it had left lands at once (burn × turns left). */
 export const consumeIgnite =
   (who: Who, burn = false): Act<BaseCtx> =>
@@ -346,6 +359,14 @@ export const igniteCmp =
   (who: 'self' | 'enemy', op: '>=' | '<', n: number): Cond =>
   (ctx) => {
     const k = igniteStacks(ctx.state.players[who === 'self' ? ctx.self : ctx.enemy])
+    return op === '>=' ? k >= n : k < n
+  }
+
+/** Chill stacks on you / the opponent compared with n (Cryomancer). */
+export const chillCmp =
+  (who: 'self' | 'enemy', op: '>=' | '<', n: number): Cond =>
+  (ctx) => {
+    const k = chillStacks(ctx.state.players[who === 'self' ? ctx.self : ctx.enemy])
     return op === '>=' ? k >= n : k < n
   }
 
