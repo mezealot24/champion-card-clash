@@ -1,6 +1,7 @@
 // ตัวต่อ (building blocks) สำหรับเขียน effect การ์ด
 // รวมกันเป็น effect ใน registry.ts เช่น when(enemyHandAtLeast(2), heal('self', 10))
 import { addRes, resourceOf } from '../resources'
+import { tuningOf } from '../tuning'
 import { drawCards, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
 import { addChill, addIgnite, chillStacks, igniteBurn, igniteStacks } from '../styles'
 import type { CardType, Side, StatusKind } from '../types'
@@ -231,7 +232,7 @@ export const ignite =
     }
   }
 
-/** Chill (Cryomancer): add n stacks (× per); at CHILL_MAX the side is Frozen (can't Strike next turn, Chill clears). */
+/** Chill (Cryomancer): add n stacks (× per); at chillMax (tuning) the side is Frozen (can't Strike next turn, Chill clears). */
 export const chill =
   (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
@@ -251,7 +252,7 @@ export const consumeIgnite =
       const p = ctx.state.players[s]
       const st = p.statuses.find((x) => x.kind === 'ignite')
       if (!st) continue
-      const dmg = burn ? igniteBurn(p) * st.turns : 0
+      const dmg = burn ? igniteBurn(p, tuningOf(ctx.state)) * st.turns : 0
       p.statuses = p.statuses.filter((x) => x !== st)
       if (!dmg) {
         log(ctx.state, `${ctx.card.def.id}: ล้าง 🔥 Ignite ของ ${s}`)
@@ -397,7 +398,7 @@ export const hasStatus = (who: 'self' | 'enemy', kind: StatusKind): Cond => (ctx
 /** you / the opponent have N+ of your class resource (Tank: HP) */
 export const resAtLeast = (who: 'self' | 'enemy', n: number): Cond => (ctx) => {
   const p = ctx.state.players[who === 'self' ? ctx.self : ctx.enemy]
-  return (resourceOf(p.championId)?.payWithHp ? p.hp : (p.res ?? 0)) >= n
+  return (resourceOf(p.championId, tuningOf(ctx.state))?.payWithHp ? p.hp : (p.res ?? 0)) >= n
 }
 
 /** Status kinds that carry a size n */

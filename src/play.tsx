@@ -1,6 +1,6 @@
 // Standalone Battle page with a data snapshot (no Supabase, no login), for sharing a playable link.
 // `npm run build:play` builds it; `node scripts/pack-play.mjs play-data.json` packs it into one HTML file
-// with the snapshot ({ champions, cards } like BattlePage loads) inlined as window.__PLAY_DATA__.
+// with the snapshot ({ champions, cards, styles, config } like BattlePage loads, params included) inlined as window.__PLAY_DATA__.
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'

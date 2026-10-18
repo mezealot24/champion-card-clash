@@ -8,6 +8,7 @@ import {
   legalActions,
   overdriveAdd,
   resourceOf,
+  tuningOf,
   STYLES,
   type Action,
   type CardInst,
@@ -33,7 +34,7 @@ const ACTIONS: { action: Action; label: string; beats: string }[] = [
 const SPEEDS = [1, 1.5, 2]
 /** Banner text per signature combo (champion · pattern). */
 /** Juggernaut: Conqueror stacks full (6) lights the fighter up. */
-const conqMax = (g: GameState, s: Side) => (g.players[s].comboData?.conqueror ?? 0) >= 6
+const conqMax = (g: GameState, s: Side) => (g.players[s].comboData?.conqueror ?? 0) >= tuningOf(g)['BR:2'].conquerorMax
 const COMBO_TEXT: Record<string, [string, string]> = {
   'TK:P > K > P': ['SECOND HELPING', 'Heal 10% of your HP'],
   'AS:P > K > S': ['DEATH MARK', 'Every later Strike bursts +50%'],
@@ -647,7 +648,7 @@ function TokenView({ side, tok, playing, locked, foe }: { side: Side; tok: Token
 function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side; hp: number; name: string; style: string; foe: string }) {
   const p = game.players[side]
   const pct = Math.max(0, Math.min(100, (hp / p.maxHp) * 100))
-  const res = game.rules.resources ? resourceOf(p.championId) : undefined
+  const res = game.rules.resources ? resourceOf(p.championId, game.tuning) : undefined
   const resView = !res ? null : res.payWithHp ? (
     <span className="res">S = HP</span>
   ) : res.cap <= 5 ? (
@@ -666,7 +667,7 @@ function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side
     ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) =>
       s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? (p.statuses.some((x) => x.kind === 'frozen') ? '🧊 Frozen' : 'No Strike') : s.kind === 'noCharge' ? 'No Charge' : s.kind === 'deathMark' ? '💀 Mark of Assassin' : s.kind === 'ignite' ? `🔥 Ignite ${s.n ?? 1}` : s.kind === 'chill' ? `❄ Chill ${s.n ?? 1}` : s.kind === 'skillSilence' ? 'Skill effects off' : s.kind === 'subZero' ? '❄ Sub-Zero' : s.kind === 'frozenTomb' ? '🧊 Frozen Tomb' : s.kind,
     ),
-    ...(p.comboData?.conqueror ? [p.comboData.conqueror >= 6 ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/6`] : []),
+    ...(p.comboData?.conqueror ? [conqMax(game, side) ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/${tuningOf(game)['BR:2'].conquerorMax}`] : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
     ...(overdriveAdd(game, side) ? [`⚡ Overdrive +${overdriveAdd(game, side)}`] : []),
   ]
@@ -753,8 +754,8 @@ function cardRule(rule: string): { timing: string; cond: string; act: string } {
 function cardFacts(game: GameState, side: Side, card: CardInst) {
   const p = game.players[side]
   const { id, type, dmg, effectText, effectSpec } = card.def
-  const res = game.rules.resources ? resourceOf(p.championId) : undefined
-  const cost = res ? costOf(p.championId, card) : 0
+  const res = game.rules.resources ? resourceOf(p.championId, game.tuning) : undefined
+  const cost = res ? costOf(p.championId, card, game.tuning) : 0
   const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (p.res ?? 0) ? res.unpaidDmgPct : undefined
   const grow = (card.grow ?? 0) + (card.growNext ?? 0)
   const base = short != null ? Math.floor((dmg * short) / 100) : dmg

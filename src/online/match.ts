@@ -6,6 +6,9 @@
 // Both clients replay the same seed and revealed actions through the engine, so the game state is never stored.
 import { createGame, legalActions, resolveTurn, type Action, type ChampionSetup, type GameState, type Side } from '../engine'
 
+/** Rules + tuning both clients start the game with (createGame opts, from the same data snapshot). */
+export type GameOpts = Omit<NonNullable<Parameters<typeof createGame>[2]>, 'seed'>
+
 export type Seat = { uid: string; champ: string; style: string }
 export type MatchDoc = { code: string; status: 'waiting' | 'playing'; seed: number; created: number; p1: Seat; p2: Seat | null }
 export type MoveDoc = { t: number; side: Side; hash: string; reveal?: string }
@@ -13,9 +16,9 @@ export type MoveDoc = { t: number; side: Side; hash: string; reveal?: string }
 export const moveId = (t: number, side: Side) => `${t}-${side}`
 
 /** Replays every turn whose two picks are revealed and valid. states[i] is the game before turn i. */
-export function replay(match: MatchDoc, moves: Record<string, MoveDoc>, setupOf: (s: Seat) => ChampionSetup) {
+export function replay(match: MatchDoc, moves: Record<string, MoveDoc>, setupOf: (s: Seat) => ChampionSetup, opts: GameOpts = {}) {
   if (!match.p2) return null
-  const states: GameState[] = [createGame(setupOf(match.p1), setupOf(match.p2), { seed: match.seed })]
+  const states: GameState[] = [createGame(setupOf(match.p1), setupOf(match.p2), { ...opts, seed: match.seed })]
   const actions: Record<Side, Action>[] = []
   for (let t = 0; !states[t].winner; t++) {
     const a1 = revealed(moves[moveId(t, 'p1')])

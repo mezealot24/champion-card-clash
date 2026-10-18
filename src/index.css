@@ -83,3 +83,13 @@ button.tag.on { background: var(--accent); color: var(--on-accent); border-color
 .conq-tag { color: #ff7a2f; font-weight: 700; }
 @keyframes conq-burn { 50% { box-shadow: 0 0 18px 4px rgba(255, 122, 47, .55); } }
 @media (prefers-reduced-motion: reduce) { .panel.conq-max { animation: none; box-shadow: 0 0 14px 3px rgba(255, 122, 47, .5); } }
+
+/* Admin tuning (components/TuningFields.tsx) */
+.tuning { margin: 4px 0 12px; }
+.tuning-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.tuning label { font-size: 0.9em; }
+.tuning label.tuned { color: var(--accent); }
+.tuning label.tuned input { border-color: var(--accent); }
+.tuning-input { display: flex; align-items: center; gap: 6px; }
+.tuning-input input.num { width: 80px; }
+button.link { background: none; border: none; color: var(--accent); padding: 0 4px; cursor: pointer; }
