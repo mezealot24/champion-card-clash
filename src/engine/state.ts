@@ -139,6 +139,7 @@ export function loseHp(state: GameState, side: Side, n: number, from: 'hit' | 'f
   const p = state.players[side]
   const before = p.hp
   p.hp = Math.max(0, p.hp - n)
+  if (p.hp < before) getStyle(p.style)?.onHpLoss?.(state, side)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
   if (from === 'hit' || p.hp >= before) return
   p.otherDmg ??= { foe: 0, self: 0 }

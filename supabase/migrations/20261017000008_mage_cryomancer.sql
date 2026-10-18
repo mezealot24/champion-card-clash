@@ -4,7 +4,9 @@
 update public.champion_styles set name = 'Cryomancer', effect = 'Frost Armor: start the game with Shield 40; every hit a Shield soaks gives the attacker 1 Chill. Deep Freeze: when you Strike with any Skill card in your chain, spend 1 more Mana to give the opponent 1 Chill. Frost Barrier: when you Block with Mana, spend 1 Mana for Shield 5 this turn; each hit your Block stops gives the attacker 1 Chill. Chill: each stack makes that side''s hits deal 10% less (3 turns, max 4). At 4 stacks the opponent is Frozen: Chill clears, Shatter takes 15% of their Max HP and they can''t Strike next turn. Absolute Zero (S + S + S all clean): the opponent is Frozen and can''t Block next turn.'
 where champion_id = 'MG' and slot = 2;
 
-update public.cards set style_only = '!MG:2' where id in ('MG-005', 'MG-006', 'MG-012', 'MG-023', 'MG-021', 'MG-025', 'MG-008', 'MG-017', 'MG-022');
+update public.cards set style_only = '!MG:2' where id in ('MG-005', 'MG-006', 'MG-012', 'MG-023', 'MG-017', 'MG-022');
+-- MG-008/021/025 were already out of the Pyromancer deck ('!MG:1'); out of Cryomancer too, they leave the deck (kept for the future deck builder)
+update public.cards set in_deck = false where id in ('MG-008', 'MG-021', 'MG-025');
 
 insert into public.cards (id, champion_id, name, source, line, type, dmg, effect, copies, sort_order, in_deck, tags, effect_json, cost, style_only) values
   ('MG-040', 'MG', 'Frost Jab', 'Claude', 'Frost', 'P', 8, 'After action, if you play Strike and this card hits clean: Opponent gains 1 Chill (each stack: hits deal 10% less, 3 turns; at 4 stacks Frozen: loses 15% Max HP and can''t Strike next turn)', 1, 40, true, '{Attack,Control}', '[{"hook":"onResolve","if":[{"c":"selfAction","a":"strike"},{"c":"hitResult","r":"clean"}],"do":[{"a":"chill","who":"enemy","n":1}]}]'::jsonb, null, 'MG:2'),

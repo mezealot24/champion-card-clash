@@ -27,9 +27,12 @@ export const IGNITE_HEAL_CUT_MAX = 50
 export const CHILL_MAX = 4 // reaching this many stacks freezes
 export const CHILL_TURNS = 3
 export const CHILL_DMG_CUT_PER_STACK = 10
-/** Frost Barrier: a Block with Mana spends this much for Shield FROST_BARRIER_SHIELD */
-export const FROST_BARRIER_MANA = 1
-export const FROST_BARRIER_SHIELD = 5
+/** Frozen Tomb (Q 2026-10-18, replaces Frost Barrier): once a game, a hit that leaves the Cryomancer below this % of Max HP
+ *  (or would kill them: they stay on 1 HP) seals them in ice: Frost Armor's Shield comes back, next turn they can only Block. */
+export const TOMB_HP_PCT = RED_HP_PCT // Q 2026-10-18: 30% (the red HP bar), was 40
+/** Frozen Tomb heal at the end of the Block-only turn: TOMB_HEAL + TOMB_HEAL_PER_MANA × Mana (all of it is spent) */
+export const TOMB_HEAL = 10
+export const TOMB_HEAL_PER_MANA = 5 // Q 2026-10-18 nerf, was 10 (sim 68%)
 /** Deep Freeze: Mana a Strike with a Skill card in it spends for 1 Chill */
 export const DEEP_FREEZE_MANA = 1
 /** Frost Armor (Q 2026-10-18, Frostbinder's start Shield back): Shield the game starts with; every hit it soaks gives the attacker 1 Chill */
@@ -50,6 +53,7 @@ export function addChill(state: GameState, side: Side, n: number): number {
   if (stacks >= CHILL_MAX) {
     const lost = Math.floor((p.maxHp * SHATTER_PCT) / 100)
     p.hp = Math.max(0, p.hp - lost)
+    STYLES[p.style ?? '']?.onHpLoss?.(state, side)
     freeze(state, side, `Chill ครบ ${CHILL_MAX}, Shatter เสีย ${lost} HP`)
     return 0
   }
@@ -130,10 +134,21 @@ export type StyleDef = {
   actionStart?: (state: GameState, side: Side, action: Action) => void
   /** last thing in the turn, before the winner check (action = what this side played) */
   endTurn?: (state: GameState, side: Side, action: Action) => void
+  /** right after this side lost HP from anything (hits, effects, burns); may change p.hp (e.g. Frozen Tomb keeps 1 HP) */
+  onHpLoss?: (state: GameState, side: Side) => void
 }
 
 const say = (state: GameState, side: Side, line: string) => state.log.push(`T${state.turn} ${side} ${line}`)
 const pctHp = (p: PlayerState) => (p.hp * 100) / p.maxHp
+/** state.heal without the state.ts import: Ignite cuts it, capped at Max HP, nothing for a side at 0 HP. Returns HP gained. */
+const heal = (state: GameState, side: Side, n: number) => {
+  const p = state.players[side]
+  if (p.hp <= 0) return 0
+  const before = p.hp
+  p.hp = Math.min(p.maxHp, p.hp + healAfterIgnite(p, n))
+  if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
+  return p.hp - before
+}
 /** Overgrowth: +1 dmg per 20 Max HP grown */
 export const overgrowthDmg = (p: PlayerState) => Math.floor((p.styleData?.grown ?? 0) / 20)
 
@@ -328,7 +343,10 @@ Object.assign(STYLES, {
    * Mage · Cryomancer (Q 2026-10-18, from a Gemini draft; replaces Frostbinder).
    * Frost Armor: start the game with Shield 40; every hit a Shield soaks gives the attacker 1 Chill.
    * Deep Freeze: a Strike with any Skill card in it spends 1 more Mana (after the chain) to give the opponent 1 Chill.
-   * Frost Barrier: a Block with Mana spends 1 for Shield 5 this turn; each hit it stops gives the attacker 1 Chill.
+   * Frozen Tomb (Q 2026-10-18, replaces Frost Barrier), once a game: HP loss that leaves you below 30% Max HP (the red bar), or would
+   * kill you (you stay on 1 HP, and can't drop below 1 for the rest of that turn), brings Frost Armor's Shield 40 back.
+   * Next turn you can only Block; at its end heal 10 + 5 per Mana, spending all Mana. The turn after, the Shield
+   * left melts: half of it comes back as HP. (Turn order and the Mana spend are Claude defaults.)
    * Chill: each stack makes that side's hits deal 10% less (3 turns, refreshed). At 4 stacks it is Frozen:
    * Chill clears, Shatter takes 15% of its Max HP and it can't Strike next turn (Absolute Zero freezes without Shatter).
    * Arcane Sub-Zero (card) leaves a subZero status: the next Strike's clean hits each give 1 Chill.
@@ -342,12 +360,6 @@ Object.assign(STYLES, {
       const p = state.players[side]
       // subZero is read here, before statuses tick (it was put on last turn)
       if (action === 'strike' && p.statuses.some((s) => s.kind === 'subZero')) p.styleData = { ...p.styleData, subZero: 1 }
-      if (action !== 'block' || !state.rules.resources || (p.res ?? 0) < FROST_BARRIER_MANA) return
-      p.res = (p.res ?? 0) - FROST_BARRIER_MANA
-      // turns 1: an old-shield tick at the end of this turn removes it
-      p.statuses.push({ kind: 'shield', turns: 1, n: FROST_BARRIER_SHIELD })
-      p.styleData = { ...p.styleData, barrier: 1 }
-      say(state, side, `Frost Barrier: ใช้ Mana ${FROST_BARRIER_MANA} → Shield ${FROST_BARRIER_SHIELD} เทิร์นนี้ + hit ที่ Block ได้ให้ Chill`)
     },
     afterChain: (state, side, r) => {
       const p = state.players[side]
@@ -363,17 +375,44 @@ Object.assign(STYLES, {
       return 0
     },
     afterHits: (state, side, r) => {
-      if (r.shieldHits) {
-        const n = addChill(state, other(side), r.shieldHits)
-        say(state, side, `Frost Armor: Shield รับ ${r.shieldHits} hit → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+      if (!r.shieldHits) return
+      const n = addChill(state, other(side), r.shieldHits)
+      say(state, side, `Frost Armor: Shield รับ ${r.shieldHits} hit → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+    },
+    onHpLoss: (state, side) => {
+      const p = state.players[side]
+      const at = p.styleData?.tombAt
+      if (at !== undefined) {
+        // sealed this turn: the rest of the turn's dmg can't finish you
+        if (at === state.turn && p.hp <= 0) p.hp = 1
+        return
       }
-      if (!state.players[side].styleData?.barrier || !r.hitsBlocked) return
-      const n = addChill(state, other(side), r.hitsBlocked)
-      say(state, side, `Frost Barrier: Block ได้ ${r.hitsBlocked} hit → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+      if (p.hp > 0 && pctHp(p) >= TOMB_HP_PCT) return
+      const saved = p.hp <= 0
+      if (saved) p.hp = 1
+      p.styleData = { ...p.styleData, tombAt: state.turn }
+      p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
+      p.statuses.push({ kind: 'shield', turns: 9999, n: FROST_ARMOR_SHIELD })
+      // read by next turn's legal actions, gone after it (statuses tick at the start of a turn)
+      p.statuses.push({ kind: 'noStrike', turns: 1 }, { kind: 'noCharge', turns: 1 }, { kind: 'frozenTomb', turns: 1 })
+      say(state, side, `🧊 Frozen Tomb${saved ? ' (กันตาย เหลือ 1 HP)' : ''}: Frost Armor Shield ${FROST_ARMOR_SHIELD} กลับมา เทิร์นหน้า Block ได้อย่างเดียว`)
     },
     endTurn: (state, side) => {
       const p = state.players[side]
-      if (p.styleData?.barrier || p.styleData?.subZero) p.styleData = { ...p.styleData, barrier: 0, subZero: 0 }
+      if (p.styleData?.subZero) p.styleData = { ...p.styleData, subZero: 0 }
+      const at = p.styleData?.tombAt
+      if (at === undefined || p.hp <= 0) return
+      if (state.turn === at + 1) {
+        const mana = state.rules.resources ? (p.res ?? 0) : 0
+        if (state.rules.resources) p.res = 0
+        const got = heal(state, side, TOMB_HEAL + TOMB_HEAL_PER_MANA * mana)
+        say(state, side, `🧊 Frozen Tomb: ใช้ Mana ${mana} ฟื้น ${got} HP`)
+      } else if (state.turn === at + 2) {
+        const left = p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
+        p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
+        const got = heal(state, side, Math.floor(left / 2))
+        say(state, side, `🧊 Frozen Tomb ละลาย: Shield ที่เหลือ ${left} → ฟื้น ${got} HP`)
+      }
     },
   },
 } satisfies Record<string, StyleDef>)
