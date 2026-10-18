@@ -1,8 +1,9 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
-import { applyConqueror, checkCombos, DEATH_MARK_PCT, lifestealPct } from './combos'
-import { getStyle, igniteBurn, igniteStacks } from './styles'
+import { applyConqueror, checkCombos, lifestealPct } from './combos'
+import { chillCut, getStyle, igniteBurn, igniteStacks } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
 import type { EffectSpec } from './effects/spec'
+import { tuningOf } from './tuning'
 import type { ChainCtx } from './effects/types'
 import { drawCards, effectOf, emit, heal, log, loseHp, markDiscarded, toDeckBottom } from './state'
 import type { Action, CardDef, CardInst, CardType, GameState, Side } from './types'
@@ -20,10 +21,13 @@ type TurnEnv = {
   hitsTaken: Record<Side, number>
   /** Extra % dmg each side takes from hits this turn (Vulnerable statuses, read before they tick). */
   vulnPct: Record<Side, number>
+  chillPct: Record<Side, number>
   /** Energy Surge this turn: Wraith Step (Block), Shroud (Charge), Elusive (Strike). */
   wraith: Record<Side, boolean>
   shroud: Record<Side, boolean>
   elusive: Record<Side, boolean>
+  /** Hits a Shield soaked dmg from (Frost Armor). */
+  shieldHits: Record<Side, number>
   /** Punch / Kick cards that hit clean this turn (Mage Mana). */
   cleanPK: Record<Side, number>
 }
@@ -58,12 +62,14 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const hitDmgTaken: Record<Side, number> = { p1: 0, p2: 0 }
   const blockNow: Record<Side, number> = { p1: 0, p2: 0 }
   const hitsTaken: Record<Side, number> = { p1: 0, p2: 0 }
+  const shieldHits: Record<Side, number> = { p1: 0, p2: 0 }
   const vulnPct: Record<Side, number> = { p1: 0, p2: 0 }
+  const chillPct: Record<Side, number> = { p1: 0, p2: 0 }
   // Energy Surge (Assassin): a full bar at the start of the turn is spent by the action picked (see resources.ts)
   const surge: Record<Side, number> = { p1: 0, p2: 0 }
   for (const side of SIDES) {
     const p = state.players[side]
-    const def = resourceOf(p.championId)
+    const def = resourceOf(p.championId, tuningOf(state))
     if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) continue
     const mode = actions[side] === 'block' ? 'A' : actions[side] === 'charge' ? 'B' : 'C'
     if (!SURGE_MODES.includes(mode)) continue
@@ -73,13 +79,14 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
   }
   const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, vulnPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 } }
+  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, shieldHits, vulnPct, chillPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 } }
 
   // Styles that act on the action picked (Molten Shield), before statuses are read
   for (const side of SIDES) getStyle(state.players[side].style)?.actionStart?.(state, side, actions[side])
 
   // Silence: a side Silenced at the start of the turn has no card effects all turn
   for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
+  for (const side of SIDES) state.players[side].skillSilenced = hasStatus(state, side, 'skillSilence')
 
   // Every turn (before attack): right after actions are revealed, so its statuses count this turn
   resolveHeld(state, actions, env, 'onHeldBefore')
@@ -89,6 +96,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const trueDmg = { p1: hasStatus(state, 'p1', 'trueDmg'), p2: hasStatus(state, 'p2', 'trueDmg') }
   const guardBreak = { p1: hasStatus(state, 'p1', 'guardBreak'), p2: hasStatus(state, 'p2', 'guardBreak') }
   for (const side of SIDES) vulnPct[side] = state.players[side].statuses.filter((s) => s.kind === 'vulnerable').reduce((t, s) => t + (s.n ?? 0), 0)
+  // Chill (Cryomancer): the chilled side's hits deal N% less this turn
+  for (const side of SIDES) chillPct[side] = chillCut(state.players[side], tuningOf(state))
 
   // statuses were checked above; they tick down now (new ones from this turn last into the next).
   // Shields tick at the end of the turn instead, so a Shield still guards this turn's hits.
@@ -110,6 +119,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       attacked,
       hitsTaken: hitsTaken[side],
       hitsBlocked: hitsBlocked[side],
+      shieldHits: shieldHits[side],
       facing: attacked ? Math.min(handAtStart[enemy].length, handAtStart[side].length) : 0,
     })
   }
@@ -166,16 +176,17 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     for (const side of SIDES) {
       const ds = getStyle(state.players[side].style)?.dualStrike
       if (!ds) continue
-      const cap = resourceOf(state.players[side].championId)?.cap ?? 0
+      const cap = resourceOf(state.players[side].championId, tuningOf(state))?.cap ?? 0
       if (ds.fillRes && state.rules.resources) addRes(state, side, cap)
-      const n = ds.draw ? drawCards(state, side, ds.draw) : 0
+      const draw = ds.draw?.(tuningOf(state)) ?? 0
+      const n = draw ? drawCards(state, side, draw) : 0
       log(state, `${side} Acceleration (Dual Strike): ${ds.fillRes ? 'Energy เต็ม, ' : ''}จั่ว ${n}`)
     }
   }
   for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side, actions[side])
   // Ignite burns at the end of every turn it's on (Pyromancer)
   for (const side of SIDES) {
-    const burn = igniteBurn(state.players[side])
+    const burn = igniteBurn(state.players[side], tuningOf(state))
     if (!burn) continue
     loseHp(state, side, burn)
     log(state, `${side} 🔥 Ignite ${igniteStacks(state.players[side])} stack ไหม้ ${burn}`)
@@ -183,6 +194,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   for (const side of SIDES) {
     const p = state.players[side]
     p.silenced = false
+    p.skillSilenced = false
     p.unpaid = undefined
     // Shields from before this turn lose a turn; used-up or expired ones go
     for (const s of p.statuses) if (oldShields.includes(s)) s.turns--
@@ -274,8 +286,8 @@ function resolveStrikes(
     const b = trueDmg[side] ? Math.max(0, bonus[side]![i]) : bonus[side]![i]
     const m = trueDmg[side] ? Math.max(1, mult[side]![i]) : mult[side]![i]
     const raw = baseDmgOf(state, side, card) + (card.grow ?? 0) + (card.growNext ?? 0) + b
-    // Vulnerable: the side being hit takes N% more dmg from every hit
-    return Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)])) / 100))
+    // Vulnerable: the side being hit takes N% more dmg from every hit; Chill: the striker's hits deal N% less
+    return Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)]) * (100 - env.chillPct[side])) / 10000))
   }
   // Before action combos (card types only), then Momentum stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
@@ -283,7 +295,10 @@ function resolveStrikes(
   for (const side of SIDES) applyConqueror(state, side, actions, bonus[side], mult[other(side)])
   // Guard Crush: a hit stopped by Block still deals half (rounded down)
   // a blocked hit deals half under Guard Crush, or when a Style marked it Critical (Fatal Rhythm, Q 2026-10-16)
-  const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : guardBreak[side] || crit[side].has(i) ? Math.floor(dmgOf(side, i) / 2) : 0)
+  const t = tuningOf(state)
+  const throughPct = (side: Side, i: number) =>
+    Math.max(guardBreak[side] ? t.BR.guardCrushBlockedPct : 0, crit[side].has(i) ? t['AS:2'].blockedCritPct : 0)
+  const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : Math.floor((dmgOf(side, i) * throughPct(side, i)) / 100))
 
   // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
   const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }
@@ -312,6 +327,7 @@ function resolveStrikes(
           sh.n = (sh.n ?? 0) - take
           absorbed += take
         }
+        if (absorbed) env.shieldHits[enemy]++
       }
       if (parry) dealt = 0
       else dealt -= absorbed
@@ -361,11 +377,11 @@ function resolveStrikes(
   for (const side of strikers) {
     if (!deathMarked[other(side)]) continue
     const total = chains[side]!.reduce((t, _, i) => t + dmgOf(side, i), 0)
-    const burst = Math.floor((total * DEATH_MARK_PCT) / 100)
+    const burst = Math.floor((total * t.AS.markBurstPct) / 100)
     if (burst <= 0) continue
     loseHp(state, other(side), burst)
     hitDmgTaken[other(side)] += burst
-    log(state, `${side} 💀 Mark of Assassin ระเบิด ${burst} (50% ของ dmg รวม ${total} ในสาย)`)
+    log(state, `${side} 💀 Mark of Assassin ระเบิด ${burst} (${t.AS.markBurstPct}% ของ dmg รวม ${total} ในสาย)`)
   }
 
   // Guard Crush is used up by this Strike: if the opponent Blocked it, they lose their 2 oldest Field cards.
@@ -376,7 +392,7 @@ function resolveStrikes(
       p.statuses = p.statuses.filter((s) => s.kind !== 'guardBreak')
       const enemy = other(side)
       if (actions[enemy] === 'block') {
-        const lost = state.players[enemy].hand.splice(0, 2)
+        const lost = state.players[enemy].hand.splice(0, t.BR.guardCrushDiscard)
         markDiscarded(state, enemy, lost.map((card, i) => ({ card, slot: i + 1, reason: 'Guard Crush' })))
         toDeckBottom(state, enemy, lost)
         if (lost.length) log(state, `${side} Guard Crush: ${enemy} ทิ้ง ${lost.map((c) => c.def.id).join(', ')}`)
@@ -393,6 +409,7 @@ function resolveStrikes(
       chainLength: chains[side]!.length,
       cleanHits: cleanHits[side],
       enemyField: handAtStart[other(side)].length,
+      skills: chains[side]!.filter((c) => c.def.type === 'S').length,
       paidSkillClean: chains[side]!.filter((c) => c.def.type === 'S' && hitResults.get(c.uid)?.clean && !state.players[side].unpaid?.includes(c.uid)).length,
     })
     if (extra) env.hitsTaken[other(side)] += extra

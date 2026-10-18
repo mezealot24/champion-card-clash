@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { must, useAsync } from '../lib/useAsync'
 import type { GameConfigRow, Json } from '../lib/database.types'
 import { SaveButton } from '../components/SaveButton'
+import { RULE_KEYS } from '../engine'
 
 type Draft = Omit<GameConfigRow, 'value' | 'updated_at'> & { raw: string }
 
@@ -58,7 +59,7 @@ function ConfigTable({ rows, onSaved }: { rows: GameConfigRow[]; onSaved: () => 
             const err = parse(d.raw).error
             return (
               <tr key={d.key}>
-                <td><code>{d.key}</code></td>
+                <td><code>{d.key}</code>{d.key in RULE_KEYS && <span className="ok" title="The battle engine reads this rule"> · engine</span>}</td>
                 <td>
                   <input className={err ? 'invalid' : 'short'} value={d.raw} title={err} onChange={(e) => edit(d.key, { raw: e.target.value })} />
                 </td>

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Action, ChampionSetup, Side } from '../engine'
 import { capability, type Db } from '../online/claude'
-import { moveId, newCode, newSecret, replay, sha256, type MatchDoc, type MoveDoc, type Seat } from '../online/match'
+import { moveId, newCode, newSecret, replay, sha256, type GameOpts, type MatchDoc, type MoveDoc, type Seat } from '../online/match'
 import { view } from '../online/mirror'
 import { Arena, type Turn } from './Arena'
 
@@ -10,6 +10,8 @@ type Props = {
   /** the Champion and Style picked on the select screen */
   mine: { champ: string; style: string }
   setupOf: (s: Seat) => ChampionSetup
+  /** rules + Champion tuning from the data snapshot */
+  gameOpts?: GameOpts
   champName: (id: string) => string
   styleName: (key: string) => string
   onQuit: () => void
@@ -148,7 +150,7 @@ function Lobby({ db, uid, mine, champName, styleName, onJoin, onQuit }: Props & 
   )
 }
 
-function Match({ db, uid, code, setupOf, champName, styleName, onQuit }: Props & { db: Db; uid: string; code: string }) {
+function Match({ db, uid, code, setupOf, gameOpts, champName, styleName, onQuit }: Props & { db: Db; uid: string; code: string }) {
   const [match, setMatch] = useState<MatchDoc | null>(null)
   const [moves, setMoves] = useState<Record<string, MoveDoc>>({})
   const [shown, setShown] = useState<number | null>(null) // turns already played back on screen
@@ -171,7 +173,7 @@ function Match({ db, uid, code, setupOf, champName, styleName, onQuit }: Props &
     return match.p1.uid === uid ? 'p1' : match.p2?.uid === uid ? 'p2' : null
   }, [match, uid, code])
 
-  const played = useMemo(() => (match ? replay(match, moves, setupOf) : null), [match, moves, setupOf])
+  const played = useMemo(() => (match ? replay(match, moves, setupOf, gameOpts) : null), [match, moves, setupOf, gameOpts])
   const t = played ? played.states.length - 1 : 0 // the turn being picked now
   const mine = seat ? moves[moveId(t, seat)] : undefined
   const theirs = seat ? moves[moveId(t, seat === 'p1' ? 'p2' : 'p1')] : undefined

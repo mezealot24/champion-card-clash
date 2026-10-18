@@ -15,7 +15,7 @@ export const HOOK_LABEL: Record<Hook, string> = {
 const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite' }
+const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero (each clean hit next Strike gives 1 Chill)', frozenTomb: 'Frozen Tomb' }
 export const PER_LABEL: Record<Per, string> = {
   hitBlocked: 'hit you blocked this turn',
   chainCard: 'card in your chain',
@@ -28,6 +28,7 @@ export const PER_LABEL: Record<Per, string> = {
   maxHpPct: '1% of your Max HP',
   missingHpPct: '1% of your missing HP',
   enemyIgnite: 'Ignite stack on opponent',
+  enemyChill: 'Chill stack on opponent',
 }
 
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
@@ -59,6 +60,7 @@ export function describeCond(c: CondSpec): string {
     case 'prevIs': return `the card before this one is a ${TYPE[c.type]}`
     case 'facingIs': return `facing card is a ${TYPE[c.type]}`
     case 'fieldHas': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.n}+ ${TYPE[c.type]} on the Field`
+    case 'chill': return c.op === '<' && c.n <= 1 ? `${c.who === 'self' ? 'you have' : 'opponent has'} no Chill` : `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.op === '<' ? `fewer than ${c.n}` : `${c.n}+`} Chill stack${c.n === 1 ? '' : 's'}`
     case 'ignite': return c.op === '<' && c.n <= 1 ? `${c.who === 'self' ? 'you have' : 'opponent has'} no Ignite` : `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.op === '<' ? `fewer than ${c.n}` : `${c.n}+`} Ignite stack${c.n === 1 ? '' : 's'}`
     default: return '(unknown condition)'
   }
@@ -108,6 +110,7 @@ export function describeAct(a: ActSpec, now = false): string {
     }
     case 'gainRes': return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gain`} ${a.n} resource` + per(a.per)
     case 'ignite': return a.n === 0 ? `${WHO[a.who]}'s Ignite starts its 3 turns again` : `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Ignite${per(a.per)} (each stack burns 2 HP + 1% Max HP every turn and cuts heals 25%, 3 turns, max 4)`
+    case 'chill': return `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Chill${per(a.per)} (each stack: hits deal 10% less, 3 turns; at 4 stacks Frozen: loses 15% Max HP and can't Strike next turn)`
     case 'consumeIgnite': return a.burn ? `${WHO[a.who]}'s Ignite explodes: all its remaining burn dmg at once` : `clear ${WHO[a.who]}'s Ignite`
     case 'mulDmg': {
       const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`
