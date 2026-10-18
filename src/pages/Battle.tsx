@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { buildDeck, createGame, isEffectMissing, pickSmartAction, STYLES, resolveTurn, type Action, type CardRowLike, type GameState, type Side } from '../engine'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { buildDeck, createGame, fillText, isEffectMissing, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, tuningFromRows, type Action, type CardRowLike, type GameState, type Side } from '../engine'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
@@ -9,10 +9,11 @@ import { Online } from './Online'
 /** Who you play against: the built-in AI, Claude as ตุ๊กตา (Artifact `sample`), or a person online (Artifact `db`). */
 type Foe = 'ai' | 'tuktah' | 'online'
 
-export type Champ = { id: string; name: string; hp_start: number; hp_max: number }
+export type Champ = { id: string; name: string; hp_start: number; hp_max: number; params?: Record<string, unknown> | null }
 export type Row = CardRowLike & { champion_id: string }
-export type StyleRow = { champion_id: string; slot: number; name: string; effect: string }
-export type BattleData = { champions: Champ[]; cards: Row[]; styles?: StyleRow[] }
+export type StyleRow = { champion_id: string; slot: number; name: string; effect: string; params?: Record<string, unknown> | null }
+/** config = game_config rows (rules the engine reads, see engine/tuning.ts RULE_KEYS); params = Admin tuning overrides */
+export type BattleData = { champions: Champ[]; cards: Row[]; styles?: StyleRow[]; config?: { key: string; value: unknown }[] }
 
 /** The game screen. Data comes from Supabase (BattlePage) or a bundled snapshot (play.tsx). */
 export function Battle({ data }: { data: BattleData }) {
@@ -37,6 +38,8 @@ export function Battle({ data }: { data: BattleData }) {
     capability('db').then((d) => setHasDb(!!d))
   }, [])
 
+  // Champion / Style numbers and rules from the DB (Admin), filled in with the engine's defaults by createGame
+  const gameOpts = useMemo(() => ({ tuning: tuningFromRows(data.champions, data.styles), rules: rulesFromConfig(data.config) }), [data])
   const deckOf = (id: string) => buildDeck(data.cards.filter((c) => c.champion_id === id))
   const missingOf = (id: string) =>
     data.cards.filter((c) => c.champion_id === id && c.in_deck !== false && isEffectMissing(c.id, c.effect, c.effect_json)).length
@@ -47,14 +50,25 @@ export function Battle({ data }: { data: BattleData }) {
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const seatSetup = useCallback((s: Seat) => ({ ...setup(s.champ), style: s.style || undefined }), [data])
-  const styleText = Object.fromEntries((data.styles ?? []).map((s) => [`${s.champion_id}:${s.slot}`, s.effect]))
+  // Style text with its {numbers} filled from the tuning (Admin), as players see it
+  const tuning = useMemo(() => resolveTuning(gameOpts.tuning), [gameOpts])
+  const styleText: Record<string, string> = useMemo(
+    () =>
+      Object.fromEntries(
+        (data.styles ?? []).map((s) => {
+          const c = data.champions.find((x) => x.id === s.champion_id)
+          return [`${s.champion_id}:${s.slot}`, fillText(s.effect, `${s.champion_id}:${s.slot}`, tuning, c ? { hpStart: c.hp_start, hpMax: c.hp_max } : {})]
+        }),
+      ),
+    [data, tuning],
+  )
 
   function start() {
     if (foe === 'online') return setOnline(true)
     setTurn(null)
     setLine('')
     setHistory([])
-    setGame(createGame({ ...setup(picks.p1), style: styleKey('p1') || undefined }, { ...setup(picks.p2), style: styleKey('p2') || undefined }))
+    setGame(createGame({ ...setup(picks.p1), style: styleKey('p1') || undefined }, { ...setup(picks.p2), style: styleKey('p2') || undefined }, gameOpts))
   }
 
   async function play(action: Action) {
@@ -78,6 +92,7 @@ export function Battle({ data }: { data: BattleData }) {
       <Online
         mine={{ champ: picks.p1, style: styleKey('p1') }}
         setupOf={seatSetup}
+        gameOpts={gameOpts}
         champName={(id) => data.champions.find((c) => c.id === id)?.name ?? id}
         styleName={(key) => (key ? (STYLES[key]?.name ?? key) : '')}
         onQuit={() => setOnline(false)}
@@ -131,7 +146,7 @@ export function Battle({ data }: { data: BattleData }) {
               })}
             </select>
             {stylesOf(picks[side]).find((s) => `${s.champion_id}:${s.slot}` === styleKey(side)) && (
-              <span className="muted">{stylesOf(picks[side]).find((s) => `${s.champion_id}:${s.slot}` === styleKey(side))!.effect}</span>
+              <span className="muted">{styleText[styleKey(side)]}</span>
             )}
           </label>
         ))}

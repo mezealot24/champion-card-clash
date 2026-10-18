@@ -20,6 +20,8 @@ export type ChampionRow = {
   identity: string
   signature_combo: string
   sort_order: number
+  /** Admin tuning overrides for the class group (resource + combo), see src/engine/tuning.ts. {} = all defaults. */
+  params: Record<string, number>
 } & Timestamps
 
 export type ChampionStyleRow = {
@@ -28,6 +30,8 @@ export type ChampionStyleRow = {
   slot: 1 | 2
   name: string
   effect: string
+  /** Admin tuning overrides for the Style group "CHAMP:slot", see src/engine/tuning.ts. {} = all defaults. */
+  params: Record<string, number>
 } & Timestamps
 
 export type CardRow = {

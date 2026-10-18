@@ -1,3 +1,4 @@
+import type { Tuning } from './tuning'
 // Pure game types: no React, no Supabase. The engine only reads these.
 import type { EffectSpec } from './effects/spec'
 
@@ -112,6 +113,8 @@ export type GameState = {
   blockStreak: number
   winner: Side | 'draw' | null
   rules: RulesConfig
+  /** Champion + Style numbers this game runs on (engine/tuning.ts); missing = defaults */
+  tuning?: Tuning
   rngSeed: number
   log: string[] // human-readable, newest last
   /** Events of the last turn only (reset by resolveTurn). */

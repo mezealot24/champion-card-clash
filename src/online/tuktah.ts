@@ -1,6 +1,6 @@
 // "vs ตุ๊กตา": the opponent's pick comes from Claude through the Artifact `sample` capability, one call per turn.
 // The page asks before the player's pick is sent anywhere, so Claude never sees it.
-import { legalActions, resourceOf, STYLES, type Action, type GameState, type PlayerState, type Side } from '../engine'
+import { legalActions, resourceOf, STYLES, tuningOf, type Action, type GameState, type PlayerState, type Side } from '../engine'
 import type { Sample } from './claude'
 
 export type TuktahMove = { action: Action; line: string }
@@ -14,12 +14,12 @@ const RULES = `Champion Card Clash rules (short):
 - Charge vs Block: charger draws for free. Charge vs Charge: both draw. Block vs Block 3 times in a row: both Fields are discarded.
 - Charging with a full Field (5) draws nothing. Card effects and Styles below can change all of this.`
 
-function side(p: PlayerState, label: string, styleText: Record<string, string>) {
-  const res = resourceOf(p.championId)
+function side(game: GameState, p: PlayerState, label: string, styleText: Record<string, string>) {
+  const res = resourceOf(p.championId, game.tuning)
   const field = p.hand.map((c, i) => `  slot ${i + 1}: ${c.def.id} ${c.def.type} ${c.def.dmg} dmg${c.grow ? ` (+${c.grow})` : ''}${c.def.effectText ? ` | ${c.def.effectText}` : ''}`)
   return [
     `${label}: ${p.championId}${p.style ? ` · Style ${STYLES[p.style]?.name ?? p.style}: ${styleText[p.style] ?? ''}` : ''}`,
-    `  HP ${p.hp}/${p.maxHp}${res && !res.payWithHp ? ` · ${res.name} ${p.res ?? 0}/${res.cap}` : ''}${p.statuses.length ? ` · statuses: ${p.statuses.map((s) => `${s.kind}${s.n != null ? ` ${s.n}` : ''} (${s.turns}t)`).join(', ')}` : ''}${p.comboData?.conqueror ? ` · Conqueror ${p.comboData.conqueror}/6` : ''}`,
+    `  HP ${p.hp}/${p.maxHp}${res && !res.payWithHp ? ` · ${res.name} ${p.res ?? 0}/${res.cap}` : ''}${p.statuses.length ? ` · statuses: ${p.statuses.map((s) => `${s.kind}${s.n != null ? ` ${s.n}` : ''} (${s.turns}t)`).join(', ')}` : ''}${p.comboData?.conqueror ? ` · Conqueror ${p.comboData.conqueror}/${tuningOf(game)['BR:2'].conquerorMax}` : ''}`,
     `  Field (${p.hand.length}/5):`,
     ...(field.length ? field : ['  (empty)']),
   ].join('\n')
@@ -34,8 +34,8 @@ export function tuktahPrompt(game: GameState, me: Side, history: { mine: Action;
 ${RULES}
 
 Turn ${game.turn + 1}. Block-vs-Block streak: ${game.blockStreak}.
-${side(game.players[me], 'YOU (Tuktah)', styleText)}
-${side(game.players[foe], 'Q (opponent)', styleText)}
+${side(game, game.players[me], 'YOU (Tuktah)', styleText)}
+${side(game, game.players[foe], 'Q (opponent)', styleText)}
 
 Recent turns (oldest first):
 ${past || '  (none yet)'}

@@ -5,6 +5,7 @@ import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
 import { getStyle, healAfterIgnite } from './styles'
 import { resourceOf } from './resources'
+import { resolveTuning, tuningOf, type Tuning, type TuningOverrides } from './tuning'
 
 // --- seeded RNG (mulberry32) so a match can be replayed from its seed ---
 export function nextRandom(state: GameState): number {
@@ -34,23 +35,26 @@ export type ChampionSetup = {
 export function createGame(
   p1: ChampionSetup,
   p2: ChampionSetup,
-  opts: { seed?: number; rules?: Partial<RulesConfig> } = {},
+  opts: { seed?: number; rules?: Partial<RulesConfig>; tuning?: Tuning | TuningOverrides } = {},
 ): GameState {
+  // overrides from the DB (any subset) are filled in with the defaults
+  const tuning = resolveTuning(opts.tuning as TuningOverrides | undefined)
   const state: GameState = {
     turn: 1,
-    players: { p1: emptyPlayer(p1, 'p1'), p2: emptyPlayer(p2, 'p2') },
+    players: { p1: emptyPlayer(p1, 'p1', tuning), p2: emptyPlayer(p2, 'p2', tuning) },
     blockStreak: 0,
     winner: null,
     rules: { ...DEFAULT_RULES, ...opts.rules },
+    tuning,
     rngSeed: opts.seed ?? Date.now() | 0,
     log: [],
   }
   for (const side of ['p1', 'p2'] as const) {
     const p = state.players[side]
     const style = getStyle(p.style)
-    style?.setup?.(p)
+    style?.setup?.(p, tuning)
     p.deck = shuffle(state, p.deck) // shuffle once; afterwards order is learnable
-    drawCards(state, side, state.rules.startHand + (style?.startDraw ?? 0))
+    drawCards(state, side, state.rules.startHand + (style?.startDraw?.(tuning) ?? 0))
   }
   return state
 }
@@ -65,7 +69,7 @@ export function inStyleDeck(def: CardDef, style?: string): boolean {
   return k.startsWith('!') ? k.slice(1) !== style : k === style
 }
 
-function emptyPlayer(setup: ChampionSetup, side: Side): PlayerState {
+function emptyPlayer(setup: ChampionSetup, side: Side, t: Tuning): PlayerState {
   return {
     championId: setup.championId,
     hp: setup.hpStart,
@@ -74,7 +78,7 @@ function emptyPlayer(setup: ChampionSetup, side: Side): PlayerState {
     deck: setup.deck.filter((def) => inStyleDeck(def, setup.style)).map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
     statuses: [],
     style: setup.style,
-    res: resourceOf(setup.championId)?.start ?? 0,
+    res: resourceOf(setup.championId, t)?.start ?? 0,
   }
 }
 
@@ -127,7 +131,7 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
 export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   if (p.hp <= 0) return 0
-  n = healAfterIgnite(p, n)
+  n = healAfterIgnite(p, n, tuningOf(state))
   const before = p.hp
   p.hp = Math.min(p.maxHp, p.hp + n)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
