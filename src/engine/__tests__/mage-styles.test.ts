@@ -91,21 +91,14 @@ describe('Cryomancer', () => {
     expect(n.players.p1.hp).toBe(90) // 40 soaked, 10 through
     expect(chill(n)).toBe(3)
   })
-  it('Frost Barrier: Block with Mana spends 1 for Shield 5, each blocked hit gives the attacker 1 Chill', () => {
+  it('Frost Barrier is gone: a Block with Mana adds no Shield and no Chill', () => {
     const s = fresh()
     s.players.p1.res = 2
     s.players.p2.hand = [hit(10), hit(10), hit(12)]
     const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
-    expect(n.players.p1.hp).toBe(93) // 3rd hit 12, Shield 5 soaks 5
-    expect(chill(n)).toBe(3) // 2 blocked + 1 soaked by the Shield (Frost Armor)
-    expect(n.players.p1.res).toBe(2) // 2 - 1, +1 for Blocking
-  })
-  it('Frost Barrier with no Mana: no Shield, no Chill', () => {
-    const s = fresh()
-    s.players.p2.hand = [hit(10), hit(10), hit(12)]
-    const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
     expect(n.players.p1.hp).toBe(88)
     expect(chill(n)).toBeUndefined()
+    expect(n.players.p1.res).toBe(3)
   })
   it('Deep Freeze: a Strike with a Skill card spends 1 more Mana for 1 Chill', () => {
     const s = fresh()
@@ -133,11 +126,10 @@ describe('Cryomancer', () => {
     expect(n.players.p1.hp).toBe(100 - 35) // 50 × 70%
   })
   it('4 Chill stacks freeze: Chill clears, Shatter takes 15% Max HP, no Strike next turn', () => {
-    const s = fresh()
-    s.players.p1.res = 1
+    const s = game('MG:2') // Frost Armor soaks both hits: 2 more Chill
     s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 2 })
     s.players.p2.hand = [hit(10), hit(10)]
-    const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
     expect(chill(n)).toBeUndefined()
     expect(n.players.p2.hp).toBe(85)
     expect(frozen(n)).toBe(true)
@@ -147,6 +139,40 @@ describe('Cryomancer', () => {
     s.players.p1.hand = [skill(3), skill(3), skill(3)]
     const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     expect(legalActions(n, 'p2')).toEqual(['charge'])
+  })
+  it('Frozen Tomb: a hit below 40% HP brings Frost Armor back, then Block only, heal 10 + 10 per Mana, then half the Shield', () => {
+    const s = fresh()
+    s.players.p1.res = 2
+    s.players.p2.hand = [hit(65)]
+    const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect(n.players.p1.hp).toBe(35)
+    expect(shield(n)).toBe(40)
+    expect(legalActions(n, 'p1')).toEqual(['block'])
+    expect(n.players.p1.statuses.some((x) => x.kind === 'frozenTomb')).toBe(true)
+    n.players.p2.hand = [hit(15)]
+    const t2 = resolveTurn(n, { p1: 'block', p2: 'strike' }) // Charge gave +1 Mana (3), Block +1 more = 4
+    expect(shield(t2)).toBe(40) // the hit was blocked
+    expect(t2.players.p1.hp).toBe(35 + 10 + 10 * 4)
+    expect(t2.players.p1.res).toBe(0)
+    expect(legalActions(t2, 'p1')).toContain('strike')
+    const t3 = resolveTurn(t2, { p1: 'charge', p2: 'charge' })
+    expect(shield(t3)).toBe(0)
+    expect(t3.players.p1.hp).toBe(100) // 85 + 20, capped at Max HP
+  })
+  it('Frozen Tomb saves you once from a lethal hit, and the rest of that turn too', () => {
+    const s = fresh()
+    s.players.p2.hand = [hit(150), hit(30)]
+    const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect(n.winner).toBeNull()
+    expect(n.players.p1.hp).toBe(1)
+    expect(shield(n)).toBe(40)
+  })
+  it('Frozen Tomb only once a game', () => {
+    const s = fresh()
+    s.players.p1.styleData = { tombAt: -5 }
+    s.players.p2.hand = [hit(150)]
+    const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect(n.winner).toBe('p2')
   })
   it('Pyromancer S + S + S only stops Block', () => {
     const s = game('MG:1')
