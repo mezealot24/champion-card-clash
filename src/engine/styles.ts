@@ -37,7 +37,7 @@ export const chillCut = (p: PlayerState) => chillStacks(p) * CHILL_DMG_CUT_PER_S
 
 /**
  * Add n Chill stacks to a side and reset its timer. Reaching CHILL_MAX freezes it:
- * Chill is cleared, it loses SHATTER_PCT of its Max HP and can't Strike next turn. Returns the stacks it has now (0 after a freeze).
+ * Chill is cleared, it loses SHATTER_PCT of its Max HP, its Conqueror stacks reset to 0 and it can't Strike next turn. Returns the stacks it has now (0 after a freeze).
  */
 export function addChill(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
@@ -49,7 +49,9 @@ export function addChill(state: GameState, side: Side, n: number): number {
     if (!p.statuses.some((s) => s.kind === 'noStrike')) p.statuses.push({ kind: 'noStrike', turns: 1 })
     const lost = Math.floor((p.maxHp * SHATTER_PCT) / 100)
     p.hp = Math.max(0, p.hp - lost)
-    state.log.push(`T${state.turn} ${side} 🧊 Frozen: Chill ครบ ${CHILL_MAX} → Shatter เสีย ${lost} HP, Strike ไม่ได้เทิร์นหน้า`)
+    // Frozen also breaks Juggernaut's momentum (Q 2026-10-18: Frost is the Bruiser counter)
+    if (p.comboData?.conqueror) p.comboData = { ...p.comboData, conqueror: 0 }
+    state.log.push(`T${state.turn} ${side} 🧊 Frozen: Chill ครบ ${CHILL_MAX} → Shatter เสีย ${lost} HP, Strike ไม่ได้เทิร์นหน้า, Conqueror หมด`)
     return 0
   }
   p.statuses.push({ kind: 'chill', turns: CHILL_TURNS, n: stacks })

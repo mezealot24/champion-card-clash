@@ -109,4 +109,12 @@ describe('Frostbinder', () => {
     expect(n.players.p2.hp).toBe(85)
     expect(n.players.p2.statuses.some((x) => x.kind === 'noStrike')).toBe(true)
   })
+  it('Frozen also resets Conqueror stacks', () => {
+    const s = fresh()
+    s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 1 })
+    s.players.p2.comboData = { conqueror: 4 }
+    s.players.p2.hand = [hit(10), hit(10)]
+    const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    expect(n.players.p2.comboData?.conqueror).toBe(0)
+  })
 })
