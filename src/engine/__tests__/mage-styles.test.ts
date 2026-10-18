@@ -1,6 +1,6 @@
-// Mage Styles: Pyromancer (MG:1) and Frostbinder (MG:2).
+// Mage Styles: Pyromancer (MG:1) and Cryomancer (MG:2).
 import { describe, expect, it } from 'vitest'
-import { createGame, resolveTurn } from '../index'
+import { createGame, legalActions, resolveTurn } from '../index'
 import { heal } from '../state'
 import type { CardDef, CardInst, GameState } from '../index'
 
@@ -75,38 +75,83 @@ describe('Pyromancer', () => {
   })
 })
 
-describe('Frostbinder', () => {
+describe('Cryomancer', () => {
   const chill = (s: GameState) => s.players.p2.statuses.find((x) => x.kind === 'chill')?.n
+  const frozen = (s: GameState) => s.players.p2.statuses.some((x) => x.kind === 'noStrike')
   const fresh = () => {
     const s = game('MG:2')
-    s.players.p1.statuses = [] // drop the Shield 40 it starts with
+    s.players.p1.statuses = [] // drop the Frost Armor Shield
     return s
   }
-  it('starts the game with Shield 40', () => {
-    expect(shield(game('MG:2'))).toBe(40)
+  it('Frost Armor: starts with Shield 40, every hit it soaks gives the attacker 1 Chill', () => {
+    const s = game('MG:2')
+    expect(shield(s)).toBe(40)
+    s.players.p2.hand = [hit(10), hit(10), hit(30)]
+    const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect(n.players.p1.hp).toBe(90) // 40 soaked, 10 through
+    expect(chill(n)).toBe(3)
   })
-  it('Glacial Guard: Block gets Shield 10, each blocked hit gives the attacker 1 Chill', () => {
+  it('Frost Barrier: Block with Mana spends 1 for Shield 5, each blocked hit gives the attacker 1 Chill', () => {
+    const s = fresh()
+    s.players.p1.res = 2
+    s.players.p2.hand = [hit(10), hit(10), hit(12)]
+    const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    expect(n.players.p1.hp).toBe(93) // 3rd hit 12, Shield 5 soaks 5
+    expect(chill(n)).toBe(3) // 2 blocked + 1 soaked by the Shield (Frost Armor)
+    expect(n.players.p1.res).toBe(2) // 2 - 1, +1 for Blocking
+  })
+  it('Frost Barrier with no Mana: no Shield, no Chill', () => {
     const s = fresh()
     s.players.p2.hand = [hit(10), hit(10), hit(12)]
     const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
-    expect(n.players.p1.hp).toBe(98) // 3rd hit 12, Shield 10 soaks 10
-    expect(chill(n)).toBe(2)
-    expect(shield(n)).toBe(0)
+    expect(n.players.p1.hp).toBe(88)
+    expect(chill(n)).toBeUndefined()
   })
-  it('Chill: each stack makes the chilled side hit 15% less', () => {
+  it('Deep Freeze: a Strike with a Skill card spends 1 more Mana for 1 Chill', () => {
     const s = fresh()
-    s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 2 })
+    s.players.p1.res = 2
+    s.players.p1.hand = [skill(5, 1), hit(5)]
+    const n = resolveTurn(s, { p1: 'strike', p2: 'block' })
+    expect(chill(n)).toBe(1)
+    expect(n.players.p1.res).toBe(0)
+  })
+  it('Deep Freeze needs a Skill card and the Mana', () => {
+    const noSkill = fresh()
+    noSkill.players.p1.res = 2
+    noSkill.players.p1.hand = [hit(5)]
+    expect(chill(resolveTurn(noSkill, { p1: 'strike', p2: 'block' }))).toBeUndefined()
+    const noMana = fresh()
+    noMana.players.p1.res = 1
+    noMana.players.p1.hand = [skill(5, 1)]
+    expect(chill(resolveTurn(noMana, { p1: 'strike', p2: 'block' }))).toBeUndefined()
+  })
+  it('Chill: each stack makes the chilled side hit 10% less', () => {
+    const s = fresh()
+    s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 3 })
     s.players.p2.hand = [hit(50)]
     const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
     expect(n.players.p1.hp).toBe(100 - 35) // 50 × 70%
   })
-  it('3 Chill stacks freeze: Chill clears, Shatter takes 15% Max HP, no Strike next turn', () => {
+  it('4 Chill stacks freeze: Chill clears, Shatter takes 15% Max HP, no Strike next turn', () => {
     const s = fresh()
-    s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 1 })
+    s.players.p1.res = 1
+    s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 2 })
     s.players.p2.hand = [hit(10), hit(10)]
     const n = resolveTurn(s, { p1: 'block', p2: 'strike' })
     expect(chill(n)).toBeUndefined()
     expect(n.players.p2.hp).toBe(85)
-    expect(n.players.p2.statuses.some((x) => x.kind === 'noStrike')).toBe(true)
+    expect(frozen(n)).toBe(true)
+  })
+  it('Absolute Zero: S + S + S all clean freezes and stops Block, so only Charge is left', () => {
+    const s = fresh()
+    s.players.p1.hand = [skill(3), skill(3), skill(3)]
+    const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(legalActions(n, 'p2')).toEqual(['charge'])
+  })
+  it('Pyromancer S + S + S only stops Block', () => {
+    const s = game('MG:1')
+    s.players.p1.hand = [skill(3), skill(3), skill(3)]
+    const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(frozen(n)).toBe(false)
   })
 })

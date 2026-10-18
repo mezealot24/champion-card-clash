@@ -231,7 +231,7 @@ export const ignite =
     }
   }
 
-/** Chill (Frostbinder): add n stacks (× per); at 5 the side is Frozen (can't Strike next turn, Chill clears). */
+/** Chill (Cryomancer): add n stacks (× per); at CHILL_MAX the side is Frozen (can't Strike next turn, Chill clears). */
 export const chill =
   (who: Who, base: number, per?: Per): Act<BaseCtx> =>
   (ctx) => {
@@ -362,7 +362,7 @@ export const igniteCmp =
     return op === '>=' ? k >= n : k < n
   }
 
-/** Chill stacks on you / the opponent compared with n (Frostbinder). */
+/** Chill stacks on you / the opponent compared with n (Cryomancer). */
 export const chillCmp =
   (who: 'self' | 'enemy', op: '>=' | '<', n: number): Cond =>
   (ctx) => {

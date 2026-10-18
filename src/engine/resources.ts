@@ -107,7 +107,8 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
   if (!def || p.silenced || !state.rules.resources) return // Silenced: effects are off anyway, nothing to pay for
   for (const card of chain) {
     const cost = costOf(p.championId, card)
-    if (cost <= 0) continue
+    // Bitter Cold: Skill effects are off, nothing to pay for
+    if (cost <= 0 || (p.skillSilenced && card.def.type === 'S')) continue
     if (def.payWithHp ? p.hp > cost : (p.res ?? 0) >= cost) {
       if (def.payWithHp) {
         p.hp -= cost

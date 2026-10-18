@@ -133,7 +133,7 @@ export function normalizeSpec(spec: EffectSpec): EffectSpec {
   )
 }
 
-const BAD_FOR_SELF: StatusKind[] = ['noStrike', 'noBlock', 'noCharge', 'silence']
+const BAD_FOR_SELF: StatusKind[] = ['noStrike', 'noBlock', 'noCharge', 'silence', 'skillSilence']
 /**
  * A drawback = an action that only hurts its own side (e.g. lose HP, Max HP −, can't Block, lose resource).
  * Q 2026-10-15: an S card you couldn't pay for still pays its drawbacks; everything else is off.
