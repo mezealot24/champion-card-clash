@@ -19,6 +19,7 @@ import {
 } from '../engine'
 import { describeSpec } from '../engine/effects/describe'
 import { champColor, fighterHTML } from './fighters'
+import { ComboTracker, CompactFx } from './LearnBits'
 import './arena.css'
 
 const W = 800
@@ -545,7 +546,11 @@ export function Arena(props: {
             </section>
           ))}
           <div className="lane">
-            <div className="log">{playing ? '' : lastLines.map(readable).join(' · ') || 'Pick an action. Both sides lock in, then reveal together.'}</div>
+            <div className="lane-left">
+              <ComboTracker game={game} side="p2" cards={view.p2.field.filter((v) => !v.gone).map((v) => v.card)} />
+              <div className="log">{playing ? '' : lastLines.map(readable).join(' · ') || 'Pick an action. Both sides lock in, then reveal together.'}</div>
+              <ComboTracker game={game} side="p1" cards={view.p1.field.filter((v) => !v.gone).map((v) => v.card)} />
+            </div>
             <div className="vs">
               <div className={`fighter p2${down === 'p2' ? ' down' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId) }} />
               <TokenView side="p2" tok={tok} playing={playing} foe={foe} />
@@ -890,7 +895,9 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
       {vc.card.owner && <span className="mod down" style={{ top: 'auto', bottom: 16 }}>stolen</span>}
       <div className="fx">
         {f.missing && <span className="rule">⚠ no code yet</span>}
-        {f.text ? (
+        {vc.card.def.effectSpec?.length ? (
+          <CompactFx spec={vc.card.def.effectSpec} res={f.costName || undefined} />
+        ) : f.text ? (
           f.text.split(' / ').map((rule, i) => {
             const r = cardRule(rule)
             return (
