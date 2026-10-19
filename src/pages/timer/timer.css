@@ -1,0 +1,13 @@
+/* Turn timer pill: fixed over the arena (which is position:fixed, z-index 50). */
+.turn-timer { position: fixed; z-index: 70; top: calc(env(safe-area-inset-top, 0px) + 6px); left: 50%; transform: translateX(-50%);
+  width: 132px; height: 24px; border-radius: 999px; overflow: hidden; background: #150f29e6; border: 2px solid #0c0718;
+  color: #f4eefe; font: 800 13px/20px 'Nunito', system-ui, sans-serif; text-align: center; pointer-events: none; }
+.turn-timer i { position: absolute; left: 0; top: 0; bottom: 0; background: #4f9dff88; transition: width .1s linear; }
+.turn-timer span { position: relative; }
+.turn-timer.low i { background: #ff547099; }
+.turn-timer.low span { animation: timer-tick 1s steps(2, start) infinite; }
+.turn-timer.out { background: #ff5470; }
+@keyframes timer-tick { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .turn-timer.low span { animation: none; } }
+.timer-setting { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.timer-setting select { width: auto; }

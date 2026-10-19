@@ -1,12 +1,11 @@
 // Learnability helpers for the battle screen (playtest feedback #3, pack B): pure text, no React.
 // - compactRules: effect_json → "when · gain · cost" lines for the card face (full text stays in the card sheet)
 // - comboInfo / comboSteps: the signature combo pattern and which steps the Field already lights
-// - styleSummary: one line per Style, numbers read live from the tuning (Admin)
 import type { CardType } from '../engine'
 import { COMBOS } from '../engine/combos'
 import { describeAct, describeCond } from '../engine/effects/describe'
 import { isDrawback, normalizeSpec, type ActSpec, type CondSpec, type EffectSpec, type Hook } from '../engine/effects/spec'
-import { fillText, type Tuning } from '../engine/tuning'
+import type { Tuning } from '../engine/tuning'
 
 export type CompactRule = { tag: string; when: string; gain: string[]; cost: string[] }
 
@@ -177,19 +176,3 @@ export function comboSteps(pattern: CardType[], types: CardType[]): boolean[] {
     return true
   })
 }
-
-// ---- Style one-liners ----
-
-/** One line per Style; {key} placeholders are filled from that Style's tuning (fillText), so Admin changes show at once. */
-export const STYLE_SUMMARY: Record<string, string> = {
-  'TK:1': 'Below {hpPct}% HP, each hit you take heals {healPctPerHit}% of missing HP. Off for good once back above {hpPct}%.',
-  'TK:2': 'Max HP +{perHitTaken} per hit taken, +{perHitBlocked} per hit Blocked (cap {maxHpCap}). Every +{hpPerDmg} Max HP = all cards +1 dmg.',
-  'BR:1': 'HP below {hpPct}%: slots 1–{slots} of your Strike deal +{bonusDmg} dmg.',
-  'BR:2': '+1 Conqueror per chain card (+{dmgPerStack} dmg each, max {conquerorMax}). At max: Omnivamp {omnivampPct}%. Block −{blockLoss}.',
-  'AS:1': 'Start with {startDraw} cards. Strike vs Strike: full Energy + draw {dualDraw}. {minChain}+ cards, no S: +{dmgPerEnergy} dmg per Energy.',
-  'AS:2': 'Every {every|ord} attack is a ×{critMult} Critical, ×{redCritMult} if the foe is below {redHpPct}% HP.',
-  'MG:1': 'Paid S cards that hit clean Ignite the foe. Block with Mana: Shield {moltenShieldPerMana} per Mana, blocked hits Ignite.',
-  'MG:2': 'Start with Shield {frostArmorShield}; hits on it Chill the foe (−{chillDmgCut}% dmg each, {chillMax} = Frozen). Below {tombHpPct}% HP: Frozen Tomb once.',
-}
-
-export const styleSummary = (key: string, t: Tuning): string => (STYLE_SUMMARY[key] ? fillText(STYLE_SUMMARY[key], key, t) : '')

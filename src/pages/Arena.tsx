@@ -78,6 +78,8 @@ export function Arena(props: {
   styleNames: Record<Side, string>
   /** full Style text, shown when a player taps the Style name */
   styleTexts?: Record<Side, string>
+  /** extra controls in the in-match Settings sheet (e.g. the turn timer switch) */
+  settingsExtra?: React.ReactNode
   onAction: (a: Action) => void
   onDone: () => void
   /** no Play again button when absent (online matches) */
@@ -630,6 +632,7 @@ export function Arena(props: {
                   <button type="button" className="big-btn" onClick={(e) => (e.stopPropagation(), setSheet('log'))}>
                     Match log
                   </button>
+                  {props.settingsExtra && <div onClick={(e) => e.stopPropagation()}>{props.settingsExtra}</div>}
                   <button type="button" className="big-btn alt" onClick={props.onQuit}>
                     Quit to Champion select
                   </button>

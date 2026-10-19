@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { resolveTuning } from '../../engine/tuning'
+import { fillText, resolveTuning } from '../../engine/tuning'
 import type { EffectSpec } from '../../engine/effects/spec'
-import { comboInfo, comboSteps, compactRules, styleSummary } from '../learnText'
+import { comboInfo, comboSteps, compactRules } from '../learnText'
+import { STYLE_SUMMARY } from '../select/info'
 
 describe('compact card text', () => {
   it('splits a rule into when · gain · cost', () => {
@@ -44,8 +45,9 @@ describe('combo tracker', () => {
 describe('Style one-liners', () => {
   it('fill every number from the tuning', () => {
     const t = resolveTuning({ 'BR:1': { bonusDmg: 12 } })
-    expect(styleSummary('BR:1', t)).toBe('HP below 50%: slots 1–2 of your Strike deal +12 dmg.')
-    expect(styleSummary('AS:2', t)).toContain('Every 4th attack')
-    for (const key of ['TK:1', 'TK:2', 'BR:1', 'BR:2', 'AS:1', 'AS:2', 'MG:1', 'MG:2']) expect(styleSummary(key, t)).not.toMatch(/\{/)
+    const line = (key: string) => fillText(STYLE_SUMMARY[key], key, t)
+    expect(line('BR:1')).toBe('Below 50% HP, your first 2 chain cards deal +12.')
+    expect(line('AS:2')).toContain('Every 4th attack')
+    for (const key of ['TK:1', 'TK:2', 'BR:1', 'BR:2', 'AS:1', 'AS:2', 'MG:1', 'MG:2']) expect(line(key)).not.toMatch(/\{/)
   })
 })
