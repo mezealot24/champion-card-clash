@@ -1,0 +1,44 @@
+/* Deck builder. Sits inside .select (same night palette, --tint = the Champion's colour). */
+.deckb { padding-bottom: 0; }
+.deckb-head { background: none; border: 0; padding: 0; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.deckb-count { display: flex; flex-direction: column; align-items: flex-end; }
+.deckb-count b { font: 400 28px/1 'Lilita One', 'Arial Black', sans-serif; color: var(--s-gold); }
+.deckb-count.ok b { color: var(--tint); }
+.deckb-count span { font-size: 12px; color: var(--s-muted); }
+.deckb-rules { margin: 0; font-size: 14px; color: var(--s-muted); }
+
+.deckb-tools { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.deckb-types { display: flex; gap: 6px; flex-wrap: wrap; }
+.deckb-types button { background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--s-line); border-radius: 999px; padding: 6px 14px; font-weight: 800; }
+.deckb-types button[aria-checked="true"] { border-color: var(--tint); background: color-mix(in srgb, var(--tint) 20%, var(--s-panel-2)); }
+.deckb-only { display: flex; gap: 6px; align-items: center; font-size: 14px; margin: 0; }
+
+.deckb-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.deckb-list li { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  background: var(--s-panel); border: 2px solid var(--s-line); border-radius: 12px; padding: 8px 10px; }
+.deckb-list li.in { border-color: color-mix(in srgb, var(--tint) 70%, var(--s-line)); }
+.deckb-list .deckb-empty { display: block; color: var(--s-muted); text-align: center; }
+.deckb-type { display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; font-weight: 900; color: #150f29; }
+.deckb-type.t-P { background: #ff8a5c; }
+.deckb-type.t-K { background: #5cc8ff; }
+.deckb-type.t-S { background: #ffc84a; }
+.deckb-card { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.deckb-card b { font-size: 15px; font-weight: 800; }
+.deckb-stats { font-size: 12px; color: var(--s-muted); font-weight: 800; }
+.deckb-text { font-size: 13px; line-height: 1.4; color: var(--s-text); opacity: .85; overflow-wrap: anywhere; }
+.deckb-step { display: flex; align-items: center; gap: 6px; }
+.deckb-step button { width: 40px; height: 40px; border-radius: 10px; border: 2px solid var(--s-line); background: var(--s-panel-2); color: var(--s-text); font-size: 20px; font-weight: 900; }
+.deckb-step button:disabled { opacity: .35; cursor: default; }
+.deckb-step output { min-width: 18px; text-align: center; font-weight: 900; font-size: 18px; }
+
+.deckb-fixed summary { cursor: pointer; font-weight: 800; }
+.deckb-fixed ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.deckb-fixed .deckb-type { width: 22px; height: 22px; font-size: 12px; }
+
+.deckb-foot { position: sticky; bottom: 0; background: var(--s-bg); border-top: 1px solid var(--s-line); margin: 0 -16px; padding: 10px 16px 14px;
+  display: flex; flex-direction: column; gap: 8px; }
+.deckb-foot > div { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.deckb-foot .start { flex: 1 1 160px; font-size: 20px; padding: 8px; }
+.deckb-foot .start:disabled { opacity: .45; cursor: default; }
+.deckb-warn { margin: 0; color: var(--s-gold); font-size: 13px; font-weight: 800; }
+.deckb-ghost { background: none; border: 2px solid var(--s-line); color: var(--s-text); border-radius: 12px; padding: 8px 12px; font-weight: 800; }

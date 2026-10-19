@@ -4,6 +4,8 @@ import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
+import { DeckBuilder } from './deck/DeckBuilder'
+import { deckRows, deckRulesFromConfig, loadDeck } from './deck/deck'
 import { Online } from './Online'
 import { ChampionSelect, type FoeKind } from './select/ChampionSelect'
 import { CHAMP_INFO } from './select/info'
@@ -15,7 +17,7 @@ import { Tutorial } from './tutorial/Tutorial'
 type Foe = FoeKind
 
 export type Champ = { id: string; name: string; hp_start: number; hp_max: number; params?: Record<string, unknown> | null }
-export type Row = CardRowLike & { champion_id: string }
+export type Row = CardRowLike & { champion_id: string; name?: string }
 export type StyleRow = { champion_id: string; slot: number; name: string; effect: string; params?: Record<string, unknown> | null }
 /** config = game_config rows (rules the engine reads, see engine/tuning.ts RULE_KEYS); params = Admin tuning overrides */
 export type BattleData = { champions: Champ[]; cards: Row[]; styles?: StyleRow[]; config?: { key: string; value: unknown }[] }
@@ -44,6 +46,7 @@ export function Battle({ data }: { data: BattleData }) {
   const [line, setLine] = useState('')
   const [history, setHistory] = useState<{ mine: Action; theirs: Action }[]>([])
   const [tutorial, setTutorial] = useState(false)
+  const [deckEdit, setDeckEdit] = useState(false)
   // new match = new id, so the turn timer restarts even when the turn number repeats
   const [match, setMatch] = useState(0)
   const [settings] = useGameSettings()
@@ -57,6 +60,9 @@ export function Battle({ data }: { data: BattleData }) {
   // Champion / Style numbers and rules from the DB (Admin), filled in with the engine's defaults by createGame
   const gameOpts = useMemo(() => ({ tuning: tuningFromRows(data.champions, data.styles), rules: rulesFromConfig(data.config) }), [data])
   const deckOf = (id: string) => buildDeck(data.cards.filter((c) => c.champion_id === id))
+  const deckRules = useMemo(() => deckRulesFromConfig(data.config), [data])
+  // the player's own deck (deck builder) when it is still legal for this Style; the AI and online seats use Admin's deck
+  const myDeck = (id: string, style?: string) => deckRows(data.cards.filter((c) => c.champion_id === id), loadDeck(id), style, deckRules)
   const missingOf = (id: string) =>
     data.cards.filter((c) => c.champion_id === id && c.in_deck !== false && isEffectMissing(c.id, c.effect, c.effect_json)).length
 
@@ -85,7 +91,8 @@ export function Battle({ data }: { data: BattleData }) {
     setLine('')
     setHistory([])
     setMatch((m) => m + 1)
-    setGame(createGame({ ...setup(picks.p1), style: styleKey('p1') || undefined }, { ...setup(picks.p2), style: styleKey('p2') || undefined }, gameOpts))
+    const myStyle = styleKey('p1') || undefined
+    setGame(createGame({ ...setup(picks.p1), deck: buildDeck(myDeck(picks.p1, myStyle).rows), style: myStyle }, { ...setup(picks.p2), style: styleKey('p2') || undefined }, gameOpts))
   }
 
   async function play(action: Action) {
@@ -137,6 +144,21 @@ export function Battle({ data }: { data: BattleData }) {
     )
   }
 
+  if (deckEdit) {
+    const style = styleKey('p1') || undefined
+    return (
+      <DeckBuilder
+        champ={picks.p1}
+        champName={champTitle(picks.p1)}
+        rows={data.cards.filter((c) => c.champion_id === picks.p1)}
+        style={style}
+        styleName={style ? STYLES[style]?.name : undefined}
+        rules={deckRules}
+        onClose={() => setDeckEdit(false)}
+      />
+    )
+  }
+
   if (!game) {
     return (
       <ChampionSelect
@@ -155,7 +177,10 @@ export function Battle({ data }: { data: BattleData }) {
         setFoe={setFoe}
         canTuktah={!!sample}
         canOnline={hasDb}
-        deckSize={(id) => deckOf(id).filter((d) => !d.styleOnly || d.styleOnly.startsWith('!')).length}
+        deckSize={(id) => (myDeck(id, styleKey('p1') || undefined).custom ? deckRules.size : deckOf(id).filter((d) => !d.styleOnly || d.styleOnly.startsWith('!')).length)}
+        deckCustom={(id) => myDeck(id, styleKey('p1') || undefined).custom}
+        deckSaved={(id) => !!loadDeck(id)}
+        onEditDeck={() => setDeckEdit(true)}
         missing={missingOf}
         onStart={start}
         onTutorial={() => setTutorial(true)}
