@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildDeck, createGame, fillText, isEffectMissing, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, tuningFromRows, type Action, type CardRowLike, type GameState, type Side } from '../engine'
+import { buildDeck, createGame, fillText, isEffectMissing, legalActions, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, tuningFromRows, type Action, type CardRowLike, type GameState, type Side } from '../engine'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
 import { Online } from './Online'
+import { ChampionSelect, type FoeKind } from './select/ChampionSelect'
+import { CHAMP_INFO } from './select/info'
+import { useGameSettings } from './settings'
+import { TimerSetting, TurnTimer } from './timer/TurnTimer'
+import { Tutorial } from './tutorial/Tutorial'
 
 /** Who you play against: the built-in AI, Claude as ตุ๊กตา (Artifact `sample`), or a person online (Artifact `db`). */
-type Foe = 'ai' | 'tuktah' | 'online'
+type Foe = FoeKind
 
 export type Champ = { id: string; name: string; hp_start: number; hp_max: number; params?: Record<string, unknown> | null }
 export type Row = CardRowLike & { champion_id: string }
@@ -32,6 +37,10 @@ export function Battle({ data }: { data: BattleData }) {
   const [thinking, setThinking] = useState(false)
   const [line, setLine] = useState('')
   const [history, setHistory] = useState<{ mine: Action; theirs: Action }[]>([])
+  const [tutorial, setTutorial] = useState(false)
+  // new match = new id, so the turn timer restarts even when the turn number repeats
+  const [match, setMatch] = useState(0)
+  const [settings] = useGameSettings()
 
   useEffect(() => {
     capability<Sample>('sample').then(setSample)
@@ -68,6 +77,7 @@ export function Battle({ data }: { data: BattleData }) {
     setTurn(null)
     setLine('')
     setHistory([])
+    setMatch((m) => m + 1)
     setGame(createGame({ ...setup(picks.p1), style: styleKey('p1') || undefined }, { ...setup(picks.p2), style: styleKey('p2') || undefined }, gameOpts))
   }
 
@@ -100,58 +110,48 @@ export function Battle({ data }: { data: BattleData }) {
     )
   }
 
+  const champTitle = (id: string) => data.champions.find((c) => c.id === id)?.name ?? id
+  const fill = (text: string, group: string) => {
+    const c = data.champions.find((x) => x.id === group.slice(0, 2))
+    return fillText(text, group, tuning, c ? { hpStart: c.hp_start, hpMax: c.hp_max } : {})
+  }
+
+  if (tutorial) {
+    return (
+      <Tutorial
+        champ={picks.p1}
+        setupOf={setup}
+        gameOpts={gameOpts}
+        names={champTitle}
+        comboText={CHAMP_INFO[picks.p1] ? fill(CHAMP_INFO[picks.p1].combo, picks.p1) : ''}
+        onExit={() => setTutorial(false)}
+      />
+    )
+  }
+
   if (!game) {
     return (
-      <div className="panel narrow-wide">
-        <h2>Battle</h2>
-        <label>
-          Opponent
-          <select value={foe} onChange={(e) => setFoe(e.target.value as Foe)}>
-            <option value="ai">AI</option>
-            <option value="tuktah" disabled={!sample}>
-              ตุ๊กตา (Claude){sample ? '' : ' · open on claude.ai'}
-            </option>
-            <option value="online" disabled={!hasDb}>
-              Online 1v1{hasDb ? '' : ' · open on claude.ai'}
-            </option>
-          </select>
-        </label>
-        {(['p1', 'p2'] as const).filter((side) => side === 'p1' || foe !== 'online').map((side) => (
-          <label key={side}>
-            {side === 'p1' ? 'Your Champion' : `${foe === 'tuktah' ? 'ตุ๊กตา' : 'AI'}'s Champion`}
-            <select
-              value={picks[side]}
-              onChange={(e) => {
-                setPicks({ ...picks, [side]: e.target.value })
-                setStylePick({ ...stylePick, [side]: null })
-              }}
-            >
-              {data.champions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.id}) · HP {c.hp_start}/{c.hp_max} · {deckOf(c.id).filter((d) => !d.styleOnly || d.styleOnly.startsWith('!')).length} ใบ
-                  {missingOf(c.id) ? ` · ⚠ ${missingOf(c.id)} effect ยังไม่ทำงาน` : ''}
-                </option>
-              ))}
-            </select>
-            <select value={styleKey(side)} onChange={(e) => setStylePick({ ...stylePick, [side]: e.target.value })} title="Style (Passive)">
-              <option value="">ไม่ใช้ Style</option>
-              {stylesOf(picks[side]).map((s) => {
-                const key = `${s.champion_id}:${s.slot}`
-                return (
-                  <option key={key} value={key} disabled={!STYLES[key]}>
-                    Style: {s.name}
-                    {STYLES[key] ? '' : ' (ยังไม่ทำงาน)'}
-                  </option>
-                )
-              })}
-            </select>
-            {stylesOf(picks[side]).find((s) => `${s.champion_id}:${s.slot}` === styleKey(side)) && (
-              <span className="muted">{styleText[styleKey(side)]}</span>
-            )}
-          </label>
-        ))}
-        <button onClick={start}>{foe === 'online' ? 'Find a match' : 'Start'}</button>
-      </div>
+      <ChampionSelect
+        champions={data.champions}
+        stylesOf={stylesOf}
+        styleText={styleText}
+        fill={fill}
+        picks={picks}
+        setChamp={(side, id) => {
+          setPicks({ ...picks, [side]: id })
+          setStylePick({ ...stylePick, [side]: null })
+        }}
+        styleKey={styleKey}
+        setStyle={(side, key) => setStylePick({ ...stylePick, [side]: key })}
+        foe={foe}
+        setFoe={setFoe}
+        canTuktah={!!sample}
+        canOnline={hasDb}
+        deckSize={(id) => deckOf(id).filter((d) => !d.styleOnly || d.styleOnly.startsWith('!')).length}
+        missing={missingOf}
+        onStart={start}
+        onTutorial={() => setTutorial(true)}
+      />
     )
   }
 
@@ -161,26 +161,37 @@ export function Battle({ data }: { data: BattleData }) {
     return key ? (STYLES[key]?.name ?? key) : ''
   }
 
+  const legal = legalActions(game, 'p1')
   return (
-    <Arena
-      game={game}
-      turn={turn}
-      names={{ p1: champName('p1'), p2: champName('p2') }}
-      styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
-      onAction={play}
-      foe={foe === 'tuktah' ? 'ตุ๊กตา' : 'AI'}
-      busy={thinking}
-      banner={thinking ? 'ตุ๊กตากำลังคิด…' : line || undefined}
-      bannerFades={!thinking}
-      onDone={() => {
-        if (turn) setGame(turn.next)
-        setTurn(null)
-      }}
-      onRestart={start}
-      onQuit={() => {
-        setTurn(null)
-        setGame(null)
-      }}
-    />
+    <>
+      <TurnTimer
+        key={`${match}:${game.turn}`}
+        seconds={settings.timerSec}
+        running={settings.timer && !turn && !thinking && !game.winner}
+        onTimeout={() => play(legal.includes('block') ? 'block' : legal[0])}
+      />
+      <Arena
+        game={game}
+        turn={turn}
+        names={{ p1: champName('p1'), p2: champName('p2') }}
+        styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
+        styleTexts={{ p1: styleText[game.players.p1.style ?? ''] ?? '', p2: styleText[game.players.p2.style ?? ''] ?? '' }}
+        settingsExtra={<TimerSetting />}
+        onAction={play}
+        foe={foe === 'tuktah' ? 'ตุ๊กตา' : 'AI'}
+        busy={thinking}
+        banner={thinking ? 'ตุ๊กตากำลังคิด…' : line || undefined}
+        bannerFades={!thinking}
+        onDone={() => {
+          if (turn) setGame(turn.next)
+          setTurn(null)
+        }}
+        onRestart={start}
+        onQuit={() => {
+          setTurn(null)
+          setGame(null)
+        }}
+      />
+    </>
   )
 }
