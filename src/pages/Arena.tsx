@@ -14,6 +14,7 @@ import {
   type CardInst,
   type GameState,
   type Side,
+  type Status,
   type TurnEvent,
 } from '../engine'
 import { describeSpec } from '../engine/effects/describe'
@@ -32,6 +33,8 @@ const ACTIONS: { action: Action; label: string; beats: string }[] = [
   { action: 'charge', label: 'Charge', beats: 'beats Block' },
 ]
 const SPEEDS = [1, 1.5, 2]
+/** Signature combo banner time at 1x speed (was 1.3 s, players couldn't read it) */
+const BANNER_MS = 3200
 /** Banner text per signature combo (champion · pattern). */
 /** Juggernaut: Conqueror stacks full (6) lights the fighter up. */
 const conqMax = (g: GameState, s: Side) => (g.players[s].comboData?.conqueror ?? 0) >= tuningOf(g)['BR:2'].conquerorMax
@@ -72,6 +75,8 @@ export function Arena(props: {
   turn: Turn | null
   names: Record<Side, string>
   styleNames: Record<Side, string>
+  /** full Style text, shown when a player taps the Style name */
+  styleTexts?: Record<Side, string>
   onAction: (a: Action) => void
   onDone: () => void
   /** no Play again button when absent (online matches) */
@@ -100,7 +105,7 @@ export function Arena(props: {
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(readSpeed)
   const skip = useRef(false)
-  const [sheet, setSheet] = useState<{ side: Side; card: CardInst } | 'log' | null>(null)
+  const [sheet, setSheet] = useState<{ side: Side; card: CardInst } | { tip: Tip } | 'log' | 'settings' | null>(null)
   const [glow, setGlow] = useState<Record<string, string>>({})
   const [down, setDown] = useState<Side | null>(null)
 
@@ -440,14 +445,20 @@ export function Arena(props: {
     }
     flushSync(() => setGlow(lit))
     charCombo(side)
-    anim(q('.fxl .dim'), [{ opacity: 0 }, { opacity: 1 }, { opacity: 1 }, { opacity: 0 }], 1300)
-    const b = add(`<div class="banner"><span>Signature combo · ${name}</span><b>${title}</b><span>${sub}</span></div>`)
+    anim(q('.fxl .dim'), [{ opacity: 0 }, { opacity: 1 }, { opacity: 1 }, { opacity: 0 }], BANNER_MS)
+    const b = add(`<div class="banner"><span>Signature combo · ${name}</span><b>${title}</b><span>${sub}</span><small>Tap to skip</small></div>`)
+    // long enough to read (playtest feedback); a tap ends it without skipping the rest of the turn
+    b.style.pointerEvents = 'auto'
+    b.addEventListener('click', (e) => {
+      e.stopPropagation()
+      b.getAnimations().forEach((a) => a.finish())
+    })
     await anim(b, [
       { transform: 'skewY(-4deg) translateX(-110%)' },
-      { transform: 'skewY(-4deg) translateX(0)', offset: 0.22 },
-      { transform: 'skewY(-4deg) translateX(2%)', offset: 0.78 },
+      { transform: 'skewY(-4deg) translateX(0)', offset: 0.1 },
+      { transform: 'skewY(-4deg) translateX(2%)', offset: 0.9 },
       { transform: 'skewY(-4deg) translateX(110%)' },
-    ], 1300)
+    ], BANNER_MS)
     b.remove()
     setGlow({})
   }
@@ -498,7 +509,17 @@ export function Arena(props: {
           }}
         >
           {(['p2', 'p1'] as Side[]).map((side) => (
-            <Hud key={side} game={game} side={side} hp={view[side].hp} name={names[side]} style={styleNames[side]} foe={foe} />
+            <Hud
+              key={side}
+              game={game}
+              side={side}
+              hp={view[side].hp}
+              name={names[side]}
+              style={styleNames[side]}
+              styleText={props.styleTexts?.[side]}
+              foe={foe}
+              onTip={(tip) => setSheet({ tip })}
+            />
           ))}
           {(['p2', 'p1'] as Side[]).map((side) => (
             <section key={side} className={`field ${side === 'p1' ? 'me' : 'enemy'}`} aria-label={side === 'p1' ? 'Your Field' : `${foe} Field`}>
@@ -514,6 +535,7 @@ export function Arena(props: {
                         game={game}
                         side={side}
                         glow={glow[vc.card.uid]}
+                        unpaid={!!turn?.next.players[side].unpaid?.includes(vc.card.uid)}
                         onOpen={() => !playing && setSheet({ side, card: vc.card })}
                       />
                     )}
@@ -538,14 +560,16 @@ export function Arena(props: {
                 TURN<b>{game.turn}</b>
               </div>
               <div className="tools">
-                <button type="button" className="tool" onClick={cycleSpeed} title="Animation speed">
-                  {speed}x
-                </button>
-                <button type="button" className="tool" onClick={() => !playing && setSheet('log')}>
-                  Log
-                </button>
-                <button type="button" className="tool" onClick={props.onQuit} title="Back to Champion select">
-                  ✕
+                <button
+                  type="button"
+                  className="tool"
+                  aria-label="Settings"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (!playing) setSheet('settings')
+                  }}
+                >
+                  ⚙
                 </button>
               </div>
             </div>
@@ -592,7 +616,29 @@ export function Arena(props: {
           )}
           {sheet && (
             <div className="sheet" onClick={() => setSheet(null)}>
-              {sheet === 'log' ? (
+              {sheet === 'settings' ? (
+                <div className="info settings">
+                  <b>Settings</b>
+                  <button type="button" className="big-btn" onClick={(e) => (e.stopPropagation(), cycleSpeed())}>
+                    Animation speed {speed}x
+                  </button>
+                  <button type="button" className="big-btn" onClick={(e) => (e.stopPropagation(), setSheet('log'))}>
+                    Match log
+                  </button>
+                  <button type="button" className="big-btn alt" onClick={props.onQuit}>
+                    Quit to Champion select
+                  </button>
+                  <p>Tap outside to close.</p>
+                </div>
+              ) : typeof sheet === 'object' && 'tip' in sheet ? (
+                <div className="info">
+                  <b>{sheet.tip.title}</b>
+                  {sheet.tip.body.split('\n').map((l, i) => (
+                    <p key={i}>{l}</p>
+                  ))}
+                  <p>Tap anywhere to close.</p>
+                </div>
+              ) : sheet === 'log' ? (
                 <div className="info" style={{ maxWidth: 560, width: '100%' }}>
                   <b>Match log</b>
                   <ul>
@@ -645,31 +691,73 @@ function TokenView({ side, tok, playing, locked, foe }: { side: Side; tok: Token
   )
 }
 
-function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side; hp: number; name: string; style: string; foe: string }) {
+type Tip = { title: string; body: string }
+type Chip = { label: string; tone: 'buff' | 'debuff'; tip: string }
+
+const turnsLeft = (s: Status) => (s.turns > 0 && s.turns < 50 ? `\n${s.turns} turn${s.turns === 1 ? '' : 's'} left.` : '')
+/** Status chip: label, buff (good for whoever carries it) or debuff, and the tap-to-read text. */
+function statusChip(s: Status, frozen: boolean): Chip {
+  const n = s.n ?? 1
+  const [label, tone, tip]: [string, Chip['tone'], string] =
+    s.kind === 'blockPlus' ? (n >= 0 ? [`Block +${n}`, 'buff', `Your Block stops ${n} more hit${n === 1 ? '' : 's'}.`] : [`Block −${-n}`, 'debuff', `Your Block stops ${-n} fewer hit${n === -1 ? '' : 's'}.`])
+    : s.kind === 'trueDmg' ? ['True Dmg', 'buff', 'Your hits ignore damage cuts. Only Block stops them.']
+    : s.kind === 'guardBreak' ? ['Guard Crush', 'buff', 'Your next Strike: blocked hits still deal part of their damage, and a Blocking opponent loses their 2 oldest Field cards.']
+    : s.kind === 'shield' ? [`Shield ${s.n ?? 0}`, 'buff', `Absorbs ${s.n ?? 0} damage from hits before your HP.`]
+    : s.kind === 'parry' ? [`Parry ${n}`, 'buff', `The next ${n} hit${n === 1 ? '' : 's'} that get past your Block deal 0.`]
+    : s.kind === 'subZero' ? ['❄ Sub-Zero', 'buff', 'Your next Strike: every clean hit gives the enemy 1 Chill.']
+    : s.kind === 'frozenTomb' ? ['🧊 Frozen Tomb', 'buff', "Sealed in ice: you can't Strike or Charge this turn, and you heal."]
+    : s.kind === 'noBlock' ? ['No Block', 'debuff', "You can't Block this turn."]
+    : s.kind === 'noStrike' ? (frozen ? ['🧊 Frozen', 'debuff', "Frozen: you can't Strike."] : ['No Strike', 'debuff', "You can't Strike this turn."])
+    : s.kind === 'noCharge' ? ['No Charge', 'debuff', "You can't Charge this turn."]
+    : s.kind === 'silence' ? ['Silenced', 'debuff', "Your cards' effects don't fire this turn. Styles and combos still work."]
+    : s.kind === 'skillSilence' ? ['Skill effects off', 'debuff', "Your S cards' effects don't fire this turn. They still deal damage."]
+    : s.kind === 'vulnerable' ? [`Vulnerable ${s.n ?? 0}%`, 'debuff', `You take ${s.n ?? 0}% more damage from hits.`]
+    : s.kind === 'deathMark' ? ['💀 Mark of Assassin', 'debuff', 'Every Strike against you bursts for extra damage, even through Block.']
+    : s.kind === 'ignite' ? [`🔥 Ignite ${n}`, 'debuff', `Burning (${n} stack${n === 1 ? '' : 's'}): you lose HP every turn and your healing is cut.`]
+    : s.kind === 'chill' ? [`❄ Chill ${n}`, 'debuff', `Chilled (${n} stack${n === 1 ? '' : 's'}): your damage is cut for each stack.`]
+    : [s.kind, 'debuff', s.kind]
+  return { label, tone, tip: tip + turnsLeft(s) }
+}
+
+const RESOURCE_TIP: Record<string, string> = {
+  TK: 'Tank pays for S cards with HP.',
+  BR: 'Rage fills when you hit or get hit. S cards cost Rage; without enough, the card hits weaker and its effect is off.',
+  MG: 'Mana comes from Charge, Block and clean P/K hits. S cards cost Mana; without enough, the effect is off.',
+  AS: 'Energy refills by 1 every turn. S cards cost Energy; without enough, the effect is off.',
+}
+
+function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: GameState; side: Side; hp: number; name: string; style: string; styleText?: string; foe: string; onTip: (t: Tip) => void }) {
   const p = game.players[side]
   const pct = Math.max(0, Math.min(100, (hp / p.maxHp) * 100))
   const res = game.rules.resources ? resourceOf(p.championId, game.tuning) : undefined
+  // chips and badges sit on the stage, whose click skips playback, so taps stop there
+  const tap = (t: Tip) => (e: React.MouseEvent) => (e.stopPropagation(), onTip(t))
+  const resTip = res && { title: res.payWithHp ? 'Pays with HP' : `${res.name} ${p.res ?? 0}/${res.cap}`, body: RESOURCE_TIP[p.championId] ?? res.name }
   const resView = !res ? null : res.payWithHp ? (
-    <span className="res">S = HP</span>
+    <button type="button" className="res" onClick={tap(resTip!)}>
+      S = HP
+    </button>
   ) : res.cap <= 5 ? (
-    <span className="res" title={res.name}>
+    <button type="button" className="res" aria-label={resTip!.title} onClick={tap(resTip!)}>
       {Array.from({ length: res.cap }, (_, i) => (
         <i key={i} className={`pip${i < (p.res ?? 0) ? '' : ' off'}`} />
       ))}
-    </span>
+    </button>
   ) : (
-    <span className="res">
+    <button type="button" className="res" onClick={tap(resTip!)}>
       {res.name} {p.res ?? 0}/{res.cap}
-    </span>
+    </button>
   )
-  const chips = [
+  const frozen = p.statuses.some((x) => x.kind === 'frozen')
+  const conqMaxN = tuningOf(game)['BR:2'].conquerorMax
+  const chips: Chip[] = [
     // frozen is only a marker for cards (the No Strike chip shows the freeze); Frozen Tomb's chip stands for its No Strike / No Charge
-    ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) =>
-      s.kind === 'blockPlus' ? `Block ${(s.n ?? 1) >= 0 ? '+' : '−'}${Math.abs(s.n ?? 1)}` : s.kind === 'trueDmg' ? 'True Dmg' : s.kind === 'guardBreak' ? 'Guard Crush' : s.kind === 'shield' ? `Shield ${s.n ?? 0}` : s.kind === 'noBlock' ? 'No Block' : s.kind === 'noStrike' ? (p.statuses.some((x) => x.kind === 'frozen') ? '🧊 Frozen' : 'No Strike') : s.kind === 'noCharge' ? 'No Charge' : s.kind === 'deathMark' ? '💀 Mark of Assassin' : s.kind === 'ignite' ? `🔥 Ignite ${s.n ?? 1}` : s.kind === 'chill' ? `❄ Chill ${s.n ?? 1}` : s.kind === 'skillSilence' ? 'Skill effects off' : s.kind === 'subZero' ? '❄ Sub-Zero' : s.kind === 'frozenTomb' ? '🧊 Frozen Tomb' : s.kind,
-    ),
-    ...(p.comboData?.conqueror ? [conqMax(game, side) ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/${tuningOf(game)['BR:2'].conquerorMax}`] : []),
+    ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) => statusChip(s, frozen)),
+    ...(p.comboData?.conqueror
+      ? [{ label: conqMax(game, side) ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: `Juggernaut stacks: +1 dmg per stack on every chain card. At ${conqMaxN}: Omnivamp and Tenacity for a few turns. Blocking loses a stack.` }]
+      : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
-    ...(overdriveAdd(game, side) ? [`⚡ Overdrive +${overdriveAdd(game, side)}`] : []),
+    ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: `If this side Strikes now with no S card, every chain card gets +${overdriveAdd(game, side)} dmg and all Energy is spent.` }] : []),
   ]
   const who = (
     <div className="who" key="who">
@@ -680,7 +768,14 @@ function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side
       <div className="name">
         <b>{name}</b>
         <span>
-          {side === 'p1' ? 'You' : foe} · {style || 'No Style'}
+          {side === 'p1' ? 'You' : foe} ·{' '}
+          {style && styleText ? (
+            <button type="button" className="style-link" onClick={tap({ title: style, body: styleText })}>
+              {style} ⓘ
+            </button>
+          ) : (
+            style || 'No Style'
+          )}
         </span>
       </div>
     </div>
@@ -706,9 +801,9 @@ function Hud({ game, side, hp, name, style, foe }: { game: GameState; side: Side
       </div>
       <div className="chips">
         {chips.map((c, i) => (
-          <span className="chip" key={i}>
-            {c}
-          </span>
+          <button type="button" className={`chip ${c.tone}`} key={i} onClick={tap({ title: c.label, body: c.tip })}>
+            {c.tone === 'buff' ? '▲' : '▼'} {c.label}
+          </button>
         ))}
       </div>
     </div>
@@ -761,12 +856,25 @@ function cardFacts(game: GameState, side: Side, card: CardInst) {
   const base = short != null ? Math.floor((dmg * short) / 100) : dmg
   const text = effectSpec?.length ? describeSpec(effectSpec) : effectText
   const missing = isEffectMissing(id, effectText, effectSpec)
-  return { id, type, dmg, total: base + grow, grow, short, cost, costName: res?.payWithHp ? 'HP' : (res?.name ?? ''), text, missing }
+  const costName = res?.payWithHp ? 'HP' : (res?.name ?? '')
+  // why this card's effect won't fire if it's played now (same rules as effectOf in engine/state.ts)
+  const off = !text
+    ? undefined
+    : p.statuses.some((s) => s.kind === 'silence')
+      ? 'Silenced'
+      : type === 'S' && p.statuses.some((s) => s.kind === 'skillSilence')
+        ? 'Skills off'
+        : short != null
+          ? `No ${costName}`
+          : undefined
+  return { id, type, dmg, total: base + grow, grow, short, cost, costName, text, missing, off }
 }
 
-function CardView({ vc, game, side, glow, onOpen }: { vc: VCard; game: GameState; side: Side; glow?: string; onOpen: () => void }) {
+function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: GameState; side: Side; glow?: string; unpaid?: boolean; onOpen: () => void }) {
   const f = cardFacts(game, side, vc.card)
-  const cls = `card t-${f.type}${vc.spent ? ' spent' : ''}${vc.gone ? ' gone' : ''}${glow ? ` glow-${glow}` : ''}`
+  // during playback the engine already knows which chain cards went unpaid this turn
+  const off = f.off ?? (unpaid && f.text ? `No ${f.costName}` : undefined)
+  const cls = `card t-${f.type}${vc.spent ? ' spent' : ''}${vc.gone ? ' gone' : ''}${off ? ' off' : ''}${glow ? ` glow-${glow}` : ''}`
   return (
     <button type="button" className={cls} data-uid={vc.card.uid} aria-label={`${f.id}, ${f.type}, ${f.total} damage`} onClick={(e) => (e.stopPropagation(), onOpen())}>
       <div className="top">
@@ -799,7 +907,7 @@ function CardView({ vc, game, side, glow, onOpen }: { vc: VCard; game: GameState
         <span className="mark" style={{ color: `var(--t${f.type})` }} dangerouslySetInnerHTML={{ __html: ICON[f.type] }} />
       </div>
       <div className="cid">{f.id}</div>
-      {vc.gone && <div className="tag">Discarded · {vc.gone}</div>}
+      {vc.gone ? <div className="tag">Discarded · {vc.gone}</div> : off && <div className="tag off">Off · {off}</div>}
     </button>
   )
 }
@@ -818,6 +926,7 @@ function CardSheet({ game, side, card }: { game: GameState; side: Side; card: Ca
         </span>
         <p>{f.text || 'No effect. Plain damage.'}</p>
         {f.short != null && <p>Not enough {f.costName}: hits for {f.short}% dmg, effect off, drawbacks still fire.</p>}
+        {f.off && f.short == null && <p>Effect off right now ({f.off}). The card still deals its damage.</p>}
         {f.missing && <p>⚠ This effect has no code yet; it plays as plain damage.</p>}
         <p>Tap anywhere to close.</p>
       </div>

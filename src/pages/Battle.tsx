@@ -167,6 +167,7 @@ export function Battle({ data }: { data: BattleData }) {
       turn={turn}
       names={{ p1: champName('p1'), p2: champName('p2') }}
       styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
+      styleTexts={{ p1: styleText[game.players.p1.style ?? ''] ?? '', p2: styleText[game.players.p2.style ?? ''] ?? '' }}
       onAction={play}
       foe={foe === 'tuktah' ? 'ตุ๊กตา' : 'AI'}
       busy={thinking}
