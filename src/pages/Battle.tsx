@@ -20,6 +20,12 @@ export type StyleRow = { champion_id: string; slot: number; name: string; effect
 /** config = game_config rows (rules the engine reads, see engine/tuning.ts RULE_KEYS); params = Admin tuning overrides */
 export type BattleData = { champions: Champ[]; cards: Row[]; styles?: StyleRow[]; config?: { key: string; value: unknown }[] }
 
+/** Banner when Tuktah gave no usable pick this turn (the AI picks instead). */
+const missLine = (code: string) =>
+  code === 'rate_limited' ? 'Tuktah needs a breather. The AI plays this turn.'
+  : code === 'not_granted' ? 'Claude is not allowed on this page. The AI plays this turn.'
+  : 'Tuktah missed this turn. The AI plays it.'
+
 /** The game screen. Data comes from Supabase (BattlePage) or a bundled snapshot (play.tsx). */
 export function Battle({ data }: { data: BattleData }) {
   const [picks, setPicks] = useState({ p1: 'BR', p2: 'BR' })
@@ -43,7 +49,8 @@ export function Battle({ data }: { data: BattleData }) {
   const [settings] = useGameSettings()
 
   useEffect(() => {
-    capability<Sample>('sample').then(setSample)
+    // sample is a function: wrap it, or React would call it as a state updater (and every pick would fail)
+    capability<Sample>('sample').then((s) => setSample(() => s))
     capability('db').then((d) => setHasDb(!!d))
   }, [])
 
@@ -89,8 +96,9 @@ export function Battle({ data }: { data: BattleData }) {
       setThinking(true)
       const move = await askTuktah(sample, game, 'p2', history, styleText)
       setThinking(false)
-      if (move) p2 = move.action
-      setLine(move?.line || (move ? '' : 'ตุ๊กตาหลุดไปแป๊บ ให้ AI เล่นแทนเทิร์นนี้นะคะ'))
+      if ('action' in move) p2 = move.action
+      else console.warn('Tuktah pick failed:', move.miss)
+      setLine(move.line || ('action' in move ? '' : missLine(move.miss)))
     }
     const actions = { p1: action, p2 }
     setHistory((h) => [...h, { mine: p2, theirs: action }])
@@ -178,9 +186,9 @@ export function Battle({ data }: { data: BattleData }) {
         styleTexts={{ p1: styleText[game.players.p1.style ?? ''] ?? '', p2: styleText[game.players.p2.style ?? ''] ?? '' }}
         settingsExtra={<TimerSetting />}
         onAction={play}
-        foe={foe === 'tuktah' ? 'ตุ๊กตา' : 'AI'}
+        foe={foe === 'tuktah' ? 'Tuktah' : 'AI'}
         busy={thinking}
-        banner={thinking ? 'ตุ๊กตากำลังคิด…' : line || undefined}
+        banner={thinking ? 'Tuktah is thinking…' : line || undefined}
         bannerFades={!thinking}
         onDone={() => {
           if (turn) setGame(turn.next)

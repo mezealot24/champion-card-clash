@@ -895,7 +895,7 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
       </div>
       <span className="dmg">{f.total}</span>
       {f.short != null ? <span className="mod down">{f.short}%</span> : f.grow ? <span className={`mod${f.grow < 0 ? ' down' : ''}`}>{f.grow > 0 ? `+${f.grow}` : f.grow}</span> : null}
-      {vc.card.owner && <span className="mod down" style={{ top: 'auto', bottom: 16 }}>stolen</span>}
+      {vc.card.owner && <span className="mod down" style={{ bottom: 17 }}>stolen</span>}
       <div className="fx">
         {f.missing && <span className="rule">⚠ no code yet</span>}
         {vc.card.def.effectSpec?.length ? (
