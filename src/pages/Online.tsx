@@ -238,7 +238,7 @@ function Match({ db, uid, code, setupOf, gameOpts, champName, styleName, onQuit 
       turn={turn}
       names={{ p1: champName(meSeat.champ), p2: champName(foeSeat.champ) }}
       styleNames={{ p1: styleName(meSeat.style), p2: styleName(foeSeat.style) }}
-      foe={foeSeat.uid === 'tuktah' ? 'ตุ๊กตา' : 'Rival'}
+      foe={foeSeat.uid === 'tuktah' ? 'Tuktah' : 'Rival'}
       busy={!!mine}
       banner={waiting ? (theirs ? 'Revealing…' : 'Waiting for opponent…') : undefined}
       onAction={pick}

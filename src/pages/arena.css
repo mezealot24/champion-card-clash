@@ -68,7 +68,8 @@
 /* damage lives in the top-right corner badge; the rest of the card is effect text */
 .arena .card .dmg { position: absolute; right: -3px; top: -3px; width: 36px; height: 34px; display: grid; place-items: center; background: var(--paper); border: 3px solid var(--ink); border-radius: 0 12px 0 12px; font: 21px var(--display); line-height: 1; -webkit-text-stroke: 2.5px var(--ink); paint-order: stroke fill; z-index: 1; }
 .arena .t-P .dmg { color: var(--tP); } .arena .t-K .dmg { color: var(--tK); } .arena .t-S .dmg { color: var(--tS); }
-.arena .card .mod { position: absolute; right: 2px; top: 33px; font: 800 8.5px var(--body); background: var(--hp); color: var(--ink); border: 2px solid var(--ink); border-radius: 6px; padding: 0 3px; z-index: 1; }
+/* on the card-id row, so it never covers the effect text */
+.arena .card .mod { position: absolute; right: 2px; bottom: 2px; font: 800 8.5px var(--body); background: var(--hp); color: var(--ink); border: 2px solid var(--ink); border-radius: 6px; padding: 0 3px; z-index: 1; }
 .arena .card .mod.down { background: var(--danger); color: #fff; }
 .arena .card .fx { flex: 1; min-height: 0; position: relative; font-size: 9.5px; line-height: 1.2; padding: 4px 5px 2px; font-weight: 700; overflow: hidden; display: flex; flex-direction: column; gap: 3px; }
 .arena .card .fx .rule { display: block; }
@@ -166,7 +167,7 @@
 .arena .sheet .big .card .dmg { width: 52px; height: 48px; font-size: 30px; }
 .arena .sheet .big .card .fx { font-size: 12.5px; padding: 6px 8px; overflow-y: auto; }
 .arena .sheet .big .card .top { height: 34px; padding-right: 52px; } .arena .sheet .big .card .type { width: 26px; height: 26px; font-size: 16px; } .arena .sheet .big .card .cid { font-size: 10px; }
-.arena .sheet .big .card .mod { top: 46px; }
+.arena .sheet .big .card .mod { bottom: 4px; }
 .arena .sheet .info { max-width: 330px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text); }
 .arena .sheet .info b { font: 22px var(--display); font-weight: 400; }
 .arena .sheet .info p { color: var(--muted); font-size: 12.5px; margin: 0; line-height: 1.45; }

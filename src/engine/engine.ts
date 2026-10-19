@@ -75,8 +75,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (!SURGE_MODES.includes(mode)) continue
     surge[side] = p.res ?? 0
     p.res = 0
-    const what = mode === 'A' ? 'Wraith Step (hit ที่ทะลุ Block โดนแค่ 1)' : mode === 'B' ? 'Shroud (ไม่โดน charge break, dmg ครึ่งเดียว)' : 'Elusive (Block ศัตรูกันน้อยลง 1)'
-    log(state, `${side} Energy Surge: ใช้ Energy ${surge[side]} ทั้งหมด → ${what}`)
+    const what = mode === 'A' ? 'Wraith Step (hits through Block deal only 1)' : mode === 'B' ? 'Shroud (no charge break, half dmg)' : 'Elusive (enemy Block stops 1 less)'
+    log(state, `${side} Energy Surge: spends all ${surge[side]} Energy → ${what}`)
   }
   const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
   const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, shieldHits, vulnPct, chillPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 } }
@@ -138,7 +138,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
         const lost = p.hand.splice(safe, 1)[0]
         markDiscarded(state, side, [{ card: lost, slot: safe + 1, reason: 'Charge break' }])
         toDeckBottom(state, side, [lost])
-        log(state, `${side} เสีย ${lost.def.id} (โดนตีขณะ Charge) → ลงใต้กอง จั่วใบใหม่ต่อท้าย`)
+        log(state, `${side} loses ${lost.def.id} (hit while Charging) → deck bottom, draws a new card`)
         drawCards(state, side, 1)
       } else if (p.hand.length === 0) {
         // empty Field: nothing to lose, the Charge still draws 1 (Q 2026-10-17)
@@ -159,7 +159,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
         p.hand = []
       }
       state.blockStreak = 0
-      log(state, `Block ชน Block ${state.rules.blockStreakDiscard} ครั้ง: ทิ้งทั้งมือ`)
+      log(state, `Block vs Block ${state.rules.blockStreakDiscard} times: both Fields discarded`)
     }
   } else {
     state.blockStreak = 0
@@ -180,7 +180,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       if (ds.fillRes && state.rules.resources) addRes(state, side, cap)
       const draw = ds.draw?.(tuningOf(state)) ?? 0
       const n = draw ? drawCards(state, side, draw) : 0
-      log(state, `${side} Acceleration (Dual Strike): ${ds.fillRes ? 'Energy เต็ม, ' : ''}จั่ว ${n}`)
+      log(state, `${side} Acceleration (Dual Strike): ${ds.fillRes ? 'Energy full, ' : ''}draws ${n}`)
     }
   }
   for (const side of SIDES) getStyle(state.players[side].style)?.endTurn?.(state, side, actions[side])
@@ -189,7 +189,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     const burn = igniteBurn(state.players[side], tuningOf(state))
     if (!burn) continue
     loseHp(state, side, burn)
-    log(state, `${side} 🔥 Ignite ${igniteStacks(state.players[side])} stack ไหม้ ${burn}`)
+    log(state, `${side} 🔥 Ignite ${igniteStacks(state.players[side])} stacks burn ${burn}`)
   }
   for (const side of SIDES) {
     const p = state.players[side]
@@ -354,11 +354,11 @@ function resolveStrikes(
       emit(state, { k: 'hit', side, slot: i, uid: card.uid, type: card.def.type, dmg, dealt, blocked, parried, absorbed, crit: crit[side].has(i) })
       if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
       const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
-      const guard = parried ? ` (${enemy} Parry ปัด ${dmg})` : absorbed ? ` (Shield กัน ${absorbed})` : ''
-      log(state, `${side} ช่อง ${i + 1} ${card.def.id} ${blocked ? `โดน Block${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} ทะลุ ${dealt})` : ''}${critTag}` : `ตี ${dmg}${critTag}${guard}`}`)
+      const guard = parried ? ` (${enemy} Parries ${dmg})` : absorbed ? ` (Shield absorbs ${absorbed})` : ''
+      log(state, `${side} slot ${i + 1} ${card.def.id} ${blocked ? `Blocked${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} through ${dealt})` : ''}${critTag}` : `hits ${dmg}${critTag}${guard}`}`)
       const ls = Math.floor((dealt * lifestealPct(state, side)) / 100)
       if (ls > 0 && heal(state, side, ls) > 0) {
-        log(state, `${side} Omnivamp ฮีล ${ls}`)
+        log(state, `${side} Omnivamp heals ${ls}`)
       }
       // clean = some dmg got through Block, Parry and Shield (GDD)
       const clean = !blocked && dealt > 0
@@ -381,7 +381,7 @@ function resolveStrikes(
     if (burst <= 0) continue
     loseHp(state, other(side), burst)
     hitDmgTaken[other(side)] += burst
-    log(state, `${side} 💀 Mark of Assassin ระเบิด ${burst} (${t.AS.markBurstPct}% ของ dmg รวม ${total} ในสาย)`)
+    log(state, `${side} 💀 Mark of Assassin bursts ${burst} (${t.AS.markBurstPct}% of chain total ${total})`)
   }
 
   // Guard Crush is used up by this Strike: if the opponent Blocked it, they lose their 2 oldest Field cards.
@@ -395,7 +395,7 @@ function resolveStrikes(
         const lost = state.players[enemy].hand.splice(0, t.BR.guardCrushDiscard)
         markDiscarded(state, enemy, lost.map((card, i) => ({ card, slot: i + 1, reason: 'Guard Crush' })))
         toDeckBottom(state, enemy, lost)
-        if (lost.length) log(state, `${side} Guard Crush: ${enemy} ทิ้ง ${lost.map((c) => c.def.id).join(', ')}`)
+        if (lost.length) log(state, `${side} Guard Crush: ${enemy} discards ${lost.map((c) => c.def.id).join(', ')}`)
       }
     }
     checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })), 'after')

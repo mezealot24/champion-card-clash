@@ -39,7 +39,7 @@ export function ChampionSelect(props: {
   const myStyle = props.styleKey('p1')
   const [full, setFull] = useState<string | null>(null)
   const newPlayer = !tutorialDone()
-  const foeName = foe === 'tuktah' ? 'ตุ๊กตา' : 'AI'
+  const foeName = foe === 'tuktah' ? 'Tuktah' : 'AI'
 
   return (
     <div className="select" style={{ '--tint': champColor(me) } as React.CSSProperties}>
@@ -160,7 +160,7 @@ export function ChampionSelect(props: {
             <select value={foe} onChange={(e) => props.setFoe(e.target.value as FoeKind)}>
               <option value="ai">AI</option>
               <option value="tuktah" disabled={!props.canTuktah}>
-                ตุ๊กตา (Claude){props.canTuktah ? '' : ' · open on claude.ai'}
+                Tuktah (Claude){props.canTuktah ? '' : ' · open on claude.ai'}
               </option>
               <option value="online" disabled={!props.canOnline}>
                 Online 1v1{props.canOnline ? '' : ' · open on claude.ai'}

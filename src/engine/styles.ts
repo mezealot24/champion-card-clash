@@ -33,7 +33,7 @@ export function addChill(state: GameState, side: Side, n: number): number {
     const lost = Math.floor((p.maxHp * t.shatterPct) / 100)
     p.hp = Math.max(0, p.hp - lost)
     STYLES[p.style ?? '']?.onHpLoss?.(state, side)
-    freeze(state, side, `Chill ครบ ${t.chillMax}, Shatter เสีย ${lost} HP`)
+    freeze(state, side, `${t.chillMax} Chill, Shatter takes ${lost} HP`)
     return 0
   }
   p.statuses.push({ kind: 'chill', turns: t.chillTurns, n: stacks })
@@ -146,7 +146,7 @@ export const STYLES: Record<string, StyleDef> = {
       p.hp = Math.min(p.maxHp, p.hp + n)
       if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
       p.styleData = { ...p.styleData, below: 1 }
-      say(state, side, `Second Wind: ฮีล ${n} (${f.healPctPerHit}% ของ HP ที่หายไป x ${r.hitsTaken} hit)`)
+      say(state, side, `Second Wind: heal ${n} (${f.healPctPerHit}% of missing HP x ${r.hitsTaken} hits)`)
     },
     endTurn: (state, side) => {
       const p = state.players[side]
@@ -155,7 +155,7 @@ export const STYLES: Record<string, StyleDef> = {
       if (pctHp(p) < line) p.styleData = { ...p.styleData, below: 1 }
       else if (p.styleData?.below) {
         p.styleData = { ...p.styleData, spent: 1 }
-        say(state, side, `Second Wind: HP กลับมาหลอดเขียว (${line}%+) ปิดถาวร`)
+        say(state, side, `Second Wind: HP back above ${line}%, off for good`)
       }
     },
   },
@@ -182,7 +182,7 @@ export const STYLES: Record<string, StyleDef> = {
       const n = overgrowthDmg(state.players[side], tuningOf(state))
       if (!n) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += n
-      say(state, side, `Overgrowth: ทุกใบ +${n} dmg`)
+      say(state, side, `Overgrowth: all cards +${n} dmg`)
     },
   },
 }
@@ -196,7 +196,7 @@ Object.assign(STYLES, {
       const f = tuningOf(state)['BR:1']
       if (pctHp(state.players[side]) >= f.hpPct) return
       for (let i = 0; i < Math.min(f.slots, bonus.length); i++) bonus[i] += f.bonusDmg
-      say(state, side, `Fury: ช่อง 1–${f.slots} +${f.bonusDmg} dmg`)
+      say(state, side, `Fury: slots 1–${f.slots} +${f.bonusDmg} dmg`)
     },
   },
   /**
@@ -218,7 +218,7 @@ Object.assign(STYLES, {
       say(state, side, `Juggernaut: Conqueror ${n}/${max}${n === max ? ' (Omnivamp)' : ''}`)
       if (n === max) {
         p.styleData = { ...p.styleData, tenacityFrom: state.turn }
-        say(state, side, `Juggernaut: Tenacity ${f.tenacityTurns} เทิร์น (ช่อง 1 ไม่โดนทิ้งจาก charge break)`)
+        say(state, side, `Juggernaut: Tenacity ${f.tenacityTurns} turns (slot 1 safe from charge break)`)
       }
     },
     chargeBreakSafe: (state, side) => {
@@ -257,7 +257,7 @@ Object.assign(STYLES, {
       if (!add) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += add
       p.res = 0
-      say(state, side, `Sonic Bliz Overdrive: ใช้ Energy ${energy} ทั้งหมด → ทุกใบในสาย +${add} dmg`)
+      say(state, side, `Sonic Bliz Overdrive: spends all ${energy} Energy → every chain card +${add} dmg`)
     },
     // Acceleration (Q 2026-10-16, replaces Extra Hits): Strike meets Strike → Energy full + draw 2 at the end of the turn
     dualStrike: { draw: (t) => t['AS:1'].dualDraw, fillRes: true },
@@ -277,7 +277,7 @@ Object.assign(STYLES, {
         if ((before + i + 1) % f.every === 0) {
           mult[i] *= x
           crit.add(i)
-          say(state, side, `Coup de grâce Critical: ช่อง ${i + 1} (ตีครั้งที่ ${before + i + 1}) dmg x${x}`)
+          say(state, side, `Coup de grâce Critical: slot ${i + 1} (attack #${before + i + 1}) dmg x${x}`)
         }
       })
       p.styleData = { ...p.styleData, attacks: before + mult.length }
@@ -297,7 +297,7 @@ Object.assign(STYLES, {
     afterChain: (state, side, r) => {
       if (!r.paidSkillClean) return 0
       const n = addIgnite(state, other(side), r.paidSkillClean)
-      say(state, side, `Touch of Flame: Skill ที่จ่ายแล้วเข้า ${r.paidSkillClean} ใบ → ศัตรูติด 🔥 Ignite (${n} stack)`)
+      say(state, side, `Touch of Flame: ${r.paidSkillClean} paid Skill hits → enemy gets 🔥 Ignite (${n} stacks)`)
       return 0
     },
     actionStart: (state, side, action) => {
@@ -310,13 +310,13 @@ Object.assign(STYLES, {
       // turns 1: an old-shield tick at the end of this turn removes it
       p.statuses.push({ kind: 'shield', turns: 1, n: spent * f.moltenShieldPerMana })
       p.styleData = { ...p.styleData, molten: 1 }
-      say(state, side, `Molten Shield: ใช้ Mana ${spent} → Shield ${spent * f.moltenShieldPerMana} เทิร์นนี้ + hit ที่ Block ได้จุด Ignite`)
+      say(state, side, `Molten Shield: spends ${spent} Mana → Shield ${spent * f.moltenShieldPerMana} this turn, blocked hits Ignite`)
     },
     afterHits: (state, side, r) => {
       const p = state.players[side]
       if (!p.styleData?.molten || !r.hitsBlocked) return
       const n = addIgnite(state, other(side), r.hitsBlocked)
-      say(state, side, `Molten Shield: Block ได้ ${r.hitsBlocked} hit → ศัตรูติด 🔥 Ignite (${n} stack)`)
+      say(state, side, `Molten Shield: blocked ${r.hitsBlocked} hits → enemy gets 🔥 Ignite (${n} stacks)`)
     },
     endTurn: (state, side) => {
       const p = state.players[side]
@@ -349,20 +349,20 @@ Object.assign(STYLES, {
       const p = state.players[side]
       if (p.styleData?.subZero && r.cleanHits) {
         const n = addChill(state, other(side), r.cleanHits)
-        say(state, side, `Arcane Sub-Zero: เข้า clean ${r.cleanHits} hit → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+        say(state, side, `Arcane Sub-Zero: ${r.cleanHits} clean hits → enemy gets ❄ Chill${n ? ` (${n} stacks)` : ''}`)
       }
       const cost = tuningOf(state)['MG:2'].deepFreezeMana
       if (r.skills && state.rules.resources && (p.res ?? 0) >= cost) {
         p.res = (p.res ?? 0) - cost
         const n = addChill(state, other(side), 1)
-        say(state, side, `Deep Freeze: ใช้ Mana ${cost} → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+        say(state, side, `Deep Freeze: spends ${cost} Mana → enemy gets ❄ Chill${n ? ` (${n} stacks)` : ''}`)
       }
       return 0
     },
     afterHits: (state, side, r) => {
       if (!r.shieldHits) return
       const n = addChill(state, other(side), r.shieldHits)
-      say(state, side, `Frost Armor: Shield รับ ${r.shieldHits} hit → ศัตรูติด ❄ Chill${n ? ` (${n} stack)` : ''}`)
+      say(state, side, `Frost Armor: Shield took ${r.shieldHits} hits → enemy gets ❄ Chill${n ? ` (${n} stacks)` : ''}`)
     },
     onHpLoss: (state, side) => {
       const p = state.players[side]
@@ -381,7 +381,7 @@ Object.assign(STYLES, {
       if (f.frostArmorShield > 0) p.statuses.push({ kind: 'shield', turns: 9999, n: f.frostArmorShield })
       // read by next turn's legal actions, gone after it (statuses tick at the start of a turn)
       p.statuses.push({ kind: 'noStrike', turns: 1 }, { kind: 'noCharge', turns: 1 }, { kind: 'frozenTomb', turns: 1 })
-      say(state, side, `🧊 Frozen Tomb${saved ? ' (กันตาย เหลือ 1 HP)' : ''}: Frost Armor Shield ${f.frostArmorShield} กลับมา เทิร์นหน้า Block ได้อย่างเดียว`)
+      say(state, side, `🧊 Frozen Tomb${saved ? ' (survives at 1 HP)' : ''}: Frost Armor Shield ${f.frostArmorShield} is back, Block only next turn`)
     },
     endTurn: (state, side) => {
       const p = state.players[side]
@@ -393,12 +393,12 @@ Object.assign(STYLES, {
         const mana = state.rules.resources ? (p.res ?? 0) : 0
         if (state.rules.resources) p.res = 0
         const got = heal(state, side, f.tombHeal + f.tombHealPerMana * mana)
-        say(state, side, `🧊 Frozen Tomb: ใช้ Mana ${mana} ฟื้น ${got} HP`)
+        say(state, side, `🧊 Frozen Tomb: spends ${mana} Mana, heals ${got} HP`)
       } else if (state.turn === at + 2) {
         const left = p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
         p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
         const got = heal(state, side, Math.floor((left * f.tombMeltPct) / 100))
-        say(state, side, `🧊 Frozen Tomb ละลาย: Shield ที่เหลือ ${left} → ฟื้น ${got} HP`)
+        say(state, side, `🧊 Frozen Tomb melts: ${left} Shield left → heals ${got} HP`)
       }
     },
   },

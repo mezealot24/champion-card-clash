@@ -109,7 +109,7 @@ export function drawCards(state: GameState, side: Side, n: number): number {
       const keep = Math.min(p.deck.length, state.rules.handMax)
       p.deck = [...shuffle(state, p.deck.slice(0, p.deck.length - keep)), ...p.deck.slice(p.deck.length - keep)]
       p.drawsSinceShuffle = 0
-      log(state, `${side} จั่วครบ deck แล้ว: สับ deck ใหม่`)
+      log(state, `${side} drew the whole deck: deck reshuffled`)
     }
     effectOf(state, side, card)?.onDraw?.({ state, self: side, enemy: side === 'p1' ? 'p2' : 'p1', card, pending: null })
   }
