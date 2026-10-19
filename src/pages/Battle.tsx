@@ -5,6 +5,7 @@ import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
 import { Online } from './Online'
+import { styleSummary } from './learnText'
 
 /** Who you play against: the built-in AI, Claude as ตุ๊กตา (Artifact `sample`), or a person online (Artifact `db`). */
 type Foe = 'ai' | 'tuktah' | 'online'
@@ -32,6 +33,8 @@ export function Battle({ data }: { data: BattleData }) {
   const [thinking, setThinking] = useState(false)
   const [line, setLine] = useState('')
   const [history, setHistory] = useState<{ mine: Action; theirs: Action }[]>([])
+  // full Style text shown under the one-line summary
+  const [styleMore, setStyleMore] = useState<Record<Side, boolean>>({ p1: false, p2: false })
 
   useEffect(() => {
     capability<Sample>('sample').then(setSample)
@@ -146,7 +149,15 @@ export function Battle({ data }: { data: BattleData }) {
               })}
             </select>
             {stylesOf(picks[side]).find((s) => `${s.champion_id}:${s.slot}` === styleKey(side)) && (
-              <span className="muted">{styleText[styleKey(side)]}</span>
+              <span className="muted">
+                {styleSummary(styleKey(side), tuning) || styleText[styleKey(side)]}{' '}
+                {styleSummary(styleKey(side), tuning) && (
+                  <button type="button" className="link" onClick={(e) => (e.preventDefault(), setStyleMore({ ...styleMore, [side]: !styleMore[side] }))}>
+                    {styleMore[side] ? 'Less' : 'More'}
+                  </button>
+                )}
+                {styleMore[side] && styleSummary(styleKey(side), tuning) && <span style={{ display: 'block' }}>{styleText[styleKey(side)]}</span>}
+              </span>
             )}
           </label>
         ))}
