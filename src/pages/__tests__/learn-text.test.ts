@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { fillText, resolveTuning } from '../../engine/tuning'
 import type { EffectSpec } from '../../engine/effects/spec'
-import { comboInfo, comboSteps, compactRules } from '../learnText'
+import { comboInfo, comboSteps, compactRules, shortAct, shortCond } from '../learnText'
 import { STYLE_SUMMARY } from '../select/info'
 
 describe('compact card text', () => {
@@ -49,5 +49,14 @@ describe('Style one-liners', () => {
     expect(line('BR:1')).toBe('Below 50% HP, your first 2 chain cards deal +12.')
     expect(line('AS:2')).toContain('Every 4th attack')
     for (const key of ['TK:1', 'TK:2', 'BR:1', 'BR:2', 'AS:1', 'AS:2', 'MG:1', 'MG:2']) expect(line(key)).not.toMatch(/\{/)
+    expect(line('MG:1')).toContain('⟡ Infuses 1 Ignite')
+  })
+})
+
+describe('⟡ Infuse short forms', () => {
+  it('reads the new action and conditions in a few words', () => {
+    expect(shortAct({ a: 'infuse', who: 'enemy', n: 2 })).toBe('⟡ Infuse 2')
+    expect(shortCond({ c: 'fieldAll', who: 'self', type: 'S' })).toBe('Field all S')
+    expect(shortCond({ c: 'handCompare', op: '<=' })).toBe('No more cards than foe')
   })
 })

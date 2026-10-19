@@ -31,6 +31,7 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   prevIs: { c: 'prevIs', type: 'P' },
   facingIs: { c: 'facingIs', type: 'K' },
   fieldHas: { c: 'fieldHas', who: 'enemy', type: 'K', n: 2 },
+  fieldAll: { c: 'fieldAll', who: 'self', type: 'S' },
   ignite: { c: 'ignite', who: 'enemy', op: '>=', n: 1 },
   chill: { c: 'chill', who: 'enemy', op: '>=', n: 1 },
 }
@@ -59,6 +60,7 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   prevIs: 'Card before this one is…',
   facingIs: 'Facing card is…',
   fieldHas: 'You / opponent has N+ Punch / Kick / Skill on the Field',
+  fieldAll: 'Your / opponent\'s Field is all Punch / Kick / Skill',
   ignite: 'You / opponent Ignite stacks ≥ / < N',
   chill: 'You / opponent Chill stacks ≥ / < N',
 }
@@ -79,11 +81,13 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
   ignite: { a: 'ignite', who: 'enemy', n: 1 },
   chill: { a: 'chill', who: 'enemy', n: 1 },
   consumeIgnite: { a: 'consumeIgnite', who: 'enemy' },
+  infuse: { a: 'infuse', who: 'enemy', n: 1 },
 }
 const ACT_LABEL: Record<string, string> = {
   draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', mulDmg: 'Dmg × % (this chain)', grow: 'Gain dmg (later attacks)', blockNow: 'Block ±N hits (this turn)',
   pierce: 'Pierce: ignore Block (Before action)', steal: "Steal opponent's card in this slot", cut: 'Cut: opponent discards Field cards', gainRes: 'Gain resource',
   ignite: 'Ignite (0 = reset timer)', consumeIgnite: 'Clear / explode Ignite', chill: 'Chill (4 = Frozen)',
+  infuse: '⟡ Infuse (Mage Style element: Ignite / Chill)',
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -170,8 +174,8 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
       </select>
       {'n' in value && value.c !== 'hp' && <Num value={value.n} onChange={(n) => onChange({ ...value, n })} />}
       {value.c === 'handCompare' && (
-        <select value={value.op} onChange={(e) => onChange({ ...value, op: e.target.value as '<' | '=' | '>' })}>
-          <option value="<">fewer</option><option value="=">equal</option><option value=">">more</option>
+        <select value={value.op} onChange={(e) => onChange({ ...value, op: e.target.value as '<' | '<=' | '=' | '>' })}>
+          <option value="<">fewer</option><option value="<=">not more (≤)</option><option value="=">equal</option><option value=">">more</option>
         </select>
       )}
       {value.c === 'chainLength' && (
@@ -241,12 +245,12 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
           <input type="checkbox" checked={!!value.pct} onChange={(e) => onChange({ ...value, pct: e.target.checked || undefined })} /> % of Max HP
         </label>
       )}
-      {(value.c === 'chainHas' || value.c === 'fieldHas') && (
+      {(value.c === 'chainHas' || value.c === 'fieldHas' || value.c === 'fieldAll') && (
         <select value={value.who} onChange={(e) => onChange({ ...value, who: e.target.value as 'self' | 'enemy' })}>
           <option value="self">you</option><option value="enemy">opponent</option>
         </select>
       )}
-      {(value.c === 'chainAll' || value.c === 'chainHas' || value.c === 'prevIs' || value.c === 'facingIs' || value.c === 'fieldHas') && (
+      {(value.c === 'chainAll' || value.c === 'chainHas' || value.c === 'prevIs' || value.c === 'facingIs' || value.c === 'fieldHas' || value.c === 'fieldAll') && (
         <TypeSelect value={value.type} onChange={(type) => onChange({ ...value, type: type! })} />
       )}
     </>

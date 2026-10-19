@@ -90,6 +90,7 @@ export const TUNING_FIELDS = {
     { key: 'perChargeBlock', label: 'Mana per Charge / Block', def: 1, min: 0 },
     { key: 'perCleanPK', label: 'Mana per clean P/K hit', def: 1, min: 0 },
     { key: 'comboNoBlockTurns', label: 'S+S+S: enemy no-Block turns', def: 1, min: 0 },
+    { key: 'infusePerS', label: 'Infuse stacks per paid Skill', def: 1, min: 0, help: 'Pyromancer: Ignite · Cryomancer: Chill, hit clean or Blocked' },
   ],
   'MG:1': [
     { key: 'igniteMax', label: 'Ignite max stacks', def: 4, min: 1 },
@@ -107,7 +108,6 @@ export const TUNING_FIELDS = {
     { key: 'chillDmgCut', label: 'Dmg cut % per Chill', def: 10, min: 0, max: 100 },
     { key: 'shatterPct', label: 'Shatter % Max HP', def: 15, min: 0, max: 100 },
     { key: 'frostArmorShield', label: 'Frost Armor Shield', def: 40, min: 0 },
-    { key: 'deepFreezeMana', label: 'Deep Freeze Mana cost', def: 1, min: 0 },
     { key: 'tombHpPct', label: 'Frozen Tomb HP line %', def: 30, min: 0, max: 100 },
     { key: 'tombHeal', label: 'Frozen Tomb heal', def: 10, min: 0 },
     { key: 'tombHealPerMana', label: 'Frozen Tomb heal per Mana', def: 5, min: 0 },
