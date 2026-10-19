@@ -79,7 +79,7 @@ export type ChainReport = {
   chainLength: number
   cleanHits: number
   enemyField: number // cards on the opponent's Field when actions were revealed
-  paidSkillClean: number // Skill cards in the chain whose cost was paid and that hit clean
+  paidSkills: number // Skill cards in the chain whose cost was paid, hit clean or Blocked (⟡ Infuse)
   skills: number // Skill cards in the chain
 }
 
@@ -113,6 +113,8 @@ export type StyleDef = {
   endTurn?: (state: GameState, side: Side, action: Action) => void
   /** right after this side lost HP from anything (hits, effects, burns); may change p.hp (e.g. Frozen Tomb keeps 1 HP) */
   onHpLoss?: (state: GameState, side: Side) => void
+  /** ⟡ Infuse: give targetSide n stacks of this Style's element (Pyromancer Ignite, Cryomancer Chill). Returns the stacks it has now. */
+  infuse?: (state: GameState, targetSide: Side, n: number) => number
 }
 
 const say = (state: GameState, side: Side, line: string) => state.log.push(`T${state.turn} ${side} ${line}`)
@@ -126,6 +128,18 @@ const heal = (state: GameState, side: Side, n: number) => {
   if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
   return p.hp - before
 }
+/**
+ * ⟡ Infuse (Mage, Q 2026-10-19): after the chain, every paid Skill card in it, hit clean or Blocked,
+ * gives the enemy MG.infusePerS stacks of the Style's element (its infuse hook). Unpaid S cards give none.
+ */
+function infuseChain(state: GameState, side: Side, r: ChainReport, element: string) {
+  const n = r.paidSkills * tuningOf(state).MG.infusePerS
+  const infuse = STYLES[state.players[side].style ?? '']?.infuse
+  if (n <= 0 || !infuse) return
+  const k = infuse(state, other(side), n)
+  say(state, side, `⟡ Infuse: ${r.paidSkills} paid Skill card${r.paidSkills === 1 ? '' : 's'} → enemy gets ${element}${k ? ` (${k} stacks)` : ''}`)
+}
+
 /** Overgrowth: +1 dmg per hpPerDmg (20) Max HP grown */
 export const overgrowthDmg = (p: PlayerState, t: Tuning) => Math.floor((p.styleData?.grown ?? 0) / t['TK:2'].hpPerDmg)
 
@@ -288,16 +302,16 @@ Object.assign(STYLES, {
 Object.assign(STYLES, {
   /**
    * Mage · Pyromancer (Q 2026-10-17, replaces Mana Flow; reworked the same day so it costs no extra Mana).
-   * Touch of Flame: every Skill card you paid for that hits clean gives the opponent 1 Ignite (after your chain).
+   * ⟡ Infuse (Q 2026-10-19, replaces Touch of Flame): every Skill card you paid for, hit clean or Blocked,
+   * gives the opponent 1 Ignite (MG.infusePerS) after your chain.
    * Molten Shield (first version, Q asked it back): a Block with Mana spends up to 3 of it for Shield 5 per Mana
    * this turn, and each hit that Block stops gives the attacker 1 Ignite. No Mana, no Molten Shield.
    */
   'MG:1': {
     name: 'Pyromancer',
+    infuse: addIgnite,
     afterChain: (state, side, r) => {
-      if (!r.paidSkillClean) return 0
-      const n = addIgnite(state, other(side), r.paidSkillClean)
-      say(state, side, `Touch of Flame: ${r.paidSkillClean} paid Skill hits → enemy gets 🔥 Ignite (${n} stacks)`)
+      infuseChain(state, side, r, '🔥 Ignite')
       return 0
     },
     actionStart: (state, side, action) => {
@@ -326,7 +340,8 @@ Object.assign(STYLES, {
   /**
    * Mage · Cryomancer (Q 2026-10-18, from a Gemini draft; replaces Frostbinder).
    * Frost Armor: start the game with Shield 40; every hit a Shield soaks gives the attacker 1 Chill.
-   * Deep Freeze: a Strike with any Skill card in it spends 1 more Mana (after the chain) to give the opponent 1 Chill.
+   * ⟡ Infuse (Q 2026-10-19, replaces Deep Freeze): every Skill card you paid for, hit clean or Blocked,
+   * gives the opponent 1 Chill (MG.infusePerS) after your chain. No extra Mana.
    * Frozen Tomb (Q 2026-10-18, replaces Frost Barrier), once a game: HP loss that leaves you below 30% Max HP (the red bar), or would
    * kill you (you stay on 1 HP, and can't drop below 1 for the rest of that turn), brings Frost Armor's Shield 40 back.
    * Next turn you can only Block; at its end heal 10 + 5 per Mana, spending all Mana. The turn after, the Shield
@@ -337,6 +352,7 @@ Object.assign(STYLES, {
    */
   'MG:2': {
     name: 'Cryomancer',
+    infuse: addChill,
     setup: (p, t) => {
       if (t['MG:2'].frostArmorShield > 0) p.statuses.push({ kind: 'shield', turns: 9999, n: t['MG:2'].frostArmorShield })
     },
@@ -351,12 +367,7 @@ Object.assign(STYLES, {
         const n = addChill(state, other(side), r.cleanHits)
         say(state, side, `Arcane Sub-Zero: ${r.cleanHits} clean hits → enemy gets ❄ Chill${n ? ` (${n} stacks)` : ''}`)
       }
-      const cost = tuningOf(state)['MG:2'].deepFreezeMana
-      if (r.skills && state.rules.resources && (p.res ?? 0) >= cost) {
-        p.res = (p.res ?? 0) - cost
-        const n = addChill(state, other(side), 1)
-        say(state, side, `Deep Freeze: spends ${cost} Mana → enemy gets ❄ Chill${n ? ` (${n} stacks)` : ''}`)
-      }
+      infuseChain(state, side, r, '❄ Chill')
       return 0
     },
     afterHits: (state, side, r) => {

@@ -3,7 +3,7 @@
 import { addRes, resourceOf } from '../resources'
 import { tuningOf } from '../tuning'
 import { drawCards, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
-import { addChill, addIgnite, chillStacks, igniteBurn, igniteStacks } from '../styles'
+import { addChill, addIgnite, chillStacks, getStyle, igniteBurn, igniteStacks } from '../styles'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond } from './types'
 
@@ -263,6 +263,21 @@ export const consumeIgnite =
     }
   }
 
+/**
+ * ⟡ Infuse (Mage, 2026-10-19): n stacks of the element of the card owner's Style (its infuse hook:
+ * Pyromancer Ignite, Cryomancer Chill). Nothing under a Style without one (e.g. a non-Mage).
+ */
+export const infuse =
+  (who: Who, n: number): Act<BaseCtx> =>
+  (ctx) => {
+    const fn = getStyle(ctx.state.players[ctx.self].style)?.infuse
+    if (!fn || n <= 0) return
+    for (const s of sides(ctx, who)) {
+      const now = fn(ctx.state, s, n)
+      log(ctx.state, `${ctx.card.def.id}: ⟡ Infuse ${n} → ${s}${now ? ` (${now} stacks)` : ''}`)
+    }
+  }
+
 /** Gain (or lose, negative) class resource: Mana / Rage / Energy. Nothing for Tank. */
 export const gainRes =
   (who: Who, base: number, per?: Per): Act<BaseCtx> =>
@@ -310,11 +325,12 @@ const handOf = (ctx: ChainCtx, who: 'self' | 'enemy') => ctx.handAtStart[who ===
 export const enemyHandAtLeast = (n: number): Cond => (ctx) => handOf(ctx, 'enemy').length >= n
 export const enemyHandEmpty: Cond = (ctx) => handOf(ctx, 'enemy').length === 0
 export const handCompare =
-  (op: '<' | '=' | '>'): Cond =>
+  (op: '<' | '<=' | '=' | '>'): Cond =>
   (ctx) => {
     const a = handOf(ctx, 'self').length
     const b = handOf(ctx, 'enemy').length
-    return op === '<' ? a < b : op === '>' ? a > b : a === b
+    // '<=' = you don't have more cards than the opponent
+    return op === '<' ? a < b : op === '<=' ? a <= b : op === '>' ? a > b : a === b
   }
 
 export const enemyAction = (a: ChainCtx['enemyAction']): Cond => (ctx) => ctx.enemyAction === a
@@ -354,6 +370,14 @@ export const fieldHas =
   (who: 'self' | 'enemy', type: CardType, n: number): Cond =>
   (ctx) =>
     countType(handOf(ctx, who), type) >= n
+
+/** Every card on your / the opponent's Field (at reveal) is this type, and there is at least one. */
+export const fieldAll =
+  (who: 'self' | 'enemy', type: CardType): Cond =>
+  (ctx) => {
+    const f = handOf(ctx, who)
+    return f.length > 0 && f.every((c) => c.def.type === type)
+  }
 
 /** Ignite stacks on you / the opponent compared with n (Pyromancer). */
 export const igniteCmp =

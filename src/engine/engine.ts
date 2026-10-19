@@ -401,7 +401,7 @@ function resolveStrikes(
     checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, ...(hitResults.get(c.uid) ?? { blocked: false, clean: false }) })), 'after')
   }
 
-  // Styles that add to a finished chain (extra hits; none use it now)
+  // Styles that add to a finished chain (⟡ Infuse, Arcane Sub-Zero; extra hits: none use it now)
   for (const side of strikers) {
     const foe = state.players[other(side)]
     const hpBefore = foe.hp
@@ -410,7 +410,7 @@ function resolveStrikes(
       cleanHits: cleanHits[side],
       enemyField: handAtStart[other(side)].length,
       skills: chains[side]!.filter((c) => c.def.type === 'S').length,
-      paidSkillClean: chains[side]!.filter((c) => c.def.type === 'S' && hitResults.get(c.uid)?.clean && !state.players[side].unpaid?.includes(c.uid)).length,
+      paidSkills: chains[side]!.filter((c) => c.def.type === 'S' && !state.players[side].unpaid?.includes(c.uid)).length,
     })
     if (extra) env.hitsTaken[other(side)] += extra
     hitDmgTaken[other(side)] += hpBefore - foe.hp // extra hits count as hit dmg (e.g. "you take N+ dmg")

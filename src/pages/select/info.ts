@@ -49,8 +49,8 @@ export const STYLE_SUMMARY: Record<string, string> = {
   'BR:2': 'Each chain card adds a stack (+{dmgPerStack} dmg). Full stacks: lifesteal.',
   'AS:1': 'Start with {startDraw} cards. Strike vs Strike refills Energy and draws {dualDraw}.',
   'AS:2': 'Every {every|ord} attack is a x{critMult} Critical.',
-  'MG:1': 'Your hits burn (Ignite) every turn and cut enemy healing.',
-  'MG:2': 'Start with Shield {frostArmorShield}. Chill the enemy; {chillMax} Chill = Frozen.',
+  'MG:1': 'Each paid S card ⟡ Infuses {MG.infusePerS} Ignite, even if Blocked. Ignite burns and cuts healing.',
+  'MG:2': 'Start with Shield {frostArmorShield}. Each paid S card ⟡ Infuses {MG.infusePerS} Chill; {chillMax} Chill = Frozen.',
 }
 
 /** The signature combo's card types, e.g. ['P','K','P']. */

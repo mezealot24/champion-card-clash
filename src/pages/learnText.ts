@@ -30,7 +30,7 @@ export function shortCond(c: CondSpec): string {
     case 'hitResult': return c.r === 'clean' ? 'Clean hit' : 'Blocked'
     case 'enemyHandAtLeast': return `Foe ${c.n}+ cards`
     case 'enemyHandEmpty': return 'Foe Field empty'
-    case 'handCompare': return { '<': 'Fewer cards than foe', '=': 'Same cards as foe', '>': 'More cards than foe' }[c.op]
+    case 'handCompare': return { '<': 'Fewer cards than foe', '<=': 'No more cards than foe', '=': 'Same cards as foe', '>': 'More cards than foe' }[c.op]
     case 'enemyChainAtLeast': return `Foe chain ${c.n}+`
     case 'chainAll': return `All ${c.type}`
     case 'chainLength': return c.op === '=' ? `Chain = ${c.n}` : `Chain ${c.n}+`
@@ -49,6 +49,7 @@ export function shortCond(c: CondSpec): string {
     case 'res': return `${who(c.who)} ${c.n}+ res`
     case 'chainHas': return c.n <= 1 ? `${c.who === 'self' ? 'Chain' : 'Foe chain'} has ${c.type}` : `${c.who === 'self' ? 'Chain' : 'Foe chain'} ${c.n}+ ${c.type}`
     case 'fieldHas': return `${who(c.who)} ${c.n}+ ${c.type} on Field`
+    case 'fieldAll': return `${c.who === 'self' ? 'Field' : 'Foe Field'} all ${c.type}`
     case 'ignite': return c.op === '<' ? `${who(c.who)} Ignite < ${c.n}` : `${who(c.who)} Ignite ${c.n}+`
     case 'chill': return c.op === '<' ? `${who(c.who)} Chill < ${c.n}` : `${who(c.who)} Chill ${c.n}+`
     default: return describeCond(c)
@@ -104,6 +105,7 @@ export function shortAct(a: ActSpec, res = 'res'): string {
     case 'ignite': return a.n === 0 ? `${a.who === 'self' ? '' : 'Foe '}Ignite refresh` : `${a.who === 'self' ? '' : 'Foe '}Ignite ${a.n}${per(a)}`
     case 'chill': return `${a.who === 'self' ? '' : 'Foe '}Chill ${a.n}${per(a)}`
     case 'consumeIgnite': return a.burn ? 'Detonate Ignite' : 'Clear Ignite'
+    case 'infuse': return `${a.who === 'self' ? 'You ' : a.who === 'both' ? 'Both ' : ''}⟡ Infuse ${a.n}`
     default: return describeAct(a)
   }
 }

@@ -46,7 +46,7 @@ describe('Cryomancer cards', () => {
     let s = resolveTurn(game([mg('MG-045')]), { p1: 'strike', p2: 'charge' })
     s.players.p1.hand = [plain(1), plain(1)]
     s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-    expect(chill(s)).toBe(2)
+    expect(chill(s)).toBe(1 + 2) // 1 from MG-045's own ⟡ Infuse (costs off = paid), then 2 clean hits
   })
   it('MG-046 Glacial Lock: opponent can\'t Charge next turn', () => {
     const s = resolveTurn(game([mg('MG-046')]), { p1: 'strike', p2: 'block' })
