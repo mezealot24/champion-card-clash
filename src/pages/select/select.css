@@ -13,7 +13,7 @@
 .select label { color: var(--s-muted); }
 .select select { background: var(--s-panel-2); color: var(--s-text); border-color: var(--s-line); }
 
-.sel-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.sel-head { background: none; border: 0; padding: 0; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
 .tut-btn { background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--s-line); border-radius: 999px; padding: 7px 16px; font-weight: 800; }
 .tut-btn.new { background: var(--s-gold); color: #22163d; border-color: #0c0718; box-shadow: 0 3px 0 #0c0718; }
 

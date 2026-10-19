@@ -11,3 +11,5 @@
 @media (prefers-reduced-motion: reduce) { .turn-timer.low span { animation: none; } }
 .timer-setting { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .timer-setting select { width: auto; }
+/* inside the arena Settings sheet: keep the night palette (global select styles follow the light theme) */
+.sheet .timer-setting select { background: #2b2152; color: #f4eefe; border: 2px solid #3d3270; border-radius: 8px; padding: 4px 8px; }
