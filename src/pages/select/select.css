@@ -62,3 +62,5 @@
   font: 400 24px/1.1 'Lilita One', 'Arial Black', sans-serif; letter-spacing: .5px; }
 .select .start:active { transform: translateY(2px); box-shadow: 0 2px 0 #0c0718; }
 @media (prefers-reduced-motion: reduce) { .champ { transition: none; } .champ:hover { transform: none; } }
+.about .deck-dd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.edit-deck { background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--tint); border-radius: 999px; padding: 3px 12px; font-size: 13px; font-weight: 800; }

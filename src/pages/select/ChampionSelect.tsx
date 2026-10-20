@@ -28,6 +28,11 @@ export function ChampionSelect(props: {
   canTuktah: boolean
   canOnline: boolean
   deckSize: (id: string) => number
+  /** the player's own deck is used for this Champion */
+  deckCustom: (id: string) => boolean
+  /** a deck is saved for this Champion (it may not fit the picked Style) */
+  deckSaved: (id: string) => boolean
+  onEditDeck: () => void
   missing: (id: string) => number
   onStart: () => void
   onTutorial: () => void
@@ -91,8 +96,15 @@ export function ChampionSelect(props: {
                   <dt>Resource</dt>
                   <dd>{props.fill(info.resource, me)}</dd>
                   <dt>Deck</dt>
-                  <dd>
-                    {props.deckSize(me)} cards{props.missing(me) ? ` · ⚠ ${props.missing(me)} effects not coded yet` : ''}
+                  <dd className="deck-dd">
+                    <span>
+                      {props.deckSize(me)} cards ·{' '}
+                      {props.deckCustom(me) ? 'your deck' : props.deckSaved(me) ? 'default (your deck needs fixing)' : 'default'}
+                      {props.missing(me) ? ` · ⚠ ${props.missing(me)} effects not coded yet` : ''}
+                    </span>
+                    <button type="button" className="edit-deck" onClick={props.onEditDeck}>
+                      Edit deck
+                    </button>
                   </dd>
                 </dl>
                 <h3>Signature combo</h3>
