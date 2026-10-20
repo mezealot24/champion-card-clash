@@ -1,6 +1,9 @@
 // Placeholder Champion drawings (chibi, side view, facing right) for the battle screen.
 // Parts carry classes the arena animates: .bob (whole body), .arm-f (front arm + weapon), .leg-f (front leg).
 // Real art can replace these later as long as it keeps the same part classes.
+// A Style with a sprite sheet (SPRITES) draws that instead: idle loops, .casting plays the attack strip once.
+import pyroIdle from './sprites/mg-pyro-idle.webp?inline'
+import pyroAttack from './sprites/mg-pyro-attack.webp?inline'
 
 export const CHAMP_COLOR: Record<string, string> = { TK: '#1fc6a6', AS: '#a96bff', BR: '#ff6a3d', MG: '#4f9dff' }
 export const champColor = (id: string) => CHAMP_COLOR[id] ?? '#b8acd8'
@@ -45,8 +48,30 @@ function parts(id: string, col: string) {
   }
 }
 
+// Strips: 25 frames side by side, each 272x192 with the feet at y 184 and the body centred (scaled down in arena.css)
+const SPRITES: Record<string, { idle: string; attack: string }> = {
+  'MG:1': { idle: pyroIdle, attack: pyroAttack },
+}
+const spriteClass = (style: string) => `sprite-${style.replace(':', '-')}`
+
+// The sheets are big data URLs: put them in one <style> instead of every fighter's markup
+let spriteCss = false
+function ensureSpriteCss() {
+  if (spriteCss || typeof document === 'undefined') return
+  spriteCss = true
+  const el = document.createElement('style')
+  el.textContent = Object.entries(SPRITES)
+    .map(([style, s]) => `.${spriteClass(style)}{--idle:url(${s.idle});--attack:url(${s.attack})}`)
+    .join('')
+  document.head.appendChild(el)
+}
+
 /** Inner HTML of a fighter: aura, the drawing, the guard bubble. */
-export function fighterHTML(champId: string): string {
+export function fighterHTML(champId: string, style?: string | null): string {
+  if (style && SPRITES[style]) {
+    ensureSpriteCss()
+    return `<i class="aura"></i><div class="sprite ${spriteClass(style)}" aria-hidden="true"></div><i class="guard"></i>`
+  }
   const col = champColor(champId)
   const { head, body, weapon } = parts(champId, col)
   return `<i class="aura"></i><svg viewBox="0 0 64 84" aria-hidden="true"><ellipse cx="31" cy="80" rx="18" ry="3.5" fill="rgba(0,0,0,.35)"/>

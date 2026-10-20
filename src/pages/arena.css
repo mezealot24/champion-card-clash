@@ -124,6 +124,15 @@
 .arena .fighter .aura { position: absolute; inset: -10px -8px 0; border-radius: 45%; background: radial-gradient(circle at 50% 60%, rgba(255,200,74,.7), transparent 65%); opacity: 0; }
 .arena .fighter.down svg { transform: rotate(-85deg) translate(-14px, 8px); }
 .arena .fighter.me.down svg { transform: scaleX(-1) rotate(-85deg) translate(-14px, 8px); }
+.arena .sprite { position: absolute; z-index: 1; left: -61.5px; top: -46.5px; width: 187px; height: 132px; pointer-events: none;
+  background: var(--idle) 0 0 / 4675px 132px no-repeat; animation: arena-sprite calc(2.4s / var(--k)) steps(25) infinite; }
+.arena .fighter.casting .sprite { background-image: var(--attack); animation: arena-sprite-once calc(800ms / var(--k)) steps(25, jump-none) 1 both; }
+.arena .fighter.me .sprite { transform: scaleX(-1); }
+.arena .fighter.down .sprite { transform: rotate(-85deg) translate(-14px, 8px); animation-play-state: paused; }
+.arena .fighter.me.down .sprite { transform: scaleX(-1) rotate(-85deg) translate(-14px, 8px); }
+.arena .fighter.conq-max .sprite { filter: drop-shadow(0 0 5px rgba(255,106,61,.9)); }
+@keyframes arena-sprite { to { background-position: -4675px 0; } }
+@keyframes arena-sprite-once { to { background-position: -4488px 0; } }
 
 /* Side column */
 .arena .side { grid-area: side; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 12px 12px 4px; position: relative; z-index: 5; gap: 6px; }
@@ -188,7 +197,7 @@
 .arena .rotate .link { background: none; border: 0; color: var(--muted); text-decoration: underline; font: 700 13px var(--body); cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
-  .arena .fighter .bob, .arena .rotate .phone { animation: none; }
+  .arena .fighter .bob, .arena .rotate .phone, .arena .sprite { animation: none; }
   .arena .hpbar i { transition: none; }
 }
 .arena .banner { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 20; max-width: 70%; padding: 8px 16px; border-radius: 14px; background: rgba(12,7,24,.82); border: 2px solid var(--gold); color: #fff; font: 800 15px var(--body); text-align: center; pointer-events: none; }
