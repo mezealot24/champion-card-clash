@@ -11,7 +11,7 @@ export function freeze(state: GameState, side: Side, why: string) {
   p.statuses = p.statuses.filter((s) => s.kind !== 'chill' && s.kind !== 'frozen')
   if (!p.statuses.some((s) => s.kind === 'noStrike')) p.statuses.push({ kind: 'noStrike', turns: 1 })
   p.statuses.push({ kind: 'frozen', turns: 2 })
-  state.log.push(`T${state.turn} ${side} 🧊 Frozen: ${why} → Strike ไม่ได้เทิร์นหน้า`)
+  state.log.push(`T${state.turn} ${side} 🧊 Frozen: ${why} → can't Strike next turn`)
 }
 
 /** One slot of the chain. Before hits, blocked/clean are both false. */
@@ -50,7 +50,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
         const before = p.hp
         p.hp = Math.min(p.maxHp, p.hp + n)
         if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
-        say(state, side, `Combo P > K > P: ฮีล ${n} (${pct}% ของ HP ที่เหลือ)`)
+        say(state, side, `Combo P > K > P: heal ${n} (${pct}% of current HP)`)
       },
     },
   ],
@@ -67,7 +67,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
         const enemy = state.players[foe(side)]
         if (enemy.statuses.some((s) => s.kind === 'deathMark')) return
         enemy.statuses.push({ kind: 'deathMark', turns: DEATH_MARK_TURNS })
-        say(state, side, 'Combo P > K > S: 💀 Mark of Assassin ติดบนศัตรูไปจนจบเกม')
+        say(state, side, 'Combo P > K > S: 💀 Mark of Assassin on the enemy for the rest of the game')
       },
     },
   ],
@@ -85,9 +85,9 @@ export const COMBOS: Record<string, ComboDef[]> = {
         const turns = tuningOf(state).MG.comboNoBlockTurns
         if (turns > 0) state.players[foe(side)].statuses.push({ kind: 'noBlock', turns })
         if (state.players[side].style === 'MG:2') {
-          say(state, side, 'Combo Absolute Zero: ศัตรู Block ไม่ได้เทิร์นหน้า')
+          say(state, side, 'Combo Absolute Zero: enemy can\'t Block next turn')
           freeze(state, foe(side), 'Absolute Zero')
-        } else say(state, side, 'Combo S + S + S: ศัตรู Block ไม่ได้เทิร์นหน้า')
+        } else say(state, side, 'Combo S + S + S: enemy can\'t Block next turn')
       },
     },
   ],
@@ -104,7 +104,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
         const p = state.players[side]
         const turns = tuningOf(state).BR.guardCrushTurns
         p.statuses = [...p.statuses.filter((s) => s.kind !== 'guardBreak'), { kind: 'guardBreak', turns }]
-        say(state, side, `Combo S > P > P: Guard Crush (ใช้กับ Strike ครั้งถัดไป ภายใน ${turns} เทิร์น)`)
+        say(state, side, `Combo S > P > P: Guard Crush (for your next Strike within ${turns} turns)`)
       },
     },
   ],
@@ -160,7 +160,7 @@ export function applyConqueror(
   if (bonus) for (let i = 0; i < bonus.length; i++) bonus[i] += n * f.dmgPerStack
   if (n >= f.conquerorMax && actions[side] === 'charge' && enemyMult && f.chargeBreakTakenPct) {
     for (let i = 0; i < enemyMult.length; i++) enemyMult[i] *= 1 + f.chargeBreakTakenPct / 100
-    say(state, side, `Momentum: โดน charge break รับ dmg เพิ่ม ${f.chargeBreakTakenPct}%`)
+    say(state, side, `Momentum: charge break hit, takes +${f.chargeBreakTakenPct}% dmg`)
   }
 }
 

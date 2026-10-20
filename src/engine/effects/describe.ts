@@ -38,7 +38,7 @@ export function describeCond(c: CondSpec): string {
   switch (c.c) {
     case 'enemyHandAtLeast': return `opponent has ${c.n}+ cards`
     case 'enemyHandEmpty': return "opponent's hand is empty"
-    case 'handCompare': return { '<': 'you have fewer cards than opponent', '=': 'you have as many cards as opponent', '>': 'you have more cards than opponent' }[c.op]
+    case 'handCompare': return { '<': 'you have fewer cards than opponent', '<=': "you don't have more cards than opponent", '=': 'you have as many cards as opponent', '>': 'you have more cards than opponent' }[c.op]
     case 'enemyAction': return `opponent plays ${ACTION[c.a]}`
     case 'selfAction': return `you play ${ACTION[c.a]}`
     case 'hitResult': return c.r === 'clean' ? 'this card hits clean' : 'this card is blocked'
@@ -60,6 +60,7 @@ export function describeCond(c: CondSpec): string {
     case 'prevIs': return `the card before this one is a ${TYPE[c.type]}`
     case 'facingIs': return `facing card is a ${TYPE[c.type]}`
     case 'fieldHas': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.n}+ ${TYPE[c.type]} on the Field`
+    case 'fieldAll': return `${c.who === 'self' ? 'your' : "opponent's"} Field is all ${TYPE[c.type]}`
     case 'chill': return c.op === '<' && c.n <= 1 ? `${c.who === 'self' ? 'you have' : 'opponent has'} no Chill` : `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.op === '<' ? `fewer than ${c.n}` : `${c.n}+`} Chill stack${c.n === 1 ? '' : 's'}`
     case 'ignite': return c.op === '<' && c.n <= 1 ? `${c.who === 'self' ? 'you have' : 'opponent has'} no Ignite` : `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.op === '<' ? `fewer than ${c.n}` : `${c.n}+`} Ignite stack${c.n === 1 ? '' : 's'}`
     default: return '(unknown condition)'
@@ -111,6 +112,7 @@ export function describeAct(a: ActSpec, now = false): string {
     case 'gainRes': return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gain`} ${a.n} resource` + per(a.per)
     case 'ignite': return a.n === 0 ? `${WHO[a.who]}'s Ignite starts its 3 turns again` : `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Ignite${per(a.per)} (each stack burns 2 HP + 1% Max HP every turn and cuts heals 25%, 3 turns, max 4)`
     case 'chill': return `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Chill${per(a.per)} (each stack: hits deal 10% less, 3 turns; at 4 stacks Frozen: loses 15% Max HP and can't Strike next turn)`
+    case 'infuse': return `⟡ Infuse ${a.n}${a.who === 'enemy' ? '' : ` on ${WHO[a.who]}`} (Pyromancer: ${a.n} Ignite · Cryomancer: ${a.n} Chill)`
     case 'consumeIgnite': return a.burn ? `${WHO[a.who]}'s Ignite explodes: all its remaining burn dmg at once` : `clear ${WHO[a.who]}'s Ignite`
     case 'mulDmg': {
       const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`

@@ -36,6 +36,7 @@ export function TuningFields({ group, params, onChange }: { group: TuningGroup; 
                 <input
                   type="number"
                   className="num"
+                  inputMode={f.decimal || (f.min ?? 0) < 0 ? 'decimal' : 'numeric'}
                   step={f.decimal ? 'any' : 1}
                   min={f.min}
                   max={f.max}

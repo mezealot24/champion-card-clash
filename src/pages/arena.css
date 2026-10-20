@@ -44,7 +44,13 @@
 .arena .pip.off { background: #3a2d63; }
 .arena .meta { display: flex; align-items: center; gap: 8px; }
 .arena .chips { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; min-width: 0; }
-.arena .chip { white-space: nowrap; font: 800 9px var(--body); text-transform: uppercase; letter-spacing: .5px; padding: 1px 6px; border-radius: 999px; border: 2px solid var(--ink); background: var(--gold); color: var(--ink); }
+.arena .chip { white-space: nowrap; font: 800 9px var(--body); text-transform: uppercase; letter-spacing: .5px; padding: 1px 6px; border-radius: 999px; border: 2px solid var(--ink); background: var(--gold); color: var(--ink); cursor: pointer; }
+/* buff = good for whoever carries it, debuff = bad (playtest: they looked the same) */
+.arena .chip.buff { background: var(--hp); color: var(--ink); }
+.arena .chip.debuff { background: var(--danger); color: #fff; }
+.arena .res { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.arena .style-link { font: inherit; color: var(--gold); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline dotted; }
+.arena .chip:focus-visible, .arena .res:focus-visible, .arena .style-link:focus-visible, .arena .tool:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .arena .pile { flex: none; width: 26px; height: 34px; border-radius: 6px; border: 2.5px solid var(--ink); background: repeating-linear-gradient(45deg, #5a3fb0 0 5px, #4a3296 5px 10px); box-shadow: 2px 2px 0 var(--ink), 4px 4px 0 #3a2a7a; display: grid; place-items: center; font: 12px var(--display); color: var(--text); }
 
 /* Field */
@@ -62,7 +68,8 @@
 /* damage lives in the top-right corner badge; the rest of the card is effect text */
 .arena .card .dmg { position: absolute; right: -3px; top: -3px; width: 36px; height: 34px; display: grid; place-items: center; background: var(--paper); border: 3px solid var(--ink); border-radius: 0 12px 0 12px; font: 21px var(--display); line-height: 1; -webkit-text-stroke: 2.5px var(--ink); paint-order: stroke fill; z-index: 1; }
 .arena .t-P .dmg { color: var(--tP); } .arena .t-K .dmg { color: var(--tK); } .arena .t-S .dmg { color: var(--tS); }
-.arena .card .mod { position: absolute; right: 2px; top: 33px; font: 800 8.5px var(--body); background: var(--hp); color: var(--ink); border: 2px solid var(--ink); border-radius: 6px; padding: 0 3px; z-index: 1; }
+/* on the card-id row, so it never covers the effect text */
+.arena .card .mod { position: absolute; right: 2px; bottom: 2px; font: 800 8.5px var(--body); background: var(--hp); color: var(--ink); border: 2px solid var(--ink); border-radius: 6px; padding: 0 3px; z-index: 1; }
 .arena .card .mod.down { background: var(--danger); color: #fff; }
 .arena .card .fx { flex: 1; min-height: 0; position: relative; font-size: 9.5px; line-height: 1.2; padding: 4px 5px 2px; font-weight: 700; overflow: hidden; display: flex; flex-direction: column; gap: 3px; }
 .arena .card .fx .rule { display: block; }
@@ -78,6 +85,9 @@
 .arena .card.back > * { visibility: hidden; }
 .arena .card.spent { filter: saturate(.25) brightness(.7); }
 .arena .card.gone { outline: 3px dashed var(--danger); outline-offset: 2px; }
+/* effect won't fire (Silence, Skills off, can't pay): the text greys out, damage stays readable */
+.arena .card.off .fx { opacity: .4; text-decoration: line-through; }
+.arena .card .tag.off { background: var(--paper-ink); }
 .arena .card .tag { position: absolute; left: -3px; right: -3px; bottom: 40px; background: var(--danger); color: #fff; font: 800 9px var(--body); text-align: center; padding: 2px 0; border-block: 2px solid var(--ink); text-transform: uppercase; letter-spacing: .4px; }
 .arena .card.glow-P { box-shadow: 0 4px 0 var(--ink), 0 0 0 4px var(--tP), 0 0 22px 6px var(--tP); }
 .arena .card.glow-K { box-shadow: 0 4px 0 var(--ink), 0 0 0 4px var(--tK), 0 0 22px 6px var(--tK); }
@@ -141,6 +151,8 @@
 .arena .banner { position: absolute; left: -10%; right: -10%; top: 140px; height: 92px; background: linear-gradient(90deg, var(--tP), var(--tK) 50%, var(--tS)); border-block: 4px solid var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--ink); }
 .arena .banner b { font: 38px var(--display); letter-spacing: 1px; color: #fff; -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; line-height: 1; }
 .arena .banner span { font: 900 12px var(--body); letter-spacing: 2px; text-transform: uppercase; }
+.arena .banner small { font: 800 9px var(--body); letter-spacing: 1px; text-transform: uppercase; opacity: .7; }
+.arena .sheet .settings { align-items: stretch; min-width: 240px; }
 .arena .toast { position: absolute; padding: 4px 10px; border-radius: 10px; border: 3px solid var(--ink); background: var(--gold); color: var(--ink); font: 14px var(--display); box-shadow: 0 3px 0 var(--ink); white-space: nowrap; }
 .arena .toast small { display: block; font: 900 8.5px var(--body); letter-spacing: 1.2px; text-transform: uppercase; }
 .arena .dim { position: absolute; inset: 0; background: rgba(12,7,24,.55); opacity: 0; }
@@ -155,7 +167,7 @@
 .arena .sheet .big .card .dmg { width: 52px; height: 48px; font-size: 30px; }
 .arena .sheet .big .card .fx { font-size: 12.5px; padding: 6px 8px; overflow-y: auto; }
 .arena .sheet .big .card .top { height: 34px; padding-right: 52px; } .arena .sheet .big .card .type { width: 26px; height: 26px; font-size: 16px; } .arena .sheet .big .card .cid { font-size: 10px; }
-.arena .sheet .big .card .mod { top: 46px; }
+.arena .sheet .big .card .mod { bottom: 4px; }
 .arena .sheet .info { max-width: 330px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--text); }
 .arena .sheet .info b { font: 22px var(--display); font-weight: 400; }
 .arena .sheet .info p { color: var(--muted); font-size: 12.5px; margin: 0; line-height: 1.45; }

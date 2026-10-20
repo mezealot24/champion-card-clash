@@ -40,7 +40,7 @@ describe('Fatal Rhythm', () => {
   it('the 4th attack is a Critical: 3x dmg, shown with its total dmg in the log', () => {
     const s = resolveTurn(game('AS:2', [hit(2), hit(2), hit(2), hit(4), hit(2)]), { p1: 'strike', p2: 'charge' })
     expect(s.players.p2.hp).toBe(100 - 8 - 12)
-    expect(s.log.some((l) => l.includes('ช่อง 4') && l.includes('ตี 12') && l.includes('Critical'))).toBe(true)
+    expect(s.log.some((l) => l.includes('slot 4') && l.includes('hits 12') && l.includes('Critical'))).toBe(true)
   })
 
   it('counts across turns, blocked attacks included', () => {
@@ -62,7 +62,7 @@ describe('Fatal Rhythm', () => {
     const r = resolveTurn(b, { p1: 'strike', p2: 'block' })
     // slot 1 blocked 0, slot 2 Critical 6 blocked → 3, slot 3 lands 2
     expect(r.players.p2.hp).toBe(100 - 3 - 2)
-    expect(r.log.some((l) => l.includes('Critical ทะลุ 3'))).toBe(true)
+    expect(r.log.some((l) => l.includes('Critical through 3'))).toBe(true)
   })
 
   it('Critical is x4 while the enemy HP is red (below 30% of Max HP)', () => {

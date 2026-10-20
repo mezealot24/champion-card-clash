@@ -133,10 +133,10 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
         ;(state.events ??= []).push({ k: 'hp', side, delta: -cost })
       }
       else p.res = (p.res ?? 0) - cost
-      log(state, `${side} จ่าย ${cost} ${def.name} ให้ ${card.def.id}`)
+      log(state, `${side} pays ${cost} ${def.name} for ${card.def.id}`)
     } else {
       p.unpaid.push(card.uid)
-      log(state, `${side} ${def.name} ไม่พอสำหรับ ${card.def.id} (ต้องการ ${cost}): ${def.unpaidStays ? 'ใช้ไม่ได้ ค้างบน Field' : def.unpaidDmgPct != null ? `ตีได้ dmg ฐาน ${def.unpaidDmgPct}% เหลือแค่ผลเสีย` : 'ตีได้ แต่เหลือแค่ผลเสีย'}`)
+      log(state, `${side} not enough ${def.name} for ${card.def.id} (needs ${cost}): ${def.unpaidStays ? 'can\'t play, stays on Field' : def.unpaidDmgPct != null ? `hits for ${def.unpaidDmgPct}% base dmg, drawbacks only` : 'hits, drawbacks only'}`)
     }
   }
 }

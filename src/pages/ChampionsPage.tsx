@@ -17,7 +17,7 @@ export function ChampionsPage() {
   return (
     <div className="panel">
       <h2>Champions</h2>
-      <table>
+      <table className="cards-mobile champ-table">
         <thead>
           <tr>
             <th>ID</th><th>Name</th><th>HP start / max</th><th>In deck</th><th>Total dmg</th><th />
@@ -28,12 +28,12 @@ export function ChampionsPage() {
             const deck = data.cards.filter((card) => card.champion_id === c.id)
             return (
               <tr key={c.id}>
-                <td><code>{c.id}</code></td>
-                <td>{c.name}</td>
-                <td>{c.hp_start} / {c.hp_max}</td>
-                <td>{deck.reduce((n, card) => n + card.copies, 0)}</td>
-                <td>{deck.reduce((n, card) => n + card.dmg * card.copies, 0)}</td>
-                <td><Link to={`/admin/champions/${c.id}`}>Edit</Link></td>
+                <td className="c-id"><code>{c.id}</code></td>
+                <td className="c-name">{c.name}</td>
+                <td data-label="HP">{c.hp_start} / {c.hp_max}</td>
+                <td data-label="In deck">{deck.reduce((n, card) => n + card.copies, 0)}</td>
+                <td data-label="Total dmg">{deck.reduce((n, card) => n + card.dmg * card.copies, 0)}</td>
+                <td className="c-edit"><Link className="button-link" to={`/admin/champions/${c.id}`}>Edit</Link></td>
               </tr>
             )
           })}

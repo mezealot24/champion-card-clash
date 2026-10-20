@@ -2,7 +2,10 @@
 import { describe, expect, it } from 'vitest'
 import { createGame, legalActions, resolveTurn } from '../index'
 import { heal } from '../state'
+import { resolveTuning } from '../tuning'
 import type { CardDef, CardInst, GameState } from '../index'
+import { describeAct, describeCond } from '../effects/describe'
+import { isDrawback, type CondSpec, type EffectSpec } from '../effects/spec'
 
 let uid = 0
 const hit = (dmg: number): CardInst => ({ uid: `h${uid++}`, def: { id: 'XX-000', type: 'P', dmg, effectText: '' } })
@@ -17,18 +20,36 @@ const skill = (dmg: number, cost = 0): CardInst => ({ uid: `s${uid++}`, def: { i
 const ignite = (s: GameState, side: 'p1' | 'p2' = 'p2') => s.players[side].statuses.find((x) => x.kind === 'ignite')
 
 describe('Pyromancer', () => {
-  it('Touch of Flame: each paid Skill card that hits clean gives 1 Ignite, no extra Mana', () => {
+  it('⟡ Infuse: each paid Skill card gives 1 Ignite, no extra Mana', () => {
     const s = game('MG:1')
     s.players.p1.res = 2
     s.players.p1.hand = [skill(5, 1), skill(5, 1), skill(5, 1)]
     const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     expect(ignite(n)?.n).toBe(2) // the 3rd went unpaid
     expect(n.players.p1.res).toBe(0)
+    expect(n.log.some((l) => l.includes('⟡ Infuse: 2 paid Skill cards → enemy gets 🔥 Ignite (2 stacks)'))).toBe(true)
   })
-  it('a blocked Skill card gives no Ignite', () => {
+  it('⟡ Infuse: a paid Skill card that is Blocked still gives 1 Ignite', () => {
     const s = game('MG:1')
+    s.players.p1.res = 1
+    s.players.p1.hand = [skill(5, 1)]
+    expect(ignite(resolveTurn(s, { p1: 'strike', p2: 'block' }))?.n).toBe(1)
+  })
+  it('⟡ Infuse: an unpaid Skill card gives no Ignite', () => {
+    const s = game('MG:1')
+    s.players.p1.res = 0
+    s.players.p1.hand = [skill(5, 1)]
+    expect(ignite(resolveTurn(s, { p1: 'strike', p2: 'charge' }))).toBeUndefined()
+  })
+  it('⟡ Infuse stacks per paid Skill come from the tuning (MG.infusePerS)', () => {
+    const s = game('MG:1')
+    s.tuning = resolveTuning({ MG: { infusePerS: 2 } })
     s.players.p1.hand = [skill(5)]
-    expect(ignite(resolveTurn(s, { p1: 'strike', p2: 'block' }))).toBeUndefined()
+    expect(ignite(resolveTurn(s, { p1: 'strike', p2: 'block' }))?.n).toBe(2)
+    const off = game('MG:1')
+    off.tuning = resolveTuning({ MG: { infusePerS: 0 } })
+    off.players.p1.hand = [skill(5)]
+    expect(ignite(resolveTurn(off, { p1: 'strike', p2: 'charge' }))).toBeUndefined()
   })
   it('Ignite burns 2 HP + 1% Max HP per stack at the end of this turn and the next 2', () => {
     let s = game('MG:1')
@@ -100,23 +121,24 @@ describe('Cryomancer', () => {
     expect(chill(n)).toBeUndefined()
     expect(n.players.p1.res).toBe(3)
   })
-  it('Deep Freeze: a Strike with a Skill card spends 1 more Mana for 1 Chill', () => {
+  it('⟡ Infuse: a paid Skill card that is Blocked gives 1 Chill and spends no extra Mana (Deep Freeze is gone)', () => {
     const s = fresh()
     s.players.p1.res = 2
     s.players.p1.hand = [skill(5, 1), hit(5)]
     const n = resolveTurn(s, { p1: 'strike', p2: 'block' })
     expect(chill(n)).toBe(1)
-    expect(n.players.p1.res).toBe(0)
+    expect(n.players.p1.res).toBe(1) // only the card's own cost
+    expect(n.log.some((l) => l.includes('Deep Freeze'))).toBe(false)
   })
-  it('Deep Freeze needs a Skill card and the Mana', () => {
+  it('⟡ Infuse needs a paid Skill card', () => {
     const noSkill = fresh()
     noSkill.players.p1.res = 2
     noSkill.players.p1.hand = [hit(5)]
     expect(chill(resolveTurn(noSkill, { p1: 'strike', p2: 'block' }))).toBeUndefined()
-    const noMana = fresh()
-    noMana.players.p1.res = 1
-    noMana.players.p1.hand = [skill(5, 1)]
-    expect(chill(resolveTurn(noMana, { p1: 'strike', p2: 'block' }))).toBeUndefined()
+    const unpaid = fresh()
+    unpaid.players.p1.res = 0
+    unpaid.players.p1.hand = [skill(5, 1)]
+    expect(chill(resolveTurn(unpaid, { p1: 'strike', p2: 'block' }))).toBeUndefined()
   })
   it('Chill: each stack makes the chilled side hit 10% less', () => {
     const s = fresh()
@@ -186,5 +208,63 @@ describe('Cryomancer', () => {
     s.players.p1.hand = [skill(3), skill(3), skill(3)]
     const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     expect(frozen(n)).toBe(false)
+  })
+})
+
+describe('⟡ Infuse action and new conditions (2026-10-19)', () => {
+  const card = (spec: EffectSpec, type: CardInst['def']['type'] = 'P'): CardInst => ({ uid: `e${uid++}`, def: { id: 'ZZ-100', type, dmg: 1, effectText: '', effectSpec: spec } })
+  const infuseP = () => card([{ hook: 'onResolve', do: [{ a: 'infuse', who: 'enemy', n: 1 }] }])
+  const chillOf = (s: GameState) => s.players.p2.statuses.find((x) => x.kind === 'chill')?.n
+  const plainGame = () => createGame({ championId: 'XX', hpStart: 100, hpMax: 100, deck }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1 })
+
+  it('infuse on a P card under Pyromancer gives Ignite', () => {
+    const s = game('MG:1')
+    s.players.p1.hand = [infuseP()]
+    const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(ignite(n)?.n).toBe(1)
+    expect(chillOf(n)).toBeUndefined()
+  })
+  it('infuse on a P card under Cryomancer gives Chill', () => {
+    const s = game('MG:2')
+    s.players.p1.hand = [infuseP()]
+    const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(chillOf(n)).toBe(1)
+    expect(ignite(n)).toBeUndefined()
+  })
+  it('infuse does nothing under a Style without one (non-Mage)', () => {
+    const s = plainGame()
+    s.players.p1.hand = [infuseP()]
+    const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(ignite(n)).toBeUndefined()
+    expect(chillOf(n)).toBeUndefined()
+  })
+  it('infuse is not a drawback, and reads as ⟡ Infuse', () => {
+    expect(isDrawback({ a: 'infuse', who: 'self', n: 1 })).toBe(false)
+    expect(describeAct({ a: 'infuse', who: 'enemy', n: 1 })).toBe('⟡ Infuse 1 (Pyromancer: 1 Ignite · Cryomancer: 1 Chill)')
+  })
+
+  const healIf = (c: CondSpec, type: CardInst['def']['type'] = 'P') => card([{ hook: 'onResolve', if: [c], do: [{ a: 'heal', who: 'self', n: 10 }] }], type)
+  const healed = (p1: CardInst[], p2: CardInst[] = []) => {
+    const s = plainGame()
+    s.players.p1.hp = 50
+    s.players.p1.hand = p1
+    s.players.p2.hand = p2
+    return resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p1.hp - 50
+  }
+  it('fieldAll: every card on that Field is the type, and the Field is not empty', () => {
+    const allS: CondSpec = { c: 'fieldAll', who: 'self', type: 'S' }
+    expect(healed([healIf(allS, 'S'), skill(1)])).toBe(10)
+    expect(healed([healIf(allS, 'S'), hit(1)])).toBe(0)
+    const foeAllP: CondSpec = { c: 'fieldAll', who: 'enemy', type: 'P' }
+    expect(healed([healIf(foeAllP)], [hit(1), hit(1)])).toBe(10)
+    expect(healed([healIf(foeAllP)], [])).toBe(0) // empty Field
+    expect(describeCond(allS)).toBe('your Field is all Skill')
+  })
+  it("handCompare '<=': you don't have more cards than the opponent", () => {
+    const le: CondSpec = { c: 'handCompare', op: '<=' }
+    expect(healed([healIf(le), hit(1)], [hit(1), hit(1)])).toBe(10) // 2 vs 2
+    expect(healed([healIf(le)], [hit(1), hit(1)])).toBe(10) // 1 vs 2
+    expect(healed([healIf(le), hit(1)], [hit(1)])).toBe(0) // 2 vs 1
+    expect(describeCond(le)).toBe("you don't have more cards than opponent")
   })
 })

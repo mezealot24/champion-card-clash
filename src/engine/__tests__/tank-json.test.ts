@@ -153,7 +153,7 @@ describe('0 HP stays down (Q 2026-10-17)', () => {
     const s = resolveTurn(game([tk('TK-001'), tk('TK-013')], [plain(60)]), { p1: 'strike', p2: 'strike' })
     expect(s.players.p1.hp).toBe(0)
     expect(s.winner).toBe('p2')
-    expect(s.log.some((l) => /TK-0(01|13): self ฮีล/.test(l))).toBe(false)
+    expect(s.log.some((l) => /TK-0(01|13): self heals/.test(l))).toBe(false)
   })
 
   it('Lifeline does not revive a Tank at 0 HP', () => {
