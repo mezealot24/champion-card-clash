@@ -66,6 +66,7 @@ const STATUS_VALUE: Partial<Record<StatusKind, number>> = {
   noStrike: -4,
   noCharge: -3,
   silence: -3,
+  skillSilence: -2,
   vulnerable: -5,
 }
 

@@ -6,3 +6,4 @@ export { STYLES, getStyle, overdriveAdd, type StyleDef, type HitReport } from '.
 export { codeEffects, getEffect, isEffectMissing } from './effects/registry'
 export { compileSpec, type EffectSpec, type EffectRule, type CondSpec, type ActSpec, type Hook } from './effects/spec'
 export { RESOURCES, resourceOf, costOf, type ResourceDef } from './resources'
+export { TUNING_FIELDS, TUNING_GROUPS, DEFAULT_TUNING, resolveTuning, tuningFromRows, tuningOf, rulesFromConfig, RULE_KEYS, tuningErrors, cleanParams, fillText, unknownPlaceholders, type TuningParams, isTuningGroup, type Tuning, type TuningGroup, type TuningOverrides, type TuneField } from './tuning'

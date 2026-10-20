@@ -44,7 +44,8 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
   const [tagFilter, setTagFilter] = useState<CardTag | ''>('')
   const [deckFilter, setDeckFilter] = useState<'all' | 'in' | 'out'>('all')
 
-  const deckCount = cards.filter((c) => c.in_deck).reduce((n, c) => n + c.copies, 0)
+  // a Style's own cards (style_only "MG:1") replace the "!MG:1" ones, so count the deck every other Style plays
+  const deckCount = cards.filter((c) => c.in_deck && !(c.style_only && !c.style_only.startsWith('!'))).reduce((n, c) => n + c.copies, 0)
   const q = query.trim().toLowerCase()
   const visible = cards.filter((c) =>
     (!q || [c.id, c.name, c.source, c.effect].some((v) => v.toLowerCase().includes(q))) &&
@@ -53,7 +54,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
     (deckFilter === 'all' || c.in_deck === (deckFilter === 'in')),
   )
   // Max deck_size cards (counting copies) can be picked for battle
-  const canPick = (c: EditableCard) => c.in_deck || deckCount + c.copies <= deckSize
+  const canPick = (c: EditableCard) => c.in_deck || (!!c.style_only && !c.style_only.startsWith('!')) || deckCount + c.copies <= deckSize
 
   const edit = (id: string, patch: Partial<EditableCard>) => {
     setCards(cards.map((c) => (c.id === id ? { ...c, ...patch } : c)))
@@ -71,7 +72,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
   }
 
   async function removeCard(id: string) {
-    if (!confirm(`ลบการ์ด ${id}? (ลบถาวร ID นี้จะไม่ถูกใช้ซ้ำ)`)) return
+    if (!confirm(`Delete card ${id}? This is permanent and the ID won't be reused.`)) return
     must(await supabase.from('cards').delete().eq('id', id))
     // keep other unsaved edits: drop the row locally instead of reloading
     setCards((prev) => prev.filter((c) => c.id !== id))
@@ -99,11 +100,11 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
       <p className="summary">
         <span className={deckCount === deckSize ? 'ok' : 'warn'}>In deck {deckCount} / {deckSize}</span>
         <span className="muted">Pool {totalCards}</span>
-        <span>Total dmg {totalDmg}{budget ? ` (budget ~${budget}, ยังไม่ล็อก)` : ''}</span>
+        <span>Total dmg {totalDmg}{budget ? ` (budget ~${budget}, not locked)` : ''}</span>
         <span>{byType}</span>
       </p>
       <div className="filters">
-        <input placeholder="Search ID / name / effect…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <input type="search" aria-label="Search cards" placeholder="Search ID / name / effect…" value={query} onChange={(e) => setQuery(e.target.value)} />
         <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as CardType | '')}>
           <option value="">All types</option>
           {TYPES.map((t) => <option key={t}>{t}</option>)}
@@ -123,23 +124,23 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
         <button className="secondary" onClick={() => downloadCsv(`${championId}-cards.csv`, cards)}>Export CSV</button>
       </div>
       <div className="table-scroll">
-        <table className="deck">
+        <table className="deck cards-mobile">
           <thead>
             <tr>
-              <th title="เอาไปสู้">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 10 Rage, Assassin 1 Energy, Tank 10 HP)">Cost</th>
-              <th>TCT</th><th>Copies</th><th>Effect</th><th />
+              <th title="Plays in battle">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 10 Rage, Assassin 1 Energy, Tank 10 HP)">Cost</th>
+              <th title='"MG:1" = only under that Style · "!MG:1" = every Style but that one · empty = always'>Style</th><th title="Original damage before conversion">Base</th><th>Copies</th><th>Effect</th><th />
             </tr>
           </thead>
           <tbody>
             {visible.map((c) => (
               <tr key={c.id} className={dirty.has(c.id) ? 'dirty' : undefined}>
-                <td title={canPick(c) ? 'เลือกไปสู้' : `deck เต็ม ${deckSize} ใบแล้ว`}>
+                <td className="c-pick" data-label="Deck" title={canPick(c) ? 'Play this card in battle' : `Deck is full (${deckSize} cards)`}>
                   <input type="checkbox" checked={c.in_deck} disabled={!canPick(c)} onChange={(e) => edit(c.id, { in_deck: e.target.checked })} />
                 </td>
-                <td><code>{c.id}</code></td>
-                <td><input value={c.name} onChange={(e) => edit(c.id, { name: e.target.value })} /></td>
-                <td><input className="short" value={c.source} onChange={(e) => edit(c.id, { source: e.target.value })} /></td>
-                <td>
+                <td className="c-id" data-label="ID"><code>{c.id}</code></td>
+                <td className="c-name" data-label="Name"><input aria-label="Name" value={c.name} onChange={(e) => edit(c.id, { name: e.target.value })} /></td>
+                <td className="c-src" data-label="Source"><input className="short" aria-label="Source" value={c.source} onChange={(e) => edit(c.id, { source: e.target.value })} /></td>
+                <td className="c-tags" data-label="Tags">
                   <div className="tags">
                     {CARD_TAGS.map((t) => (
                       <button
@@ -153,42 +154,45 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
                     ))}
                   </div>
                 </td>
-                <td>
-                  <select value={c.type} onChange={(e) => edit(c.id, { type: e.target.value as CardType })}>
+                <td className="c-type" data-label="Type">
+                  <select aria-label="Type" value={c.type} onChange={(e) => edit(c.id, { type: e.target.value as CardType })}>
                     {TYPES.map((t) => <option key={t}>{t}</option>)}
                   </select>
                 </td>
-                <td><input className="num" type="number" min={0} value={c.dmg} onChange={(e) => edit(c.id, { dmg: Number(e.target.value) })} /></td>
-                <td title="ค่าชั่วคราว รอ Q ตั้ง">
+                <td className="c-dmg" data-label="dmg"><input className="num" type="number" inputMode="numeric" aria-label="dmg" min={0} value={c.dmg} onChange={(e) => edit(c.id, { dmg: Number(e.target.value) })} /></td>
+                <td className="c-tent" data-label="Tentative" title="Tentative number, not final yet">
                   <input type="checkbox" checked={c.dmg_tentative} onChange={(e) => edit(c.id, { dmg_tentative: e.target.checked })} />
                 </td>
-                <td>
+                <td className="c-cost" data-label="Cost">
                   <input
                     className="num"
                     type="number"
+                    inputMode="numeric"
+                    aria-label="Cost"
                     min={0}
                     placeholder={c.type === 'S' ? 'def' : ''}
                     value={c.cost ?? ''}
                     onChange={(e) => edit(c.id, { cost: e.target.value === '' ? null : Number(e.target.value) })}
                   />
                 </td>
-                <td className="muted">{c.dmg_tct ?? '–'}</td>
-                <td><input className="num" type="number" min={1} max={4} value={c.copies} onChange={(e) => edit(c.id, { copies: Number(e.target.value) })} /></td>
-                <td>
-                  <textarea rows={1} value={c.effect} onChange={(e) => edit(c.id, { effect: e.target.value })} />
+                <td className="c-style" data-label="Style"><input className="short" aria-label="Style" placeholder="all" value={c.style_only ?? ''} onChange={(e) => edit(c.id, { style_only: e.target.value.trim() || null })} /></td>
+                <td className="c-tct muted" data-label="TCT">{c.dmg_tct ?? '–'}</td>
+                <td className="c-copies" data-label="Copies"><input className="num" type="number" inputMode="numeric" aria-label="Copies" min={1} max={4} value={c.copies} onChange={(e) => edit(c.id, { copies: Number(e.target.value) })} /></td>
+                <td className="c-effect" data-label="Effect">
+                  <textarea rows={1} aria-label="Effect text" value={c.effect} onChange={(e) => edit(c.id, { effect: e.target.value })} />
                   <EffectBuilder
                     value={c.effect_json}
                     onChange={(effect_json) => edit(c.id, { effect_json })}
                     onUseText={(effect) => edit(c.id, { effect })}
                   />
                 </td>
-                <td><button className="danger" onClick={() => removeCard(c.id)} title="Delete">✕</button></td>
+                <td className="c-del"><button className="danger" onClick={() => removeCard(c.id)} title="Delete card" aria-label={`Delete ${c.id}`}>✕</button></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <div className="actions">
+      <div className="actions sticky-bar">
         <button className="secondary" onClick={addCard}>+ Add card</button>
         <SaveButton onSave={save} disabled={dirty.size === 0} label={`Save ${dirty.size || ''} change${dirty.size === 1 ? '' : 's'}`} />
       </div>

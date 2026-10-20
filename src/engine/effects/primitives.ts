@@ -1,7 +1,9 @@
 // ตัวต่อ (building blocks) สำหรับเขียน effect การ์ด
 // รวมกันเป็น effect ใน registry.ts เช่น when(enemyHandAtLeast(2), heal('self', 10))
 import { addRes, resourceOf } from '../resources'
+import { tuningOf } from '../tuning'
 import { drawCards, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
+import { addChill, addIgnite, chillStacks, getStyle, igniteBurn, igniteStacks } from '../styles'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond, HitIn } from './types'
 
@@ -13,7 +15,7 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
 }
 
 /** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
-export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'maxHpPct' | 'missingHpPct'
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'maxHpPct' | 'missingHpPct' | 'enemyIgnite' | 'enemyChill'
 
 export function perCount(ctx: BaseCtx, per?: Per): number {
   if (!per) return 1
@@ -38,6 +40,9 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
       const p = ctx.state.players[ctx.self]
       return Math.max(0, p.maxHp - p.hp) / 100
     }
+    // Ignite stacks on the opponent (Pyromancer)
+    case 'enemyIgnite': return igniteStacks(ctx.state.players[ctx.enemy])
+    case 'enemyChill': return chillStacks(ctx.state.players[ctx.enemy])
     // a "per" this build doesn't know counts 0 (old builds reading newer DB rows)
     default: return 0
   }
@@ -55,7 +60,7 @@ export const draw =
       if (ctx.pending) ctx.pending[s] += n
       else drawCards(ctx.state, s, n)
     }
-    log(ctx.state, `${ctx.card.def.id}: ${who} จั่ว ${n}`)
+    log(ctx.state, `${ctx.card.def.id}: ${who} draws ${n}`)
   }
 
 /** ฮีล n (ไม่เกิน Max HP) */
@@ -68,7 +73,7 @@ export const heal =
     const live = sides(ctx, who).filter((s) => ctx.state.players[s].hp > 0)
     if (!live.length) return
     for (const s of live) healHp(ctx.state, s, n)
-    log(ctx.state, `${ctx.card.def.id}: ${who} ฮีล ${n}`)
+    log(ctx.state, `${ctx.card.def.id}: ${who} heals ${n}`)
   }
 
 /** เสีย HP n ตรงๆ (ไม่ใช่ hit, ทะลุ Block) */
@@ -78,7 +83,7 @@ export const loseHp =
     const n = Math.floor(base * perCount(ctx, per))
     if (n <= 0) return
     for (const s of sides(ctx, who)) loseHpRaw(ctx.state, s, n, s === ctx.self ? 'self' : 'foe')
-    log(ctx.state, `${ctx.card.def.id}: ${who} เสีย ${n} HP`)
+    log(ctx.state, `${ctx.card.def.id}: ${who} loses ${n} HP`)
   }
 
 /** เพิ่ม/ลด Max HP (HP ปัจจุบันไม่เกิน Max ใหม่) */
@@ -100,7 +105,7 @@ export const status =
     const n = base === undefined ? undefined : Math.floor(base * perCount(ctx, per))
     if (n !== undefined && per && n <= 0) return
     for (const s of sides(ctx, who)) ctx.state.players[s].statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
-    log(ctx.state, `${ctx.card.def.id}: ${who} ติด ${kind}${n === undefined ? '' : ` ${n}`} ${turns} เทิร์น`)
+    log(ctx.state, `${ctx.card.def.id}: ${who} gets ${kind}${n === undefined ? '' : ` ${n}`} for ${turns} turns`)
   }
 
 /** Before attack only: Block stops n more hits this turn (negative = fewer, never below 0). */
@@ -108,7 +113,7 @@ export const blockNow =
   (who: Who, n: number): Act =>
   (ctx) => {
     for (const s of sides(ctx, who)) ctx.blockNow[s] += n
-    log(ctx.state, `${ctx.card.def.id}: ${who} Block ${n >= 0 ? '+' : ''}${n} hit เทิร์นนี้`)
+    log(ctx.state, `${ctx.card.def.id}: ${who} Block ${n >= 0 ? '+' : ''}${n} hit this turn`)
   }
 
 /**
@@ -122,7 +127,7 @@ export const grow =
     const key = dur === 'game' ? 'grow' : 'growNext'
     const cur = c[key] ?? 0
     c[key] = stack ? cur + n : n >= 0 ? Math.max(cur, n) : Math.min(cur, n)
-    log(ctx.state, `${c.def.id}: dmg ${n >= 0 ? '+' : ''}${n} ${dur === 'game' ? 'ถาวร' : 'ครั้งถัดไป'}`)
+    log(ctx.state, `${c.def.id}: dmg ${n >= 0 ? '+' : ''}${n} ${dur === 'game' ? 'for the game' : 'next time'}`)
   }
 
 /** ใช้ใน hook `modify` เท่านั้น: ปรับ dmg ของการ์ดในสาย */
@@ -130,6 +135,7 @@ export type DmgTarget =
   | 'this' // ใบนี้
   | 'next' // ใบถัดไป 1 ใบ
   | 'following' // ทุกใบที่ตามหลัง
+  | 'chain' // ทุกใบในสายเรา รวมใบนี้
   | { slot: number } // ช่องที่ n (นับ 1)
   | { enemySlot: number } // ช่องที่ n ในสายศัตรู (มีผลเมื่อศัตรู Strike)
   | 'facing' // ใบประจันหน้าของศัตรู (มีผลเมื่อศัตรู Strike)
@@ -166,7 +172,7 @@ export const pierce =
   (ctx) => {
     const slots = target === 'chain' ? ctx.chain.map((_, i) => i) : targetSlots(ctx, target)
     for (const i of slots) if (i < ctx.pierce.length) ctx.pierce[i] = 1
-    if (ctx.chain.length) log(ctx.state, `${ctx.card.def.id}: Pierce (ทะลุ Block)`)
+    if (ctx.chain.length) log(ctx.state, `${ctx.card.def.id}: Pierce (through Block)`)
   }
 
 /**
@@ -181,7 +187,7 @@ export const steal: Act = (ctx) => {
   foe.hand.splice(ctx.slot, 1)
   taken.owner = taken.owner === ctx.self ? undefined : (taken.owner ?? ctx.enemy)
   me.hand.push(taken)
-  log(ctx.state, `${ctx.card.def.id}: ${ctx.self} ขโมย ${taken.def.id} มาไว้บน Field`)
+  log(ctx.state, `${ctx.card.def.id}: ${ctx.self} steals ${taken.def.id} onto its Field`)
 }
 
 /** Which opponent Field card a Cut takes: oldest (slot 1), newest (last slot), or the one in this card's slot. */
@@ -199,7 +205,7 @@ export const cut =
     const foe = ctx.state.players[ctx.enemy]
     for (let k = 0; k < n; k++) {
       if ((foe.cutTaken ?? 0) >= CUT_CAP) {
-        log(ctx.state, `${ctx.card.def.id}: Cut ครบ ${CUT_CAP} ใบในเทิร์นนี้แล้ว`)
+        log(ctx.state, `${ctx.card.def.id}: already Cut ${CUT_CAP} cards this turn`)
         return
       }
       const i = which === 'oldest' ? 0 : which === 'newest' ? foe.hand.length - 1 : ctx.slot
@@ -209,7 +215,66 @@ export const cut =
       foe.cutTaken = (foe.cutTaken ?? 0) + 1
       markDiscarded(ctx.state, ctx.enemy, [{ card: lost, slot: i + 1, reason: 'Cut' }])
       toDeckBottom(ctx.state, ctx.enemy, [lost])
-      log(ctx.state, `${ctx.card.def.id}: Cut → ${ctx.enemy} ทิ้ง ${lost.def.id} ลงใต้กอง`)
+      log(ctx.state, `${ctx.card.def.id}: Cut → ${ctx.enemy} sends ${lost.def.id} to the deck bottom`)
+    }
+  }
+
+/** Ignite (Pyromancer): add n stacks (× per) (max 4) and reset the timer to 3 turns. n = 0 only refreshes a burn that's on. */
+export const ignite =
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
+  (ctx) => {
+    const n = Math.floor(base * perCount(ctx, per))
+    if (per && n <= 0) return
+    for (const s of sides(ctx, who)) {
+      const had = igniteStacks(ctx.state.players[s])
+      const now = addIgnite(ctx.state, s, n)
+      if (now || had) log(ctx.state, `${ctx.card.def.id}: ${s} 🔥 Ignite ${now} stacks (timer reset to 3 turns)`)
+    }
+  }
+
+/** Chill (Cryomancer): add n stacks (× per); at chillMax (tuning) the side is Frozen (can't Strike next turn, Chill clears). */
+export const chill =
+  (who: Who, base: number, per?: Per): Act<BaseCtx> =>
+  (ctx) => {
+    const n = Math.floor(base * perCount(ctx, per))
+    if (n <= 0) return
+    for (const s of sides(ctx, who)) {
+      const now = addChill(ctx.state, s, n)
+      if (now) log(ctx.state, `${ctx.card.def.id}: ${s} ❄ Chill ${now} stack`)
+    }
+  }
+
+/** Clear Ignite. burn = it explodes: every burn it had left lands at once (burn × turns left). */
+export const consumeIgnite =
+  (who: Who, burn = false): Act<BaseCtx> =>
+  (ctx) => {
+    for (const s of sides(ctx, who)) {
+      const p = ctx.state.players[s]
+      const st = p.statuses.find((x) => x.kind === 'ignite')
+      if (!st) continue
+      const dmg = burn ? igniteBurn(p, tuningOf(ctx.state)) * st.turns : 0
+      p.statuses = p.statuses.filter((x) => x !== st)
+      if (!dmg) {
+        log(ctx.state, `${ctx.card.def.id}: clears ${s}'s 🔥 Ignite`)
+        continue
+      }
+      loseHpRaw(ctx.state, s, dmg, s === ctx.self ? 'self' : 'foe')
+      log(ctx.state, `${ctx.card.def.id}: ${s}'s 🔥 Ignite bursts for ${dmg}`)
+    }
+  }
+
+/**
+ * ⟡ Infuse (Mage, 2026-10-19): n stacks of the element of the card owner's Style (its infuse hook:
+ * Pyromancer Ignite, Cryomancer Chill). Nothing under a Style without one (e.g. a non-Mage).
+ */
+export const infuse =
+  (who: Who, n: number): Act<BaseCtx> =>
+  (ctx) => {
+    const fn = getStyle(ctx.state.players[ctx.self].style)?.infuse
+    if (!fn || n <= 0) return
+    for (const s of sides(ctx, who)) {
+      const now = fn(ctx.state, s, n)
+      log(ctx.state, `${ctx.card.def.id}: ⟡ Infuse ${n} → ${s}${now ? ` (${now} stacks)` : ''}`)
     }
   }
 
@@ -227,6 +292,7 @@ function targetSlots(ctx: ChainCtx, target: Exclude<DmgTarget, 'facing' | 'enemy
   if (target === 'this') return [ctx.slot]
   if (target === 'next') return [ctx.slot + 1]
   if (target === 'following') return ctx.chain.map((_, i) => i).filter((i) => i > ctx.slot)
+  if (target === 'chain') return ctx.chain.map((_, i) => i)
   return [target.slot - 1]
 }
 
@@ -259,11 +325,12 @@ const handOf = (ctx: ChainCtx, who: 'self' | 'enemy') => ctx.handAtStart[who ===
 export const enemyHandAtLeast = (n: number): Cond => (ctx) => handOf(ctx, 'enemy').length >= n
 export const enemyHandEmpty: Cond = (ctx) => handOf(ctx, 'enemy').length === 0
 export const handCompare =
-  (op: '<' | '=' | '>'): Cond =>
+  (op: '<' | '<=' | '=' | '>'): Cond =>
   (ctx) => {
     const a = handOf(ctx, 'self').length
     const b = handOf(ctx, 'enemy').length
-    return op === '<' ? a < b : op === '>' ? a > b : a === b
+    // '<=' = you don't have more cards than the opponent
+    return op === '<' ? a < b : op === '<=' ? a <= b : op === '>' ? a > b : a === b
   }
 
 export const enemyAction = (a: ChainCtx['enemyAction']): Cond => (ctx) => ctx.enemyAction === a
@@ -304,6 +371,30 @@ export const fieldHas =
   (ctx) =>
     countType(handOf(ctx, who), type) >= n
 
+/** Every card on your / the opponent's Field (at reveal) is this type, and there is at least one. */
+export const fieldAll =
+  (who: 'self' | 'enemy', type: CardType): Cond =>
+  (ctx) => {
+    const f = handOf(ctx, who)
+    return f.length > 0 && f.every((c) => c.def.type === type)
+  }
+
+/** Ignite stacks on you / the opponent compared with n (Pyromancer). */
+export const igniteCmp =
+  (who: 'self' | 'enemy', op: '>=' | '<', n: number): Cond =>
+  (ctx) => {
+    const k = igniteStacks(ctx.state.players[who === 'self' ? ctx.self : ctx.enemy])
+    return op === '>=' ? k >= n : k < n
+  }
+
+/** Chill stacks on you / the opponent compared with n (Cryomancer). */
+export const chillCmp =
+  (who: 'self' | 'enemy', op: '>=' | '<', n: number): Cond =>
+  (ctx) => {
+    const k = chillStacks(ctx.state.players[who === 'self' ? ctx.self : ctx.enemy])
+    return op === '>=' ? k >= n : k < n
+  }
+
 /** เราโดน hit รวม ≥ n dmg ในเทิร์นนี้ (Block ที่กันได้ไม่นับ) */
 export const tookDmg = (n: number): Cond => (ctx) => ctx.hitDmgTaken[ctx.self] >= n
 
@@ -343,7 +434,7 @@ export const hasStatus = (who: 'self' | 'enemy', kind: StatusKind): Cond => (ctx
 /** you / the opponent have N+ of your class resource (Tank: HP) */
 export const resAtLeast = (who: 'self' | 'enemy', n: number): Cond => (ctx) => {
   const p = ctx.state.players[who === 'self' ? ctx.self : ctx.enemy]
-  return (resourceOf(p.championId)?.payWithHp ? p.hp : (p.res ?? 0)) >= n
+  return (resourceOf(p.championId, tuningOf(ctx.state))?.payWithHp ? p.hp : (p.res ?? 0)) >= n
 }
 
 /** Status kinds that carry a size n */

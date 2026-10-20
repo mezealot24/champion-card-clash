@@ -23,7 +23,7 @@ function Header() {
       )}
       {session && (
         <span className="who">
-          {session.user.email} <code>{role}</code>
+          <span className="who-email">{session.user.email}</span> <code className="who-role">{role}</code>
           <button className="secondary" onClick={() => supabase.auth.signOut()}>Sign out</button>
         </span>
       )}

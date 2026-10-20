@@ -98,7 +98,7 @@ describe('Reshuffle', () => {
     expect(s.players.p1.drawsSinceShuffle).toBe(3)
     s = turn(s, 'charge', 'charge')
     expect(s.players.p1.drawsSinceShuffle).toBe(0)
-    expect(s.log.some((l) => l.includes('สับ deck ใหม่'))).toBe(true)
+    expect(s.log.some((l) => l.includes('deck reshuffled'))).toBe(true)
   })
 
   it('keeps the newest discards at the bottom when it reshuffles', () => {

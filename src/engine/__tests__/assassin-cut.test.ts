@@ -76,7 +76,7 @@ describe('Sonic Bliz Overdrive', () => {
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 3 * 7)
   })
 
-  it('not with an S card in the chain, not with fewer than 3 cards, not for Coup de grâce', () => {
+  it('not with an S card in the chain, not with fewer than 3 cards, not for Fatal Rhythm', () => {
     const withS = [...five().slice(0, 4), card(1, 'S')]
     let g = game(withS, [], 'AS:1')
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(95)

@@ -3,6 +3,16 @@
 // each combo fires once per chain.
 // Kept free of state.ts imports (like styles.ts).
 import type { Action, CardType, GameState, Side } from './types'
+import { tuningOf } from './tuning'
+
+/** Freeze a side: Chill clears and it can't Strike next turn. `frozen` outlasts noStrike by a turn so cards can read it that turn. */
+export function freeze(state: GameState, side: Side, why: string) {
+  const p = state.players[side]
+  p.statuses = p.statuses.filter((s) => s.kind !== 'chill' && s.kind !== 'frozen')
+  if (!p.statuses.some((s) => s.kind === 'noStrike')) p.statuses.push({ kind: 'noStrike', turns: 1 })
+  p.statuses.push({ kind: 'frozen', turns: 2 })
+  state.log.push(`T${state.turn} ${side} 🧊 Frozen: ${why} → can't Strike next turn`)
+}
 
 /** One slot of the chain. Before hits, blocked/clean are both false. */
 export type ComboHit = { type: CardType; blocked: boolean; clean: boolean }
@@ -22,14 +32,11 @@ const say = (state: GameState, side: Side, line: string) => state.log.push(`T${s
 const foe = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1')
 const allClean = (h: ComboHit[]) => h.every((x) => x.clean)
 
-export const CONQUEROR_MAX = 6
-/** Mark of Assassin lasts the rest of the game (statuses count down, so: a number no game reaches) */
+/** Mark of Assassin lasts the rest of the game (statuses count down, so: a number no game reaches). Burst % = tuning AS.markBurstPct */
 export const DEATH_MARK_TURNS = 9999
-/** Mark of Assassin burst: % of the chain's total dmg */
-export const DEATH_MARK_PCT = 50
 
 export const COMBOS: Record<string, ComboDef[]> = {
-  /** Tank · P > K > P (two P + one K, any order; Q 2026-10-16): if the opponent Blocks one of them, heal 10% of your current HP. */
+  /** Tank · P > K > P (two P + one K, any order; Q 2026-10-16): if the opponent Blocks one of them, heal comboHealPct (10%) of your current HP. */
   TK: [
     {
       name: 'P > K > P',
@@ -37,12 +44,13 @@ export const COMBOS: Record<string, ComboDef[]> = {
       ok: (h) => h.some((x) => x.blocked),
       fire: (state, side) => {
         const p = state.players[side]
-        const n = Math.floor(p.hp / 10)
+        const pct = tuningOf(state).TK.comboHealPct
+        const n = Math.floor((p.hp * pct) / 100)
         if (p.hp <= 0 || n <= 0) return // a side at 0 HP stays down
         const before = p.hp
         p.hp = Math.min(p.maxHp, p.hp + n)
         if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
-        say(state, side, `Combo P > K > P: ฮีล ${n} (10% ของ HP ที่เหลือ)`)
+        say(state, side, `Combo P > K > P: heal ${n} (${pct}% of current HP)`)
       },
     },
   ],
@@ -59,19 +67,27 @@ export const COMBOS: Record<string, ComboDef[]> = {
         const enemy = state.players[foe(side)]
         if (enemy.statuses.some((s) => s.kind === 'deathMark')) return
         enemy.statuses.push({ kind: 'deathMark', turns: DEATH_MARK_TURNS })
-        say(state, side, 'Combo P > K > S: 💀 Mark of Assassin ติดบนศัตรูไปจนจบเกม')
+        say(state, side, 'Combo P > K > S: 💀 Mark of Assassin on the enemy for the rest of the game')
       },
     },
   ],
-  /** Mage · S + S + S, all clean: the opponent can't Block next turn. */
+  /**
+   * Mage · S + S + S, all clean: the opponent can't Block next turn.
+   * Under Cryomancer it is Absolute Zero (Q 2026-10-18): the opponent is also Frozen, whatever its Chill,
+   * so it can't Strike or Block next turn and is left with Charge.
+   */
   MG: [
     {
       name: 'S + S + S',
       pattern: ['S', 'S', 'S'],
       ok: allClean,
       fire: (state, side) => {
-        state.players[foe(side)].statuses.push({ kind: 'noBlock', turns: 1 })
-        say(state, side, 'Combo S + S + S: ศัตรู Block ไม่ได้เทิร์นหน้า')
+        const turns = tuningOf(state).MG.comboNoBlockTurns
+        if (turns > 0) state.players[foe(side)].statuses.push({ kind: 'noBlock', turns })
+        if (state.players[side].style === 'MG:2') {
+          say(state, side, 'Combo Absolute Zero: enemy can\'t Block next turn')
+          freeze(state, foe(side), 'Absolute Zero')
+        } else say(state, side, 'Combo S + S + S: enemy can\'t Block next turn')
       },
     },
   ],
@@ -86,8 +102,9 @@ export const COMBOS: Record<string, ComboDef[]> = {
       pattern: ['S', 'P', 'P'],
       fire: (state, side) => {
         const p = state.players[side]
-        p.statuses = [...p.statuses.filter((s) => s.kind !== 'guardBreak'), { kind: 'guardBreak', turns: 3 }]
-        say(state, side, 'Combo S > P > P: Guard Crush (ใช้กับ Strike ครั้งถัดไป ภายใน 3 เทิร์น)')
+        const turns = tuningOf(state).BR.guardCrushTurns
+        p.statuses = [...p.statuses.filter((s) => s.kind !== 'guardBreak'), { kind: 'guardBreak', turns }]
+        say(state, side, `Combo S > P > P: Guard Crush (for your next Strike within ${turns} turns)`)
       },
     },
   ],
@@ -126,7 +143,7 @@ export function checkCombos(state: GameState, side: Side, hits: ComboHit[], when
 export const conquerorOf = (state: GameState, side: Side) => state.players[side].comboData?.conqueror ?? 0
 
 /**
- * Conqueror stacks (Bruiser · Juggernaut Style, styles.ts; was the S > K > K combo until Q 2026-10-16):
+ * Momentum stacks (Bruiser · Juggernaut Style, styles.ts; was the S > K > K combo until Q 2026-10-16):
  * +stack dmg on every slot of this side's chain;
  * at max stack, a charge break makes the opponent's hits deal 30% more.
  */
@@ -139,12 +156,16 @@ export function applyConqueror(
 ) {
   const n = conquerorOf(state, side)
   if (!n) return
-  if (bonus) for (let i = 0; i < bonus.length; i++) bonus[i] += n
-  if (n >= CONQUEROR_MAX && actions[side] === 'charge' && enemyMult) {
-    for (let i = 0; i < enemyMult.length; i++) enemyMult[i] *= 1.3
-    say(state, side, 'Conqueror: โดน charge break รับ dmg เพิ่ม 30%')
+  const f = tuningOf(state)['BR:2']
+  if (bonus) for (let i = 0; i < bonus.length; i++) bonus[i] += n * f.dmgPerStack
+  if (n >= f.conquerorMax && actions[side] === 'charge' && enemyMult && f.chargeBreakTakenPct) {
+    for (let i = 0; i < enemyMult.length; i++) enemyMult[i] *= 1 + f.chargeBreakTakenPct / 100
+    say(state, side, `Momentum: charge break hit, takes +${f.chargeBreakTakenPct}% dmg`)
   }
 }
 
-/** Omnivamp: % of each hit's dmg healed back (0 when not at max Conqueror). */
-export const lifestealPct = (state: GameState, side: Side) => (conquerorOf(state, side) >= CONQUEROR_MAX ? 10 : 0)
+/** Lifesteal: % of each hit's dmg healed back (0 when not at max Momentum). */
+export const lifestealPct = (state: GameState, side: Side) => {
+  const f = tuningOf(state)['BR:2']
+  return conquerorOf(state, side) >= f.conquerorMax ? f.omnivampPct : 0
+}

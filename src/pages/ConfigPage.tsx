@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { must, useAsync } from '../lib/useAsync'
 import type { GameConfigRow, Json } from '../lib/database.types'
 import { SaveButton } from '../components/SaveButton'
+import { RULE_KEYS } from '../engine'
 
 type Draft = Omit<GameConfigRow, 'value' | 'updated_at'> & { raw: string }
 
@@ -10,7 +11,7 @@ function parse(raw: string): { value?: Json; error?: string } {
   try {
     return { value: JSON.parse(raw) as Json }
   } catch {
-    return { error: 'ต้องเป็น JSON เช่น 5, 2.5, true, "text", [1,2]' }
+    return { error: 'Must be JSON, e.g. 5, 2.5, true, "text", [1,2]' }
   }
 }
 
@@ -42,7 +43,7 @@ function ConfigTable({ rows, onSaved }: { rows: GameConfigRow[]; onSaved: () => 
   }
 
   async function remove(key: string) {
-    if (!confirm(`ลบ config "${key}"?`)) return
+    if (!confirm(`Delete config "${key}"?`)) return
     must(await supabase.from('game_config').delete().eq('key', key))
     onSaved()
   }
@@ -50,27 +51,28 @@ function ConfigTable({ rows, onSaved }: { rows: GameConfigRow[]; onSaved: () => 
   return (
     <div className="panel">
       <h2>Game configuration</h2>
-      <p className="muted">ค่ากติกากลางของเกม ค่าเป็น JSON (ตัวเลขพิมพ์ตรงๆ ได้เลย)</p>
-      <table>
+      <p className="muted">Shared game rules. Values are JSON (type plain numbers as they are).</p>
+      <table className="cards-mobile config-table">
         <thead><tr><th>Key</th><th>Value</th><th>Description</th><th /></tr></thead>
         <tbody>
           {drafts.map((d) => {
             const err = parse(d.raw).error
             return (
               <tr key={d.key}>
-                <td><code>{d.key}</code></td>
-                <td>
-                  <input className={err ? 'invalid' : 'short'} value={d.raw} title={err} onChange={(e) => edit(d.key, { raw: e.target.value })} />
+                <td className="c-key"><code>{d.key}</code>{d.key in RULE_KEYS && <span className="ok" title="The battle engine reads this rule"> · engine</span>}</td>
+                <td className="c-value" data-label="Value">
+                  <input className={err ? 'invalid' : 'short'} aria-label={`${d.key} value`} value={d.raw} title={err} onChange={(e) => edit(d.key, { raw: e.target.value })} />
+                  {err && <small className="error">{err}</small>}
                 </td>
-                <td><input value={d.description} onChange={(e) => edit(d.key, { description: e.target.value })} /></td>
-                <td><button className="danger" onClick={() => remove(d.key)} title="Delete">✕</button></td>
+                <td className="c-desc" data-label="Description"><input aria-label={`${d.key} description`} value={d.description} onChange={(e) => edit(d.key, { description: e.target.value })} /></td>
+                <td className="c-del"><button className="danger" onClick={() => remove(d.key)} title="Delete" aria-label={`Delete ${d.key}`}>✕</button></td>
               </tr>
             )
           })}
         </tbody>
       </table>
-      <div className="actions">
-        <input placeholder="new_key" value={newKey} onChange={(e) => setNewKey(e.target.value.trim())} />
+      <div className="actions sticky-bar">
+        <input aria-label="New key" placeholder="new_key" value={newKey} onChange={(e) => setNewKey(e.target.value.trim())} />
         <button
           className="secondary"
           disabled={!keyValid}

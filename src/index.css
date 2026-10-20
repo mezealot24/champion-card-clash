@@ -40,8 +40,9 @@ button.danger { background: transparent; color: var(--danger); padding: 4px 8px;
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .table-scroll { overflow-x: auto; }
-table.deck td:nth-child(11) { min-width: 380px; }
-table.deck td:nth-child(3) { min-width: 160px; }
+table.deck td.c-effect { min-width: 380px; }
+table.deck td.c-name { min-width: 160px; }
+table.deck td.c-type select { min-width: 60px; }
 tr.dirty { background: var(--dirty); }
 .summary { display: flex; gap: 20px; flex-wrap: wrap; font-weight: 500; }
 .actions, .save { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
@@ -78,8 +79,142 @@ button.tag.on { background: var(--accent); color: var(--on-accent); border-color
 .effect-builder select { width: auto; }
 .effect-builder .hint { margin: 0; font-size: 12px; }
 
-/* Juggernaut: Conqueror stacks full → the fighter's panel burns */
+/* Juggernaut: Momentum stacks full → the fighter's panel burns */
 .panel.conq-max { border-color: #ff7a2f; animation: conq-burn 1.2s ease-in-out infinite; }
 .conq-tag { color: #ff7a2f; font-weight: 700; }
 @keyframes conq-burn { 50% { box-shadow: 0 0 18px 4px rgba(255, 122, 47, .55); } }
 @media (prefers-reduced-motion: reduce) { .panel.conq-max { animation: none; box-shadow: 0 0 14px 3px rgba(255, 122, 47, .5); } }
+
+/* Admin tuning (components/TuningFields.tsx) */
+.tuning { margin: 4px 0 12px; }
+.tuning-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.tuning label { font-size: 0.9em; }
+.tuning label.tuned { color: var(--accent); }
+.tuning label.tuned input { border-color: var(--accent); }
+.tuning-input { display: flex; align-items: center; gap: 6px; }
+.tuning-input input.num { width: 80px; }
+
+.text-preview { margin: -4px 0 12px; font-size: 0.9em; }
+.text-preview p { margin: 4px 0; }
+.text-preview code { margin-right: 4px; }
+button.link { background: none; border: none; color: var(--accent); padding: 0 4px; cursor: pointer; }
+
+/* Admin on phones: sticky save bar, tables as cards, thumb-size controls */
+.sticky-bar { position: sticky; bottom: 0; z-index: 5; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 12px -16px -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--panel); border-top: 1px solid var(--border); border-radius: 0 0 10px 10px; }
+.sticky-bar .save { margin-top: 0; }
+.sticky-bar input { width: 160px; }
+a.button-link { display: inline-block; padding: 6px 14px; border: 1px solid var(--accent); border-radius: 6px; color: var(--accent); text-decoration: none; }
+select { background-color: var(--bg); color: var(--text); }
+button, a, input, select, summary, label { touch-action: manipulation; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+td input[type="number"], .tuning input { font-variant-numeric: tabular-nums; }
+
+@media (max-width: 760px) {
+  main { padding: 10px; }
+  .panel { padding: 12px; border-radius: 8px; }
+  .sticky-bar { margin: 12px -12px -12px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }
+  h2 { font-size: 1.25rem; }
+
+  /* header: one compact row, nav scrolls sideways, email hidden */
+  header { gap: 8px 12px; padding: 8px 12px; flex-wrap: wrap; }
+  header > strong { font-size: 15px; }
+  header nav { order: 3; width: 100%; overflow-x: auto; gap: 4px; }
+  header nav a { padding: 10px 12px; border-radius: 6px; white-space: nowrap; }
+  header nav a.active { background: var(--bg); }
+  .who-email { display: none; }
+
+  /* 16px inputs (no zoom on focus) and 44px touch targets */
+  input, select, textarea { font-size: 16px; min-height: 44px; padding: 8px 10px; }
+  input[type="checkbox"] { min-height: 0; width: 24px; height: 24px; accent-color: var(--accent); }
+  button { min-height: 44px; padding: 8px 14px; }
+  button.danger { min-width: 44px; padding: 8px; }
+  button.link { min-height: 44px; min-width: 44px; font-size: 20px; }
+  button.tag { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+  .effect-builder summary { padding: 10px 0; }
+  label.inline { min-height: 44px; gap: 8px; }
+
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .style-row { grid-template-columns: 1fr; }
+  .tuning .grid { grid-template-columns: 1fr; }
+  .tuning-input input.num { width: 100px; flex: none; }
+  .tuning-head { justify-content: space-between; }
+
+  .filters input[type="search"] { width: 100%; }
+  .filters select { flex: 1 1 30%; min-width: 0; }
+  .filters .spacer { display: none; }
+  .filters button { flex: 1; }
+  .summary { gap: 6px 14px; font-size: 14px; }
+
+  /* tables → stacked cards; each cell names itself via data-label */
+  .table-scroll { overflow: visible; }
+  table.cards-mobile thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  table.cards-mobile, table.cards-mobile tbody { display: block; }
+  table.cards-mobile tr { display: grid; gap: 8px 10px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  table.cards-mobile tr.dirty { background: var(--dirty); border-color: var(--warn); }
+  table.cards-mobile td { display: flex; flex-direction: column; gap: 4px; padding: 0; border: 0; min-width: 0; }
+  table.cards-mobile td[data-label]::before { content: attr(data-label); font-size: 12px; color: var(--muted); }
+  table.cards-mobile td input.num, table.cards-mobile td input.short { width: 100%; }
+
+  /* deck card: name + delete on top, numbers in a 4-up grid, tags and effect full width */
+  table.deck td.c-effect, table.deck td.c-name, table.deck td.c-type select { min-width: 0; }
+  table.deck tr { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-areas:
+    "id    id     id    del"
+    "name  name   name  name"
+    "type  dmg    cost  copies"
+    "pick  tent   tct   style"
+    "src   src    src   src"
+    "tags  tags   tags  tags"
+    "effect effect effect effect"; }
+  table.deck .c-id { grid-area: id; justify-content: center; } table.deck .c-id::before { display: none; }
+  table.deck .c-id code { font-size: 15px; font-weight: 700; }
+  table.deck .c-del { grid-area: del; align-items: flex-end; }
+  table.deck .c-name { grid-area: name; } table.deck .c-name::before { display: none; }
+  table.deck .c-name input { font-weight: 600; }
+  table.deck .c-type { grid-area: type; } table.deck .c-dmg { grid-area: dmg; }
+  table.deck .c-cost { grid-area: cost; } table.deck .c-copies { grid-area: copies; }
+  table.deck .c-pick { grid-area: pick; } table.deck .c-tent { grid-area: tent; }
+  table.deck .c-tct { grid-area: tct; } table.deck .c-tct { justify-content: flex-start; }
+  table.deck .c-style { grid-area: style; } table.deck .c-src { grid-area: src; }
+  table.deck .c-tags { grid-area: tags; } table.deck .c-effect { grid-area: effect; }
+  table.deck .c-pick input, table.deck .c-tent input { margin: 10px 0; }
+  table.deck .c-effect textarea { min-height: 72px; field-sizing: content; }
+  .tags { min-width: 0; gap: 6px; }
+
+  /* champions list: whole row is a card with an Edit button */
+  table.champ-table tr { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-areas: "id name edit" "a b c"; align-items: center; }
+  table.champ-table .c-id { grid-area: id; } table.champ-table .c-name { grid-area: name; font-weight: 600; font-size: 16px; }
+  table.champ-table .c-edit { grid-area: edit; align-items: flex-end; }
+  table.champ-table a.button-link { padding: 10px 18px; }
+
+  /* config: key + delete header, value and description full width */
+  table.config-table tr { grid-template-columns: 1fr auto; }
+  table.config-table .c-key { justify-content: center; word-break: break-all; }
+  table.config-table .c-value, table.config-table .c-desc { grid-column: 1 / -1; }
+  table.config-table .c-value { grid-row: 2; } table.config-table .c-desc { grid-row: 3; }
+  table.config-table .c-del { grid-column: 2; grid-row: 1; }
+  .sticky-bar input { flex: 1 1 140px; width: auto; }
+
+  /* effect builder: each rule row stacks, selects fill the width */
+  .effect-builder { font-size: 14px; }
+  .effect-builder .rule { padding: 8px; }
+  .effect-builder .rule-row { gap: 8px; }
+  .effect-builder select { width: auto; max-width: 100%; flex: 1 1 140px; }
+  .effect-builder input.num { width: 72px; }
+  .effect-builder .rule-row > span.muted { flex-basis: 100%; }
+}
+@media (max-width: 760px) {
+  table.cards-mobile .effect-builder input.num { width: 88px; flex: none; }
+  .effect-builder .rule-row > span:first-child { flex-basis: 100%; font-weight: 600; margin-top: 4px; }
+  .filters button { flex: 1 1 40%; white-space: nowrap; }
+}
+.style-block + .style-block { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px; }
+@media (max-width: 760px) {
+  header > strong { flex: 1; min-width: 0; }
+  .who { font-size: 13px; } .who-role { display: none; }
+  .who button { min-height: 36px; padding: 4px 12px; }
+  .tuning .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tuning-input { flex-wrap: wrap; gap: 2px 6px; }
+  .tuning-input input.num { width: 100%; flex: 1 1 100%; }
+}
+@media (max-width: 760px) { .filters > span.muted { flex-basis: 100%; } }
