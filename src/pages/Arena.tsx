@@ -205,6 +205,14 @@ export function Arena(props: {
     const f = fighter(side)
     if (!f) return
     const d = facing(side)
+    const sprite = f.querySelector('.sprite')
+    if (sprite) {
+      // restart the attack strip even if the last one is still playing
+      f.classList.remove('casting')
+      void (f as HTMLElement).offsetWidth
+      f.classList.add('casting')
+      wait(800).then(() => f.classList.remove('casting'))
+    }
     const limb = f.querySelector(type === 'K' ? '.leg-f' : '.arm-f')
     const ang = type === 'K' ? -80 : type === 'P' ? -95 : -145
     anim(f, [{ transform: 'none' }, { transform: `translateX(${-8 * d}px) rotate(${-6 * d}deg)`, offset: 0.3 }, { transform: `translateX(${38 * d}px) rotate(${4 * d}deg)`, offset: 0.62 }, { transform: 'none' }], 520, { easing: 'cubic-bezier(.5,0,.3,1)' })
@@ -238,8 +246,8 @@ export function Arena(props: {
     const d = facing(side)
     const p = pos(f)
     for (let i = 0; i < 3; i++) {
-      const g = add(`<div class="ghostimg" style="left:${p.x}px;top:${p.y}px">${f.querySelector('svg')!.outerHTML}</div>`)
-      if (side === 'p1') (g.firstChild as SVGElement).style.transform = 'scaleX(-1)'
+      const g = add(`<div class="ghostimg" style="left:${p.x}px;top:${p.y}px">${f.querySelector('svg, .sprite')!.outerHTML}</div>`)
+      if (side === 'p1') (g.firstChild as HTMLElement).style.transform = 'scaleX(-1)'
       anim(g, [{ opacity: 0.5, transform: 'translate(-50%,-50%)' }, { opacity: 0, transform: `translate(calc(-50% + ${-30 * d * (i + 1)}px),-50%)` }], 600, { delay: i * 90 }).then(() => g.remove())
     }
     const aura = f.querySelector('.aura') as HTMLElement
@@ -556,11 +564,11 @@ export function Arena(props: {
               <ComboTracker game={game} side="p1" cards={view.p1.field.filter((v) => !v.gone).map((v) => v.card)} />
             </div>
             <div className="vs">
-              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId) }} />
+              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
               <TokenView side="p2" tok={tok} playing={playing} foe={foe} />
               <div className="verdict">{hits || tok.verdict}</div>
               <TokenView side="p1" tok={tok} playing={playing} locked={locked} foe={foe} />
-              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId) }} />
+              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
             </div>
           </div>
           <div className="side">
