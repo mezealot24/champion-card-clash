@@ -84,8 +84,8 @@ function ChampionForm(props: { champion: ChampionRow; styles: ChampionStyleRow[]
       <div className="grid">
         <label>Name<input value={champion.name} onChange={(e) => set('name', e.target.value)} /></label>
         <label>Archetype<input value={champion.archetype} onChange={(e) => set('archetype', e.target.value)} /></label>
-        <label>HP start<input type="number" min={1} value={champion.hp_start} onChange={(e) => set('hp_start', Number(e.target.value))} /></label>
-        <label>HP max<input type="number" min={1} value={champion.hp_max} onChange={(e) => set('hp_max', Number(e.target.value))} /></label>
+        <label>HP start<input type="number" inputMode="numeric" min={1} value={champion.hp_start} onChange={(e) => set('hp_start', Number(e.target.value))} /></label>
+        <label>HP max<input type="number" inputMode="numeric" min={1} value={champion.hp_max} onChange={(e) => set('hp_max', Number(e.target.value))} /></label>
       </div>
       <label>Identity<textarea rows={2} value={champion.identity} onChange={(e) => set('identity', e.target.value)} /></label>
       <label>Signature combo<textarea rows={2} value={champion.signature_combo} onChange={(e) => set('signature_combo', e.target.value)} /></label>
@@ -103,7 +103,7 @@ function ChampionForm(props: { champion: ChampionRow; styles: ChampionStyleRow[]
       {styles.map((s) => {
         const g = styleGroup(s.slot)
         return (
-          <div key={s.slot}>
+          <div key={s.slot} className="style-block">
             <div className="grid style-row">
               <label>Style {s.slot} name<input value={s.name} onChange={(e) => setStyle(s.slot, { name: e.target.value })} /></label>
               <label className="wide">Effect<textarea rows={3} value={s.effect} onChange={(e) => setStyle(s.slot, { effect: e.target.value })} /></label>
@@ -119,8 +119,10 @@ function ChampionForm(props: { champion: ChampionRow; styles: ChampionStyleRow[]
           </div>
         )
       })}
-      {invalid && <p className="error">{invalid}</p>}
-      <SaveButton onSave={save} disabled={!!invalid} />
+      <div className="sticky-bar">
+        <SaveButton onSave={save} disabled={!!invalid} label="Save champion" />
+        {invalid && <span className="error">{invalid}</span>}
+      </div>
     </div>
   )
 }
