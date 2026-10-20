@@ -99,3 +99,20 @@ describe('loadout', () => {
     expect(s.winner).toBeNull()
   })
 })
+
+describe('randomLoadout', () => {
+  it('rolls a legal full loadout for every Style', async () => {
+    const { randomLoadout } = await import('../index')
+    for (const style of Object.keys(TREES)) {
+      const champ = style.split(':')[0]
+      for (let i = 0; i < 30; i++) {
+        const l = randomLoadout(champ, style, 5)
+        expect(OATHS[champ].some((o) => o.id === l.oath)).toBe(true)
+        expect(MINORS.some((m) => m.id === l.minor)).toBe(true)
+        expect(l.asc).toHaveLength(5)
+        expect(validAsc(l.asc!, 5)).toBe(true)
+      }
+    }
+    expect(randomLoadout('TK', undefined, 5).asc).toEqual([])
+  })
+})
