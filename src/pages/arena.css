@@ -194,3 +194,4 @@
 .arena .banner { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 20; max-width: 70%; padding: 8px 16px; border-radius: 14px; background: rgba(12,7,24,.82); border: 2px solid var(--gold); color: #fff; font: 800 15px var(--body); text-align: center; pointer-events: none; }
 .arena .banner.fades { animation: banner-out 4s forwards; }
 @keyframes banner-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+.arena .slot.closed { border-style: solid; border-color: rgba(255,122,107,.45); color: rgba(255,122,107,.7); background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,122,107,.12) 6px 12px); }

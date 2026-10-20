@@ -2,7 +2,7 @@
 // รวมกันเป็น effect ใน registry.ts เช่น when(enemyHandAtLeast(2), heal('self', 10))
 import { addRes, resourceOf } from '../resources'
 import { tuningOf } from '../tuning'
-import { drawCards, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
+import { drawCards, handMaxOf, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
 import { addChill, addIgnite, chillStacks, getStyle, igniteBurn, igniteStacks } from '../styles'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond, HitIn } from './types'
@@ -183,7 +183,7 @@ export const steal: Act = (ctx) => {
   const foe = ctx.state.players[ctx.enemy]
   const me = ctx.state.players[ctx.self]
   const taken = foe.hand[ctx.slot]
-  if (!taken || me.hand.length >= ctx.state.rules.handMax) return
+  if (!taken || me.hand.length >= handMaxOf(ctx.state, ctx.self)) return
   foe.hand.splice(ctx.slot, 1)
   taken.owner = taken.owner === ctx.self ? undefined : (taken.owner ?? ctx.enemy)
   me.hand.push(taken)
@@ -252,7 +252,7 @@ export const consumeIgnite =
       const p = ctx.state.players[s]
       const st = p.statuses.find((x) => x.kind === 'ignite')
       if (!st) continue
-      const dmg = burn ? igniteBurn(p, tuningOf(ctx.state)) * st.turns : 0
+      const dmg = burn ? igniteBurn(p, tuningOf(ctx.state, s === 'p1' ? 'p2' : 'p1')) * st.turns : 0
       p.statuses = p.statuses.filter((x) => x !== st)
       if (!dmg) {
         log(ctx.state, `${ctx.card.def.id}: clears ${s}'s 🔥 Ignite`)
@@ -434,7 +434,7 @@ export const hasStatus = (who: 'self' | 'enemy', kind: StatusKind): Cond => (ctx
 /** you / the opponent have N+ of your class resource (Tank: HP) */
 export const resAtLeast = (who: 'self' | 'enemy', n: number): Cond => (ctx) => {
   const p = ctx.state.players[who === 'self' ? ctx.self : ctx.enemy]
-  return (resourceOf(p.championId, tuningOf(ctx.state))?.payWithHp ? p.hp : (p.res ?? 0)) >= n
+  return (resourceOf(p.championId, tuningOf(ctx.state, who === 'self' ? ctx.self : ctx.enemy))?.payWithHp ? p.hp : (p.res ?? 0)) >= n
 }
 
 /** Status kinds that carry a size n */

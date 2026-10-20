@@ -73,6 +73,16 @@ export type PlayerState = {
   discarded?: { card: CardInst; slot: number; reason: string }[]
   /** Field cards this side lost to Cut effects this turn (capped by CUT_CAP). */
   cutTaken?: number
+  /** Loadout pieces in play (engine/loadout.ts keys: "oath:TK:o1", "minor:m2", "asc:TK:1:A3"). They act like extra Styles. */
+  perks?: string[]
+  /** This player's own numbers when their loadout changes some (tuningOf(state, side)); none = the game's. */
+  tuning?: Tuning
+  /** Field size for this player when a loadout changes it (default: rules.handMax). */
+  fieldMax?: number
+  /** S card cost changes from the loadout: +pct % then +flat (Tank: HP). */
+  costMod?: { pct: number; flat: number }
+  /** Loadout bookkeeping (once-per-match pieces and the like). */
+  perkData?: Record<string, number>
 }
 
 export type RulesConfig = {

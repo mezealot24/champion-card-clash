@@ -38,7 +38,7 @@ const SPEEDS = [1, 1.5, 2]
 const BANNER_MS = 3200
 /** Banner text per signature combo (champion · pattern). */
 /** Juggernaut: Momentum stacks full (6) lights the fighter up. */
-const conqMax = (g: GameState, s: Side) => (g.players[s].comboData?.conqueror ?? 0) >= tuningOf(g)['BR:2'].conquerorMax
+const conqMax = (g: GameState, s: Side) => (g.players[s].comboData?.conqueror ?? 0) >= tuningOf(g, s)['BR:2'].conquerorMax
 const COMBO_TEXT: Record<string, [string, string]> = {
   'TK:P > K > P': ['SECOND HELPING', 'Heal 10% of your HP'],
   'AS:P > K > S': ['DEATH MARK', 'Every later Strike bursts +50%'],
@@ -528,9 +528,11 @@ export function Arena(props: {
             <section key={side} className={`field ${side === 'p1' ? 'me' : 'enemy'}`} aria-label={side === 'p1' ? 'Your Field' : `${foe} Field`}>
               {Array.from({ length: game.rules.handMax }, (_, i) => {
                 const vc = view[side].field[i]
+                // a slot the loadout closed (Deep Roots, Bloodlust)
+                const closed = i >= (game.players[side].fieldMax ?? game.rules.handMax)
                 return (
-                  <div className="slot" key={i}>
-                    {i + 1}
+                  <div className={`slot${closed ? ' closed' : ''}`} key={i} title={closed ? 'Closed by a Sigil' : undefined}>
+                    {closed ? '✕' : i + 1}
                     {vc && (
                       <CardView
                         key={vc.card.uid}
@@ -737,7 +739,7 @@ const RESOURCE_TIP: Record<string, string> = {
 function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: GameState; side: Side; hp: number; name: string; style: string; styleText?: string; foe: string; onTip: (t: Tip) => void }) {
   const p = game.players[side]
   const pct = Math.max(0, Math.min(100, (hp / p.maxHp) * 100))
-  const res = game.rules.resources ? resourceOf(p.championId, game.tuning) : undefined
+  const res = game.rules.resources ? resourceOf(p.championId, tuningOf(game, side)) : undefined
   // chips and badges sit on the stage, whose click skips playback, so taps stop there
   const tap = (t: Tip) => (e: React.MouseEvent) => (e.stopPropagation(), onTip(t))
   const resTip = res && { title: res.payWithHp ? 'Pays with HP' : `${res.name} ${p.res ?? 0}/${res.cap}`, body: RESOURCE_TIP[p.championId] ?? res.name }
@@ -757,7 +759,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
     </button>
   )
   const frozen = p.statuses.some((x) => x.kind === 'frozen')
-  const conqMaxN = tuningOf(game)['BR:2'].conquerorMax
+  const conqMaxN = tuningOf(game, side)['BR:2'].conquerorMax
   const chips: Chip[] = [
     // frozen is only a marker for cards (the No Strike chip shows the freeze); Frozen Tomb's chip stands for its No Strike / No Charge
     ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) => statusChip(s, frozen)),
@@ -857,8 +859,8 @@ function cardRule(rule: string): { timing: string; cond: string; act: string } {
 function cardFacts(game: GameState, side: Side, card: CardInst) {
   const p = game.players[side]
   const { id, type, dmg, effectText, effectSpec } = card.def
-  const res = game.rules.resources ? resourceOf(p.championId, game.tuning) : undefined
-  const cost = res ? costOf(p.championId, card, game.tuning) : 0
+  const res = game.rules.resources ? resourceOf(p.championId, tuningOf(game, side)) : undefined
+  const cost = res ? costOf(p.championId, card, tuningOf(game, side), p.costMod) : 0
   const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (p.res ?? 0) ? res.unpaidDmgPct : undefined
   const grow = (card.grow ?? 0) + (card.growNext ?? 0)
   const base = short != null ? Math.floor((dmg * short) / 100) : dmg

@@ -3,7 +3,8 @@
 import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, TurnEvent } from './types'
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
-import { getStyle, healAfterIgnite } from './styles'
+import { healAfterIgnite, hooksOf } from './styles'
+import { applyLoadout, type Loadout } from './loadout'
 import { resourceOf } from './resources'
 import { resolveTuning, tuningOf, type Tuning, type TuningOverrides } from './tuning'
 
@@ -30,6 +31,7 @@ export type ChampionSetup = {
   hpMax: number
   deck: CardDef[] // already expanded by copies (see buildDeck)
   style?: string // "CHAMP:slot", see engine/styles.ts
+  loadout?: Loadout // Sigils + Ascendancy nodes, see engine/loadout.ts
 }
 
 export function createGame(
@@ -51,10 +53,11 @@ export function createGame(
   }
   for (const side of ['p1', 'p2'] as const) {
     const p = state.players[side]
-    const style = getStyle(p.style)
-    style?.setup?.(p, tuning)
+    applyLoadout(p, (side === 'p1' ? p1 : p2).loadout, tuning)
+    const t = tuningOf(state, side)
+    for (const h of hooksOf(p)) h.setup?.(p, t)
     p.deck = shuffle(state, p.deck) // shuffle once; afterwards order is learnable
-    drawCards(state, side, state.rules.startHand + (style?.startDraw?.(tuning) ?? 0))
+    drawCards(state, side, state.rules.startHand + hooksOf(p).reduce((n, h) => n + (h.startDraw?.(t) ?? 0), 0))
   }
   return state
 }
@@ -97,7 +100,8 @@ export function effectOf(state: GameState, side: Side, card: CardInst) {
 export function drawCards(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   let drawn = 0
-  for (let i = 0; i < n && p.hand.length < state.rules.handMax && p.deck.length > 0; i++) {
+  const max = handMaxOf(state, side)
+  for (let i = 0; i < n && p.hand.length < max && p.deck.length > 0; i++) {
     const card = p.deck.shift()!
     p.hand.push(card)
     card.enteredWith = p.hand.length
@@ -116,6 +120,9 @@ export function drawCards(state: GameState, side: Side, n: number): number {
   return drawn
 }
 
+/** How many cards this side's Field holds (a loadout can close slots). */
+export const handMaxOf = (state: GameState, side: Side) => Math.min(state.rules.handMax, state.players[side].fieldMax ?? state.rules.handMax)
+
 /** Used / lost cards go to the bottom of the deck (deck never runs out). */
 /** A stolen card goes back under its owner's deck. */
 export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
@@ -131,7 +138,7 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
 export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   if (p.hp <= 0) return 0
-  n = healAfterIgnite(p, n, tuningOf(state))
+  n = healAfterIgnite(p, n, tuningOf(state, side === 'p1' ? 'p2' : 'p1'))
   const before = p.hp
   p.hp = Math.min(p.maxHp, p.hp + n)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
@@ -143,7 +150,7 @@ export function loseHp(state: GameState, side: Side, n: number, from: 'hit' | 'f
   const p = state.players[side]
   const before = p.hp
   p.hp = Math.max(0, p.hp - n)
-  if (p.hp < before) getStyle(p.style)?.onHpLoss?.(state, side)
+  if (p.hp < before) for (const h of hooksOf(p)) h.onHpLoss?.(state, side)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
   if (from === 'hit' || p.hp >= before) return
   p.otherDmg ??= { foe: 0, self: 0 }

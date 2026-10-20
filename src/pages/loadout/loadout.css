@@ -1,0 +1,33 @@
+/* Loadout screen. Sits inside .select (same night palette, --tint = the Champion's colour). */
+.lo { padding-bottom: 0; --buff: #5fd38d; --pen: #ff7a6b; }
+.lo-head { background: none; border: 0; padding: 0; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+.lo-beta { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--s-gold); }
+.lo-note { margin: 0; font-size: 13px; color: var(--s-muted); }
+
+.lo-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+.lo-opt { display: flex; flex-direction: column; gap: 6px; text-align: left; background: var(--s-panel-2); color: var(--s-text); border: 2px solid transparent; border-radius: 12px; padding: 10px 12px; }
+.lo-opt.on { border-color: var(--tint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 25%, transparent); }
+.lo-opt b { font-size: 15px; font-weight: 800; }
+.lo-line { display: flex; gap: 6px; font-size: 13px; line-height: 1.4; }
+.lo-line i { flex: none; font-style: normal; font-size: 10px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; height: fit-content; margin-top: 1px; }
+.lo-line.up i { background: color-mix(in srgb, var(--buff) 22%, transparent); color: var(--buff); }
+.lo-line.down i { background: color-mix(in srgb, var(--pen) 22%, transparent); color: var(--pen); }
+
+.lo-tree { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.lo-branch { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.lo-branch h3 { margin: 0; text-align: center; font: 800 12px/1.2 'Nunito', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--s-muted); }
+.lo-node { display: flex; flex-direction: column; gap: 2px; text-align: left; background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--s-line); border-radius: 12px; padding: 8px 10px; }
+.lo-node b { display: flex; justify-content: space-between; gap: 6px; font-size: 14px; font-weight: 800; }
+.lo-node b i { font-style: normal; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--s-muted); }
+.lo-node span { font-size: 12.5px; line-height: 1.35; color: var(--s-muted); overflow-wrap: anywhere; }
+.lo-node.avail { border-color: var(--tint); }
+.lo-node.taken { border-color: var(--tint); background: color-mix(in srgb, var(--tint) 22%, var(--s-panel-2)); }
+.lo-node.taken span { color: var(--s-text); }
+.lo-node.locked { opacity: .45; }
+.lo-node.cap { border-radius: 4px 16px 4px 16px; }
+
+.lo-ghost { align-self: flex-start; background: none; border: 2px solid var(--s-line); color: var(--s-text); border-radius: 12px; padding: 8px 12px; font-weight: 800; }
+.lo-ghost:disabled { opacity: .4; cursor: default; }
+.lo-foot { position: sticky; bottom: 0; background: var(--s-bg); border-top: 1px solid var(--s-line); margin: 0 -16px; padding: 10px 16px 14px; }
+.lo-foot > div { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.lo-foot .start { flex: 1 1 160px; font-size: 20px; padding: 8px; }

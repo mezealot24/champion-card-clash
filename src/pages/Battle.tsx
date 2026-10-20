@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildDeck, createGame, fillText, isEffectMissing, legalActions, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, tuningFromRows, type Action, type CardRowLike, type GameState, type Side } from '../engine'
+import { buildDeck, createGame, fillText, isEffectMissing, legalActions, MINORS, OATHS, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
 import { DeckBuilder } from './deck/DeckBuilder'
 import { deckRows, deckRulesFromConfig, loadDeck } from './deck/deck'
+import { LoadoutBuilder } from './loadout/LoadoutBuilder'
+import { ascPointsFromConfig, loadoutFor } from './loadout/loadout'
 import { Online } from './Online'
 import { ChampionSelect, type FoeKind } from './select/ChampionSelect'
 import { CHAMP_INFO } from './select/info'
@@ -47,6 +49,7 @@ export function Battle({ data }: { data: BattleData }) {
   const [history, setHistory] = useState<{ mine: Action; theirs: Action }[]>([])
   const [tutorial, setTutorial] = useState(false)
   const [deckEdit, setDeckEdit] = useState(false)
+  const [loadoutEdit, setLoadoutEdit] = useState(false)
   // new match = new id, so the turn timer restarts even when the turn number repeats
   const [match, setMatch] = useState(0)
   const [settings] = useGameSettings()
@@ -58,7 +61,8 @@ export function Battle({ data }: { data: BattleData }) {
   }, [])
 
   // Champion / Style numbers and rules from the DB (Admin), filled in with the engine's defaults by createGame
-  const gameOpts = useMemo(() => ({ tuning: tuningFromRows(data.champions, data.styles), rules: rulesFromConfig(data.config) }), [data])
+  const gameOpts = useMemo(() => ({ tuning: tuningFromRows(data.champions, data.styles, data.config), rules: rulesFromConfig(data.config) }), [data])
+  const ascPoints = useMemo(() => ascPointsFromConfig(data.config), [data])
   const deckOf = (id: string) => buildDeck(data.cards.filter((c) => c.champion_id === id))
   const deckRules = useMemo(() => deckRulesFromConfig(data.config), [data])
   // the player's own deck (deck builder) when it is still legal for this Style; the AI and online seats use Admin's deck
@@ -92,7 +96,7 @@ export function Battle({ data }: { data: BattleData }) {
     setHistory([])
     setMatch((m) => m + 1)
     const myStyle = styleKey('p1') || undefined
-    setGame(createGame({ ...setup(picks.p1), deck: buildDeck(myDeck(picks.p1, myStyle).rows), style: myStyle }, { ...setup(picks.p2), style: styleKey('p2') || undefined }, gameOpts))
+    setGame(createGame({ ...setup(picks.p1), deck: buildDeck(myDeck(picks.p1, myStyle).rows), style: myStyle, loadout: loadoutFor(picks.p1, myStyle, ascPoints) }, { ...setup(picks.p2), style: styleKey('p2') || undefined }, gameOpts))
   }
 
   async function play(action: Action) {
@@ -144,6 +148,21 @@ export function Battle({ data }: { data: BattleData }) {
     )
   }
 
+  if (loadoutEdit) {
+    const style = styleKey('p1') || undefined
+    return (
+      <LoadoutBuilder
+        champ={picks.p1}
+        champName={champTitle(picks.p1)}
+        style={style}
+        styleName={style ? STYLES[style]?.name : undefined}
+        points={ascPoints}
+        fill={fill}
+        onClose={() => setLoadoutEdit(false)}
+      />
+    )
+  }
+
   if (deckEdit) {
     const style = styleKey('p1') || undefined
     return (
@@ -181,6 +200,8 @@ export function Battle({ data }: { data: BattleData }) {
         deckCustom={(id) => myDeck(id, styleKey('p1') || undefined).custom}
         deckSaved={(id) => !!loadDeck(id)}
         onEditDeck={() => setDeckEdit(true)}
+        loadout={loadoutLines(picks.p1, styleKey('p1') || undefined, loadoutFor(picks.p1, styleKey('p1') || undefined, ascPoints))}
+        onEditLoadout={() => setLoadoutEdit(true)}
         missing={missingOf}
         onStart={start}
         onTutorial={() => setTutorial(true)}
@@ -195,6 +216,7 @@ export function Battle({ data }: { data: BattleData }) {
   }
 
   const legal = legalActions(game, 'p1')
+  const myLoadout = loadoutFor(game.players.p1.championId, game.players.p1.style, ascPoints)
   return (
     <>
       <TurnTimer
@@ -208,7 +230,10 @@ export function Battle({ data }: { data: BattleData }) {
         turn={turn}
         names={{ p1: champName('p1'), p2: champName('p2') }}
         styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
-        styleTexts={{ p1: styleText[game.players.p1.style ?? ''] ?? '', p2: styleText[game.players.p2.style ?? ''] ?? '' }}
+        styleTexts={{
+          p1: [styleText[game.players.p1.style ?? ''] ?? '', ...loadoutLines(game.players.p1.championId, game.players.p1.style, myLoadout).map((l) => `${l.label}: ${l.value}.`)].filter(Boolean).join(' '),
+          p2: styleText[game.players.p2.style ?? ''] ?? '',
+        }}
         settingsExtra={<TimerSetting />}
         onAction={play}
         foe={foe === 'tuktah' ? 'Tuktah' : 'AI'}
@@ -227,4 +252,20 @@ export function Battle({ data }: { data: BattleData }) {
       />
     </>
   )
+}
+
+/** The loadout as short lines for the Champion screen and the in-match Style sheet. */
+function loadoutLines(champ: string, style: string | undefined, l: Loadout | undefined): { label: string; value: string }[] {
+  if (!l) return []
+  const out: { label: string; value: string }[] = []
+  const oath = OATHS[champ]?.find((o) => o.id === l.oath)
+  if (oath) out.push({ label: 'Oath', value: oath.name })
+  const minor = MINORS.find((m) => m.id === l.minor)
+  if (minor) out.push({ label: 'Minor', value: minor.name })
+  if (l.asc?.length) {
+    const tree = style ? TREES[style] : undefined
+    const names = l.asc.map((id) => tree?.nodes.find((n) => n.id === id)?.name ?? id)
+    out.push({ label: 'Ascendancy', value: names.join(', ') })
+  }
+  return out
 }

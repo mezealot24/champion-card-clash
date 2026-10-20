@@ -24,7 +24,8 @@ export const chillCut = (p: PlayerState, t: Tuning) => chillStacks(p) * t['MG:2'
 /** Add n Chill stacks to a side and reset its timer. Reaching chillMax freezes it and Shatter takes shatterPct of its Max HP. Returns the stacks it has now (0 after a freeze). */
 export function addChill(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
-  const t = tuningOf(state)['MG:2']
+  // the numbers of whoever applies it (the other side)
+  const t = tuningOf(state, other(side))['MG:2']
   const cur = p.statuses.find((s) => s.kind === 'chill')
   if (!cur && n <= 0) return 0
   const stacks = Math.min(t.chillMax, (cur?.n ?? 0) + n)
@@ -32,7 +33,7 @@ export function addChill(state: GameState, side: Side, n: number): number {
   if (stacks >= t.chillMax) {
     const lost = Math.floor((p.maxHp * t.shatterPct) / 100)
     p.hp = Math.max(0, p.hp - lost)
-    STYLES[p.style ?? '']?.onHpLoss?.(state, side)
+    for (const h of hooksOf(p)) h.onHpLoss?.(state, side)
     freeze(state, side, `${t.chillMax} Chill, Shatter takes ${lost} HP`)
     return 0
   }
@@ -53,7 +54,7 @@ export const healAfterIgnite = (p: PlayerState, n: number, t: Tuning) =>
 /** Add n Ignite stacks to a side (capped) and reset its timer. Returns the stacks it has now. */
 export function addIgnite(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
-  const t = tuningOf(state)['MG:1']
+  const t = tuningOf(state, other(side))['MG:1']
   const cur = p.statuses.find((s) => s.kind === 'ignite')
   // n = 0 only refreshes the timer of a burn that's already on (Sear Flesh)
   if (!cur && n <= 0) return 0
@@ -96,7 +97,7 @@ export type StyleDef = {
    * bonus = dmg added per slot of this side's chain, mult = dmg multiplier per slot (applied after bonus),
    * crit = add a slot index to show that hit as Critical in the log
    */
-  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[]) => void
+  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[], pierce?: number[]) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
   /** Strike chains only: right after Before action combos, before Momentum and any hit (e.g. Juggernaut stacks) */
@@ -110,21 +111,42 @@ export type StyleDef = {
   /** right after actions are revealed, before statuses are read or tick (e.g. Molten Shield on Block) */
   actionStart?: (state: GameState, side: Side, action: Action) => void
   /** last thing in the turn, before the winner check (action = what this side played) */
-  endTurn?: (state: GameState, side: Side, action: Action) => void
+  endTurn?: (state: GameState, side: Side, action: Action, enemyAction?: Action) => void
   /** right after this side lost HP from anything (hits, effects, burns); may change p.hp (e.g. Frozen Tomb keeps 1 HP) */
   onHpLoss?: (state: GameState, side: Side) => void
   /** ⟡ Infuse: give targetSide n stacks of this Style's element (Pyromancer Ignite, Cryomancer Chill). Returns the stacks it has now. */
   infuse?: (state: GameState, targetSide: Side, n: number) => number
+  // ---- used by loadout pieces (engine/loadout.ts), which share this shape ----
+  /** extra hits this side's Block stops this turn (negative = fewer) */
+  blockBonus?: (state: GameState, side: Side) => number
+  /** Omnivamp % this side gets on top of others */
+  lifesteal?: (state: GameState, side: Side) => number
+  /** dmg taken off every hit that gets past this side's Block */
+  hitCut?: (state: GameState, side: Side) => number
+  /** extra cards a Charge that isn't broken draws, decided per turn */
+  extraChargeDraw?: (state: GameState, side: Side) => number
+}
+
+/** A Style or loadout piece that acts in the game: same hooks. Loadout pieces register here (engine/loadout.ts). */
+export const PERK_HOOKS: Record<string, StyleDef> = {}
+
+/** Everything that hooks into a side's turn: its Style, then its loadout pieces in order. */
+export function hooksOf(p: PlayerState): StyleDef[] {
+  const out: StyleDef[] = []
+  const style = p.style ? STYLES[p.style] : undefined
+  if (style) out.push(style)
+  for (const k of p.perks ?? []) if (PERK_HOOKS[k]) out.push(PERK_HOOKS[k])
+  return out
 }
 
 const say = (state: GameState, side: Side, line: string) => state.log.push(`T${state.turn} ${side} ${line}`)
 const pctHp = (p: PlayerState) => (p.hp * 100) / p.maxHp
 /** state.heal without the state.ts import: Ignite cuts it, capped at Max HP, nothing for a side at 0 HP. Returns HP gained. */
-const heal = (state: GameState, side: Side, n: number) => {
+export const styleHeal = (state: GameState, side: Side, n: number) => {
   const p = state.players[side]
   if (p.hp <= 0) return 0
   const before = p.hp
-  p.hp = Math.min(p.maxHp, p.hp + healAfterIgnite(p, n, tuningOf(state)))
+  p.hp = Math.min(p.maxHp, p.hp + healAfterIgnite(p, n, tuningOf(state, other(side))))
   if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
   return p.hp - before
 }
@@ -133,7 +155,7 @@ const heal = (state: GameState, side: Side, n: number) => {
  * gives the enemy MG.infusePerS stacks of the Style's element (its infuse hook). Unpaid S cards give none.
  */
 function infuseChain(state: GameState, side: Side, r: ChainReport, element: string) {
-  const n = r.paidSkills * tuningOf(state).MG.infusePerS
+  const n = r.paidSkills * tuningOf(state, side).MG.infusePerS
   const infuse = STYLES[state.players[side].style ?? '']?.infuse
   if (n <= 0 || !infuse) return
   const k = infuse(state, other(side), n)
@@ -152,10 +174,9 @@ export const STYLES: Record<string, StyleDef> = {
     name: 'Lifeline',
     afterHits: (state, side, r) => {
       const p = state.players[side]
-      const t = tuningOf(state)
-      const f = t['TK:1']
+      const f = tuningOf(state, side)['TK:1']
       if (p.styleData?.spent || r.hitsTaken === 0 || p.hp <= 0 || pctHp(p) >= f.hpPct) return
-      const n = healAfterIgnite(p, Math.floor(((p.maxHp - p.hp) * f.healPctPerHit * r.hitsTaken) / 100), t)
+      const n = healAfterIgnite(p, Math.floor(((p.maxHp - p.hp) * f.healPctPerHit * r.hitsTaken) / 100), tuningOf(state, other(side)))
       const before = p.hp
       p.hp = Math.min(p.maxHp, p.hp + n)
       if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
@@ -165,7 +186,7 @@ export const STYLES: Record<string, StyleDef> = {
     endTurn: (state, side) => {
       const p = state.players[side]
       if (p.styleData?.spent) return
-      const line = tuningOf(state)['TK:1'].hpPct
+      const line = tuningOf(state, side)['TK:1'].hpPct
       if (pctHp(p) < line) p.styleData = { ...p.styleData, below: 1 }
       else if (p.styleData?.below) {
         p.styleData = { ...p.styleData, spent: 1 }
@@ -185,7 +206,7 @@ export const STYLES: Record<string, StyleDef> = {
     afterHits: (state, side, r) => {
       if (!r.attacked) return
       const p = state.players[side]
-      const f = tuningOf(state)['TK:2']
+      const f = tuningOf(state, side)['TK:2']
       const gain = Math.min(f.maxHpCap - p.maxHp, r.hitsTaken * f.perHitTaken + r.hitsBlocked * f.perHitBlocked + r.facing * f.perFacing)
       if (gain <= 0) return
       p.maxHp += gain
@@ -193,7 +214,7 @@ export const STYLES: Record<string, StyleDef> = {
       say(state, side, `Titan Bloom: Max HP +${gain} → ${p.maxHp}`)
     },
     beforeHits: (state, side, bonus) => {
-      const n = overgrowthDmg(state.players[side], tuningOf(state))
+      const n = overgrowthDmg(state.players[side], tuningOf(state, side))
       if (!n) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += n
       say(state, side, `Titan Bloom: all cards +${n} dmg`)
@@ -207,7 +228,7 @@ Object.assign(STYLES, {
   'BR:1': {
     name: 'Fury',
     beforeHits: (state, side, bonus) => {
-      const f = tuningOf(state)['BR:1']
+      const f = tuningOf(state, side)['BR:1']
       if (pctHp(state.players[side]) >= f.hpPct) return
       for (let i = 0; i < Math.min(f.slots, bonus.length); i++) bonus[i] += f.bonusDmg
       say(state, side, `Fury: slots 1–${f.slots} +${f.bonusDmg} dmg`)
@@ -223,7 +244,7 @@ Object.assign(STYLES, {
     name: 'Juggernaut',
     strikeStart: (state, side, chain) => {
       const p = state.players[side]
-      const f = tuningOf(state)['BR:2']
+      const f = tuningOf(state, side)['BR:2']
       const max = f.conquerorMax
       const was = p.comboData?.conqueror ?? 0
       const n = Math.min(max, was + chain.length)
@@ -237,13 +258,13 @@ Object.assign(STYLES, {
     },
     chargeBreakSafe: (state, side) => {
       const from = state.players[side].styleData?.tenacityFrom
-      return from != null && state.turn > from && state.turn <= from + tuningOf(state)['BR:2'].tenacityTurns ? 1 : 0
+      return from != null && state.turn > from && state.turn <= from + tuningOf(state, side)['BR:2'].tenacityTurns ? 1 : 0
     },
     endTurn: (state, side, action) => {
       const p = state.players[side]
       const n = p.comboData?.conqueror ?? 0
       if (action !== 'block' || !n) return
-      const f = tuningOf(state)['BR:2']
+      const f = tuningOf(state, side)['BR:2']
       const left = Math.max(0, n - f.blockLoss)
       p.comboData = { ...p.comboData, conqueror: left }
       say(state, side, `Juggernaut: Block, Momentum ${left}/${f.conquerorMax}`)
@@ -271,6 +292,7 @@ Object.assign(STYLES, {
       if (!add) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += add
       p.res = 0
+      p.styleData = { ...p.styleData, odTurn: state.turn } // for loadout pieces that react to an Overdrive
       say(state, side, `Sonic Bliz Overdrive: spends all ${energy} Energy → every chain card +${add} dmg`)
     },
     // Acceleration (Q 2026-10-16, replaces Extra Hits): Strike meets Strike → Energy full + draw 2 at the end of the turn
@@ -284,7 +306,7 @@ Object.assign(STYLES, {
     beforeHits: (state, side, _bonus, mult, crit) => {
       const p = state.players[side]
       const enemy = state.players[side === 'p1' ? 'p2' : 'p1']
-      const f = tuningOf(state)['AS:2']
+      const f = tuningOf(state, side)['AS:2']
       const x = enemy.hp * 100 < enemy.maxHp * f.redHpPct ? f.redCritMult : f.critMult
       const before = p.styleData?.attacks ?? 0
       mult.forEach((_, i) => {
@@ -317,7 +339,7 @@ Object.assign(STYLES, {
     actionStart: (state, side, action) => {
       const p = state.players[side]
       // Molten Shield v1 (Q asked it back 2026-10-17): Block spends up to 3 Mana, Shield 5 per Mana
-      const f = tuningOf(state)['MG:1']
+      const f = tuningOf(state, side)['MG:1']
       if (action !== 'block' || !state.rules.resources || (p.res ?? 0) <= 0 || f.moltenMaxMana <= 0) return
       const spent = Math.min(f.moltenMaxMana, p.res ?? 0)
       p.res = (p.res ?? 0) - spent
@@ -383,7 +405,7 @@ Object.assign(STYLES, {
         if (at === state.turn && p.hp <= 0) p.hp = 1
         return
       }
-      const f = tuningOf(state)['MG:2']
+      const f = tuningOf(state, side)['MG:2']
       if (p.hp > 0 && pctHp(p) >= f.tombHpPct) return
       const saved = p.hp <= 0
       if (saved) p.hp = 1
@@ -399,16 +421,16 @@ Object.assign(STYLES, {
       if (p.styleData?.subZero) p.styleData = { ...p.styleData, subZero: 0 }
       const at = p.styleData?.tombAt
       if (at === undefined || p.hp <= 0) return
-      const f = tuningOf(state)['MG:2']
+      const f = tuningOf(state, side)['MG:2']
       if (state.turn === at + 1) {
         const mana = state.rules.resources ? (p.res ?? 0) : 0
         if (state.rules.resources) p.res = 0
-        const got = heal(state, side, f.tombHeal + f.tombHealPerMana * mana)
+        const got = styleHeal(state, side, f.tombHeal + f.tombHealPerMana * mana)
         say(state, side, `🧊 Frozen Tomb: spends ${mana} Mana, heals ${got} HP`)
       } else if (state.turn === at + 2) {
         const left = p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
         p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
-        const got = heal(state, side, Math.floor((left * f.tombMeltPct) / 100))
+        const got = styleHeal(state, side, Math.floor((left * f.tombMeltPct) / 100))
         say(state, side, `🧊 Frozen Tomb melts: ${left} Shield left → heals ${got} HP`)
       }
     },
@@ -422,7 +444,7 @@ Object.assign(STYLES, {
 export function overdriveAdd(state: GameState, side: Side, chain: CardInst[] = state.players[side].hand): number {
   const p = state.players[side]
   if (p.style !== 'AS:1' || !state.rules.resources || (p.res ?? 0) <= 0) return 0
-  const f = tuningOf(state)['AS:1']
+  const f = tuningOf(state, side)['AS:1']
   if (chain.length < f.minChain || chain.some((c) => c.def.type === 'S')) return 0
   return (p.res ?? 0) * f.dmgPerEnergy
 }

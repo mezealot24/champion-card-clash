@@ -1,9 +1,9 @@
 // Number form for one tuning group (engine/tuning.ts): a Champion's class numbers or one Style's.
 // params keeps only the numbers that differ from the default, so an untouched field follows the code default.
-import { fillText, isTuningGroup, TUNING_FIELDS, unknownPlaceholders, type Tuning, type TuneField, type TuningGroup, type TuningParams as Params } from '../engine'
+import { fieldsOf, fillText, isTuningGroup, unknownPlaceholders, type Tuning, type TuneField, type TuningGroup, type TuningParams as Params } from '../engine'
 
 export function TuningFields({ group, params, onChange }: { group: TuningGroup; params: Params; onChange: (p: Params) => void }) {
-  const fields = TUNING_FIELDS[group] as readonly TuneField[]
+  const fields = fieldsOf(group)
   const changed = fields.filter((f) => params[f.key] !== undefined && params[f.key] !== f.def).length
 
   function set(f: TuneField, raw: string) {
@@ -62,7 +62,7 @@ export function TuningFields({ group, params, onChange }: { group: TuningGroup; 
 
 /** Under a Style / combo text box: the text as players see it (placeholders filled) and the placeholders it can use. */
 export function TextPreview({ text, group, tuning, extra }: { text: string; group: string; tuning: Tuning; extra: Record<string, number> }) {
-  const fields = isTuningGroup(group) ? (TUNING_FIELDS[group] as readonly TuneField[]) : []
+  const fields = isTuningGroup(group) ? fieldsOf(group) : []
   const bad = unknownPlaceholders(text, group, Object.keys(extra))
   const filled = fillText(text, group, tuning, extra)
   return (

@@ -2,6 +2,7 @@
 import { legalActions, resolveTurn } from './engine'
 import { COMBOS } from './combos'
 import { overdriveAdd } from './styles'
+import { handMaxOf } from './state'
 import type { Action, CardType, GameState, Side, StatusKind } from './types'
 import { other } from './types'
 
@@ -12,9 +13,9 @@ export function pickAiAction(state: GameState, side: Side, rand: () => number = 
 
   if (me.hand.length === 0) weights.strike = 0
   if (foe.hand.length === 0) weights.charge += 4 // foe cannot hurt us this turn
-  if (foe.hand.length >= state.rules.handMax) weights.block += 3 // big chain incoming
-  if (me.hand.length >= state.rules.handMax) weights.strike += 3 // full hand, Charge is wasted
-  if (me.hand.length >= state.rules.handMax) weights.charge = 0
+  if (foe.hand.length >= handMaxOf(state, other(side))) weights.block += 3 // big chain incoming
+  if (me.hand.length >= handMaxOf(state, side)) weights.strike += 3 // full hand, Charge is wasted
+  if (me.hand.length >= handMaxOf(state, side)) weights.charge = 0
 
   const legal = legalActions(state, side)
   const options = legal.map((a) => [a, weights[a]] as const).filter(([, w]) => w > 0)
@@ -78,7 +79,7 @@ export function comboPotential(state: GameState, side: Side): number {
   const p = state.players[side]
   const combos = COMBOS[p.championId] ?? []
   if (!combos.length) return 0
-  const free = state.rules.handMax - p.hand.length
+  const free = handMaxOf(state, side) - p.hand.length
   const deckShare = (t: CardType) => (p.deck.length ? p.deck.filter((c) => c.def.type === t).length / p.deck.length : 0)
   let total = 0
   for (const combo of combos) {
@@ -104,7 +105,7 @@ function score(state: GameState, side: Side, w: AiWeights): number {
     const victim = state.players[other(s)]
     const shield = p.statuses.reduce((t, x) => t + (x.kind === 'shield' ? (x.n ?? 0) : 0), 0)
     const hp = (100 * (p.hp + shield)) / Math.max(1, p.maxHp)
-    const full = p.hand.length >= state.rules.handMax ? w.fullField : 1
+    const full = p.hand.length >= handMaxOf(state, s) ? w.fullField : 1
     // cards on the Field are loaded dmg: worth a share of their dmg as % of the opponent's life bar
     // Sonic Bliz Overdrive: the Energy bar turns into +N dmg on every card of a no-S Field of 3+
     const loaded = p.hand.reduce((t, c) => t + c.def.dmg, 0) + overdriveAdd(state, s) * p.hand.length
@@ -150,7 +151,7 @@ function solve(m: number[][], iters = 300): { mix: number[]; value: number } {
 /** The AI's own choices: with a full Field it only Strikes or Blocks (Q 2026-10-17), Charge would draw nothing. */
 export function aiActions(state: GameState, side: Side): Action[] {
   const legal = legalActions(state, side)
-  if (state.players[side].hand.length < state.rules.handMax) return legal
+  if (state.players[side].hand.length < handMaxOf(state, side)) return legal
   const noCharge = legal.filter((a) => a !== 'charge')
   return noCharge.length ? noCharge : legal
 }
