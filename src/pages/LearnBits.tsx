@@ -14,7 +14,7 @@ import './learnbits.css'
 export function ComboTracker({ game, side, cards }: { game: GameState; side: Side; cards: CardInst[] }) {
   const [open, setOpen] = useState(false)
   const p = game.players[side]
-  const combos = comboInfo(p.championId, p.style, tuningOf(game))
+  const combos = comboInfo(p.championId, p.style, tuningOf(game, side))
   if (!combos.length) return null
   const types = cards.map((c) => c.def.type)
   return (

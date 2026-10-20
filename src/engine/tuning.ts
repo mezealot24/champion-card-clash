@@ -3,6 +3,9 @@
 // champions.params (group "TK", "BR", …: class resource + signature combo) and
 // champion_styles.params (group "TK:1", "MG:2", …). DB wins; a key missing there falls back to these defaults.
 // The engine reads them from GameState.tuning (createGame opts.tuning), so a game keeps the numbers it started with.
+// Loadout numbers (Sigils, Ascendancy nodes; engine/loadoutData.ts) join the same groups, plus group MINOR from game_config.
+// A player with a loadout gets their own copy (PlayerState.tuning, see tuningOf(state, side)).
+import { LOADOUT_FIELDS, MINORS, minorConfigKey } from './loadoutData'
 
 export type TuneField = {
   key: string
@@ -116,15 +119,21 @@ export const TUNING_FIELDS = {
 } as const satisfies Record<string, readonly TuneField[]>
 
 type Fields = typeof TUNING_FIELDS
-export type TuningGroup = keyof Fields
-/** Fully resolved numbers: every group, every key. */
-export type Tuning = { [G in TuningGroup]: { [F in Fields[G][number] as F['key']]: number } }
+export type TuningGroup = keyof Fields | 'MINOR'
+/** Fully resolved numbers: every group, every key (loadout numbers are read by name, so any group is a number map too). */
+export type Tuning = { [G in keyof Fields]: { [F in Fields[G][number] as F['key']]: number } } & Record<string, Record<string, number>>
 /** What the DB holds: any subset. */
 export type TuningOverrides = Partial<Record<string, Record<string, unknown>>>
 
-export const TUNING_GROUPS = Object.keys(TUNING_FIELDS) as TuningGroup[]
+export const TUNING_GROUPS = [...Object.keys(TUNING_FIELDS), 'MINOR'] as TuningGroup[]
 
-export const isTuningGroup = (g: string): g is TuningGroup => g in TUNING_FIELDS
+export const isTuningGroup = (g: string): g is TuningGroup => g in TUNING_FIELDS || g === 'MINOR'
+
+/** A group's fields: its own numbers, then its loadout numbers (Oaths, Ascendancy nodes, Minors). */
+export const fieldsOf = (group: TuningGroup): readonly TuneField[] => [
+  ...(((TUNING_FIELDS as Record<string, readonly TuneField[]>)[group] ?? []) as readonly TuneField[]),
+  ...(LOADOUT_FIELDS[group] ?? []),
+]
 
 /** Defaults filled in under any DB overrides. Unknown groups / keys and non-numbers are ignored. */
 export function resolveTuning(overrides: TuningOverrides = {}): Tuning {
@@ -132,7 +141,7 @@ export function resolveTuning(overrides: TuningOverrides = {}): Tuning {
   for (const g of TUNING_GROUPS) {
     const o = overrides[g] ?? {}
     out[g] = Object.fromEntries(
-      (TUNING_FIELDS[g] as readonly TuneField[]).map((f) => {
+      fieldsOf(g).map((f) => {
         const v = o[f.key]
         return [f.key, typeof v === 'number' && Number.isFinite(v) ? v : f.def]
       }),
@@ -147,15 +156,27 @@ export const DEFAULT_TUNING: Tuning = resolveTuning()
 export function tuningFromRows(
   champions: { id: string; params?: Record<string, unknown> | null }[] = [],
   styles: { champion_id: string; slot: number; params?: Record<string, unknown> | null }[] = [],
+  config: { key: string; value: unknown }[] = [],
 ): TuningOverrides {
   const out: TuningOverrides = {}
   for (const c of champions) if (c.params) out[c.id] = c.params
   for (const s of styles) if (s.params) out[`${s.champion_id}:${s.slot}`] = s.params
+  // Minor Sigil numbers: game_config minor_* keys (Admin → Config)
+  const minor: Record<string, unknown> = {}
+  for (const m of MINORS) for (const f of m.fields) {
+    const row = config.find((r) => r.key === minorConfigKey(f.key))
+    if (row) minor[f.key] = row.value
+  }
+  if (Object.keys(minor).length) out.MINOR = minor
   return out
 }
 
-/** The numbers a game runs on (older saved states and hand-made test states have none: defaults). */
-export const tuningOf = (state: { tuning?: Tuning }): Tuning => state.tuning ?? DEFAULT_TUNING
+/**
+ * The numbers a game runs on (older saved states and hand-made test states have none: defaults).
+ * With a side: that player's own numbers when their loadout changed some (Ascendancy, Oath), else the game's.
+ */
+export const tuningOf = (state: { tuning?: Tuning; players?: Record<string, { tuning?: Tuning }> }, side?: string): Tuning =>
+  (side ? state.players?.[side]?.tuning : undefined) ?? state.tuning ?? DEFAULT_TUNING
 
 /** game_config keys the engine reads (Admin → Config), mapped to RulesConfig. Other keys (deck_size, dmg_budget…) are for the editors. */
 export const RULE_KEYS = {
@@ -183,7 +204,7 @@ export type TuningParams = Record<string, number>
 
 /** Fields outside min..max, or not whole numbers where they must be. Empty = fine. */
 export function tuningErrors(group: TuningGroup, params: TuningParams): string[] {
-  return (TUNING_FIELDS[group] as readonly TuneField[]).flatMap((f) => {
+  return fieldsOf(group).flatMap((f) => {
     const v = params[f.key]
     if (v === undefined) return []
     if (!Number.isFinite(v)) return [`${f.label}: not a number`]
@@ -196,7 +217,7 @@ export function tuningErrors(group: TuningGroup, params: TuningParams): string[]
 
 /** What gets saved: only the numbers that differ from the defaults. */
 export function cleanParams(group: TuningGroup, params: TuningParams): TuningParams {
-  const defs = new Map((TUNING_FIELDS[group] as readonly TuneField[]).map((f) => [f.key, f.def]))
+  const defs = new Map(fieldsOf(group).map((f) => [f.key, f.def]))
   return Object.fromEntries(Object.entries(params).filter(([k, v]) => defs.has(k) && v !== defs.get(k)))
 }
 
@@ -205,7 +226,7 @@ export function cleanParams(group: TuningGroup, params: TuningParams): TuningPar
 // in the Cryomancer text), {GROUP.key} (any group, e.g. {MG.cap}) or {key|ord} for 1st / 2nd / 3rd / 4th.
 // Extra values (e.g. hpStart / hpMax of the Champion) can be passed in. Unknown placeholders stay as typed.
 
-const PLACEHOLDER = /\{(?:([A-Z]{2}(?::\d)?)\.)?([a-zA-Z]+)(\|ord)?\}/g
+const PLACEHOLDER = /\{(?:([A-Z]{2}(?::\d)?)\.)?([a-zA-Z][a-zA-Z0-9]*)(\|ord)?\}/g
 
 const fmt = (n: number) => String(Math.round(n * 100) / 100)
 const ord = (n: number) => {

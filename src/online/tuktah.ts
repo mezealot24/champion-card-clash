@@ -15,11 +15,11 @@ const RULES = `Champion Card Clash rules (short):
 - Charging with a full Field (5) draws nothing. Card effects and Styles below can change all of this.`
 
 function side(game: GameState, p: PlayerState, label: string, styleText: Record<string, string>) {
-  const res = resourceOf(p.championId, game.tuning)
+  const res = resourceOf(p.championId, p.tuning ?? tuningOf(game))
   const field = p.hand.map((c, i) => `  slot ${i + 1}: ${c.def.id} ${c.def.type} ${c.def.dmg} dmg${c.grow ? ` (+${c.grow})` : ''}${c.def.effectText ? ` | ${c.def.effectText}` : ''}`)
   return [
     `${label}: ${p.championId}${p.style ? ` · Style ${STYLES[p.style]?.name ?? p.style}: ${styleText[p.style] ?? ''}` : ''}`,
-    `  HP ${p.hp}/${p.maxHp}${res && !res.payWithHp ? ` · ${res.name} ${p.res ?? 0}/${res.cap}` : ''}${p.statuses.length ? ` · statuses: ${p.statuses.map((s) => `${s.kind}${s.n != null ? ` ${s.n}` : ''} (${s.turns}t)`).join(', ')}` : ''}${p.comboData?.conqueror ? ` · Momentum ${p.comboData.conqueror}/${tuningOf(game)['BR:2'].conquerorMax}` : ''}`,
+    `  HP ${p.hp}/${p.maxHp}${res && !res.payWithHp ? ` · ${res.name} ${p.res ?? 0}/${res.cap}` : ''}${p.statuses.length ? ` · statuses: ${p.statuses.map((s) => `${s.kind}${s.n != null ? ` ${s.n}` : ''} (${s.turns}t)`).join(', ')}` : ''}${p.comboData?.conqueror ? ` · Momentum ${p.comboData.conqueror}/${(p.tuning ?? tuningOf(game))['BR:2'].conquerorMax}` : ''}`,
     `  Field (${p.hand.length}/5):`,
     ...(field.length ? field : ['  (empty)']),
   ].join('\n')

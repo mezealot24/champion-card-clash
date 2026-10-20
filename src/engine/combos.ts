@@ -44,7 +44,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
       ok: (h) => h.some((x) => x.blocked),
       fire: (state, side) => {
         const p = state.players[side]
-        const pct = tuningOf(state).TK.comboHealPct
+        const pct = tuningOf(state, side).TK.comboHealPct
         const n = Math.floor((p.hp * pct) / 100)
         if (p.hp <= 0 || n <= 0) return // a side at 0 HP stays down
         const before = p.hp
@@ -82,7 +82,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
       pattern: ['S', 'S', 'S'],
       ok: allClean,
       fire: (state, side) => {
-        const turns = tuningOf(state).MG.comboNoBlockTurns
+        const turns = tuningOf(state, side).MG.comboNoBlockTurns
         if (turns > 0) state.players[foe(side)].statuses.push({ kind: 'noBlock', turns })
         if (state.players[side].style === 'MG:2') {
           say(state, side, 'Combo Absolute Zero: enemy can\'t Block next turn')
@@ -102,7 +102,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
       pattern: ['S', 'P', 'P'],
       fire: (state, side) => {
         const p = state.players[side]
-        const turns = tuningOf(state).BR.guardCrushTurns
+        const turns = tuningOf(state, side).BR.guardCrushTurns
         p.statuses = [...p.statuses.filter((s) => s.kind !== 'guardBreak'), { kind: 'guardBreak', turns }]
         say(state, side, `Combo S > P > P: Guard Crush (for your next Strike within ${turns} turns)`)
       },
@@ -156,7 +156,7 @@ export function applyConqueror(
 ) {
   const n = conquerorOf(state, side)
   if (!n) return
-  const f = tuningOf(state)['BR:2']
+  const f = tuningOf(state, side)['BR:2']
   if (bonus) for (let i = 0; i < bonus.length; i++) bonus[i] += n * f.dmgPerStack
   if (n >= f.conquerorMax && actions[side] === 'charge' && enemyMult && f.chargeBreakTakenPct) {
     for (let i = 0; i < enemyMult.length; i++) enemyMult[i] *= 1 + f.chargeBreakTakenPct / 100
@@ -166,6 +166,6 @@ export function applyConqueror(
 
 /** Lifesteal: % of each hit's dmg healed back (0 when not at max Momentum). */
 export const lifestealPct = (state: GameState, side: Side) => {
-  const f = tuningOf(state)['BR:2']
+  const f = tuningOf(state, side)['BR:2']
   return conquerorOf(state, side) >= f.conquerorMax ? f.omnivampPct : 0
 }

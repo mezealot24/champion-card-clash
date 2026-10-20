@@ -64,3 +64,7 @@
 @media (prefers-reduced-motion: reduce) { .champ { transition: none; } .champ:hover { transform: none; } }
 .about .deck-dd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .edit-deck { background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--tint); border-radius: 999px; padding: 3px 12px; font-size: 13px; font-weight: 800; }
+.locked-slots div.set { border-style: solid; border-color: var(--tint); }
+.locked-slots div.set b { opacity: 1; }
+.locked-slots div.set span { color: var(--s-text); }
+.loadout .edit-deck { align-self: flex-start; }

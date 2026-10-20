@@ -101,18 +101,19 @@ export const resourceOf = (championId: string, t?: Tuning): ResourceDef | undefi
   return r[championId]
 }
 
-/** What this card costs its current holder. P/K cost nothing unless cards.cost says so. */
-export function costOf(championId: string, card: CardInst, t?: Tuning): number {
+/** What this card costs its current holder. P/K cost nothing unless cards.cost says so. mod = the holder's loadout change to S costs. */
+export function costOf(championId: string, card: CardInst, t?: Tuning, mod?: { pct: number; flat: number }): number {
   const def = resourceOf(championId, t)
   if (!def) return 0
-  if (card.def.cost != null) return Math.max(0, card.def.cost)
-  return card.def.type === 'S' ? def.defaultCost : 0
+  const base = card.def.cost != null ? Math.max(0, card.def.cost) : card.def.type === 'S' ? def.defaultCost : 0
+  if (!mod || card.def.type !== 'S') return base
+  return Math.max(0, Math.round((base * (100 + mod.pct)) / 100) + mod.flat)
 }
 
 /** Add n to a side's bar, kept between 0 and its cap. No-op for Tank. */
 export function addRes(state: GameState, side: Side, n: number) {
   const p = state.players[side]
-  const def = resourceOf(p.championId, tuningOf(state))
+  const def = resourceOf(p.championId, tuningOf(state, side))
   if (!def || def.payWithHp) return
   p.res = Math.max(0, Math.min(def.cap, (p.res ?? 0) + n))
 }
@@ -120,11 +121,11 @@ export function addRes(state: GameState, side: Side, n: number) {
 /** Pay for every card in the chain, in order. Cards that can't be paid go into p.unpaid (only drawbacks fire this turn). */
 export function payChain(state: GameState, side: Side, chain: CardInst[]) {
   const p = state.players[side]
-  const def = resourceOf(p.championId, tuningOf(state))
+  const def = resourceOf(p.championId, tuningOf(state, side))
   p.unpaid = []
   if (!def || p.silenced || !state.rules.resources) return // Silenced: effects are off anyway, nothing to pay for
   for (const card of chain) {
-    const cost = costOf(p.championId, card, tuningOf(state))
+    const cost = costOf(p.championId, card, tuningOf(state, side), p.costMod)
     // Bitter Cold: Skill effects are off, nothing to pay for
     if (cost <= 0 || (p.skillSilenced && card.def.type === 'S')) continue
     if (def.payWithHp ? p.hp > cost : (p.res ?? 0) >= cost) {
@@ -147,7 +148,7 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
  */
 export function holdUnpaid(state: GameState, side: Side, chain: CardInst[]): CardInst[] {
   const p = state.players[side]
-  if (!p.unpaid?.length || !resourceOf(p.championId, tuningOf(state))?.unpaidStays) return chain
+  if (!p.unpaid?.length || !resourceOf(p.championId, tuningOf(state, side))?.unpaidStays) return chain
   p.hand = chain.filter((c) => p.unpaid!.includes(c.uid))
   p.unpaid = []
   return chain.filter((c) => !p.hand.includes(c))
@@ -156,7 +157,7 @@ export function holdUnpaid(state: GameState, side: Side, chain: CardInst[]): Car
 /** End of turn: each class fills (or drains) its bar. */
 export function gainRes(state: GameState, side: Side, t: TurnSummary) {
   if (!state.rules.resources) return
-  const def = resourceOf(state.players[side].championId, tuningOf(state))
+  const def = resourceOf(state.players[side].championId, tuningOf(state, side))
   const n = def?.gain?.(t) ?? 0
   if (n) addRes(state, side, n)
 }
@@ -164,6 +165,6 @@ export function gainRes(state: GameState, side: Side, t: TurnSummary) {
 /** Base dmg of a card this turn: halved (or whatever the class says) when it went unpaid. */
 export function baseDmgOf(state: GameState, side: Side, card: CardInst): number {
   const p = state.players[side]
-  const pct = resourceOf(p.championId, tuningOf(state))?.unpaidDmgPct
+  const pct = resourceOf(p.championId, tuningOf(state, side))?.unpaidDmgPct
   return pct != null && p.unpaid?.includes(card.uid) ? Math.floor((card.def.dmg * pct) / 100) : card.def.dmg
 }

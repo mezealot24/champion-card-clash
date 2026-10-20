@@ -1,5 +1,5 @@
 // Pre-match screen: pick a Champion and its Style, see in plain words how they play, pick the opponent, start or learn.
-// The Loadout block is a placeholder for Sigils + Ascendancy (design/customization-options-2026-10-18.md).
+// The Loadout block shows the Sigils + Ascendancy picked on the Loadout screen (design/customization-options-2026-10-18.md).
 import { useState } from 'react'
 import { STYLES, type Side } from '../../engine'
 import type { Champ, StyleRow } from '../Battle'
@@ -33,6 +33,9 @@ export function ChampionSelect(props: {
   /** a deck is saved for this Champion (it may not fit the picked Style) */
   deckSaved: (id: string) => boolean
   onEditDeck: () => void
+  /** the player's Sigils + Ascendancy for this Champion and Style, as short lines */
+  loadout: { label: string; value: string }[]
+  onEditLoadout: () => void
   missing: (id: string) => number
   onStart: () => void
   onTutorial: () => void
@@ -143,24 +146,24 @@ export function ChampionSelect(props: {
             </button>
           </section>
 
-          <section className="box loadout" aria-label="Loadout, coming soon">
+          <section className="box loadout">
             <h2>
-              Loadout <span>coming soon</span>
+              Loadout <span>Sigils + Ascendancy</span>
             </h2>
             <div className="locked-slots">
-              <div>
-                <b>Ascendancy</b>
-                <span>Upgrade tree for your Style</span>
-              </div>
-              <div>
-                <b>Sigil I · Oath</b>
-                <span>Big boon, with a cost</span>
-              </div>
-              <div>
-                <b>Sigil II · Minor</b>
-                <span>Small shared bonus</span>
-              </div>
+              {(['Ascendancy', 'Oath', 'Minor'] as const).map((label) => {
+                const v = props.loadout.find((l) => l.label === label)?.value
+                return (
+                  <div key={label} className={v ? 'set' : undefined}>
+                    <b>{label === 'Ascendancy' ? 'Ascendancy' : label === 'Oath' ? 'Sigil I · Oath' : 'Sigil II · Minor'}</b>
+                    <span>{v ?? (label === 'Ascendancy' ? 'Upgrade tree for your Style' : label === 'Oath' ? 'Big boon, with a cost' : 'Small shared bonus')}</span>
+                  </div>
+                )
+              })}
             </div>
+            <button type="button" className="edit-deck" onClick={props.onEditLoadout}>
+              Edit loadout
+            </button>
           </section>
         </div>
       )}
