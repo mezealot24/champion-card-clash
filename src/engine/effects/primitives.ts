@@ -5,7 +5,7 @@ import { tuningOf } from '../tuning'
 import { drawCards, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
 import { addChill, addIgnite, chillStacks, getStyle, igniteBurn, igniteStacks } from '../styles'
 import type { CardType, Side, StatusKind } from '../types'
-import type { Act, BaseCtx, ChainCtx, Cond } from './types'
+import type { Act, BaseCtx, ChainCtx, Cond, HitIn } from './types'
 
 export type Who = 'self' | 'enemy' | 'both'
 
@@ -410,6 +410,18 @@ export const hp =
 
 /** You had n+ cards on your Field (this one included) when this card came into play. */
 export const enteredWith = (n: number): Cond => (ctx) => (ctx.card.enteredWith ?? 0) >= n
+
+/** This card was drawn into slot n (counted 1-based, the Field position it came in at). */
+export const enteredAt = (n: number): Cond => (ctx) => ctx.card.enteredWith === n
+
+/**
+ * You've been hit / you Blocked n+ enemy cards (of this type, or any) this turn.
+ * On hit counts only enemy slots up to this card's slot; everywhere else counts the whole turn.
+ */
+const hitsInOf = (ctx: ChainCtx, pick: (h: HitIn) => boolean, type?: CardType) =>
+  (ctx.hitsIn?.[ctx.self] ?? []).filter((h) => pick(h) && (!type || h.type === type) && (ctx.hitsUpTo == null || h.slot <= ctx.hitsUpTo)).length
+export const hitBy = (n: number, type?: CardType): Cond => (ctx) => hitsInOf(ctx, (h) => h.landed, type) >= n
+export const blockedType = (n: number, type?: CardType): Cond => (ctx) => hitsInOf(ctx, (h) => h.blocked, type) >= n
 
 export const hpAtMost = (n: number): Cond => (ctx) => ctx.state.players[ctx.self].hp <= n
 export const hpNotAbove: Cond = (ctx) => ctx.state.players[ctx.self].hp <= ctx.state.players[ctx.enemy].hp

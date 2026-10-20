@@ -1,4 +1,7 @@
-import type { Action, CardInst, GameState, Side } from '../types'
+import type { Action, CardInst, CardType, GameState, Side } from '../types'
+
+/** One enemy hit a side received: landed = not stopped by Block or Parry. */
+export type HitIn = { slot: number; type: CardType; blocked: boolean; landed: boolean }
 
 /** What every effect can see. pending != null means draws wait until the chain ends. */
 export type BaseCtx = {
@@ -27,6 +30,10 @@ export type ChainCtx = BaseCtx & {
   blockNow: Record<Side, number>
   /** Dmg each side takes from hits this turn (known once Before attack is done). */
   hitDmgTaken: Record<Side, number>
+  /** Enemy hits each side received this turn (empty during Before action). */
+  hitsIn: Record<Side, HitIn[]>
+  /** On hit only: count just the enemy hits up to this slot (0-based). */
+  hitsUpTo?: number
   /** Dmg bonus per slot of my chain; modify hooks write here. */
   bonus: number[]
   /** Same for the enemy chain (only when the enemy Strikes). */

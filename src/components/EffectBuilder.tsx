@@ -31,6 +31,9 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   prevIs: { c: 'prevIs', type: 'P' },
   facingIs: { c: 'facingIs', type: 'K' },
   fieldHas: { c: 'fieldHas', who: 'enemy', type: 'K', n: 2 },
+  enteredAt: { c: 'enteredAt', n: 1 },
+  hitBy: { c: 'hitBy', n: 1, type: 'K' },
+  blockedType: { c: 'blockedType', n: 1, type: 'K' },
   fieldAll: { c: 'fieldAll', who: 'self', type: 'S' },
   ignite: { c: 'ignite', who: 'enemy', op: '>=', n: 1 },
   chill: { c: 'chill', who: 'enemy', op: '>=', n: 1 },
@@ -60,6 +63,9 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   prevIs: 'Card before this one is…',
   facingIs: 'Facing card is…',
   fieldHas: 'You / opponent has N+ Punch / Kick / Skill on the Field',
+  enteredAt: 'This card was drawn into slot N',
+  hitBy: "You've been hit by N+ Punch / Kick / Skill this turn",
+  blockedType: 'You Blocked N+ Punch / Kick / Skill this turn',
   fieldAll: 'Your / opponent\'s Field is all Punch / Kick / Skill',
   ignite: 'You / opponent Ignite stacks ≥ / < N',
   chill: 'You / opponent Chill stacks ≥ / < N',
@@ -252,6 +258,9 @@ function CondEditor({ value, onChange }: { value: CondSpec; onChange: (v: CondSp
       )}
       {(value.c === 'chainAll' || value.c === 'chainHas' || value.c === 'prevIs' || value.c === 'facingIs' || value.c === 'fieldHas' || value.c === 'fieldAll') && (
         <TypeSelect value={value.type} onChange={(type) => onChange({ ...value, type: type! })} />
+      )}
+      {(value.c === 'hitBy' || value.c === 'blockedType') && (
+        <TypeSelect value={value.type} allowAny onChange={(type) => onChange({ ...value, type })} />
       )}
     </>
   )

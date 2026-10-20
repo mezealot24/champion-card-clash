@@ -39,6 +39,10 @@ export type CondSpec =
   | { c: 'prevIs'; type: CardType }
   | { c: 'facingIs'; type: CardType }
   | { c: 'fieldHas'; who: 'self' | 'enemy'; type: CardType; n: number }
+  // Tank heal rework (2026-10-17)
+  | { c: 'enteredAt'; n: number }
+  | { c: 'hitBy'; n: number; type?: CardType }
+  | { c: 'blockedType'; n: number; type?: CardType }
   // Mage redesign (2026-10-19): every card on that Field is this type (Field not empty)
   | { c: 'fieldAll'; who: 'self' | 'enemy'; type: CardType }
   // Pyromancer (2026-10-17)
@@ -98,6 +102,9 @@ function cond(s: CondSpec): Cond {
     case 'prevIs': return P.prevIs(s.type)
     case 'facingIs': return P.facingIs(s.type)
     case 'fieldHas': return P.fieldHas(s.who, s.type, s.n)
+    case 'enteredAt': return P.enteredAt(s.n)
+    case 'hitBy': return P.hitBy(s.n, s.type)
+    case 'blockedType': return P.blockedType(s.n, s.type)
     case 'fieldAll': return P.fieldAll(s.who, s.type)
     case 'ignite': return P.igniteCmp(s.who, s.op, s.n)
     case 'chill': return P.chillCmp(s.who, s.op, s.n)
