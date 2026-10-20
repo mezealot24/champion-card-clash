@@ -20,6 +20,8 @@ export type ChampionRow = {
   identity: string
   signature_combo: string
   sort_order: number
+  /** Admin tuning overrides for the class group (resource + combo), see src/engine/tuning.ts. {} = all defaults. */
+  params: Record<string, number>
 } & Timestamps
 
 export type ChampionStyleRow = {
@@ -28,6 +30,8 @@ export type ChampionStyleRow = {
   slot: 1 | 2
   name: string
   effect: string
+  /** Admin tuning overrides for the Style group "CHAMP:slot", see src/engine/tuning.ts. {} = all defaults. */
+  params: Record<string, number>
 } & Timestamps
 
 export type CardRow = {
@@ -45,6 +49,8 @@ export type CardRow = {
   effect_json: EffectSpec | null // see src/engine/effects/spec.ts
   /** Resource cost when it strikes (src/engine/resources.ts). Null on an S card = class default. */
   cost: number | null
+  /** "MG:1" = only in the deck under that Style; "!MG:1" = under every Style but that one; null = always (engine inStyleDeck). */
+  style_only?: string | null
   copies: number
   in_deck: boolean
   sort_order: number

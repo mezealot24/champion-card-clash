@@ -1,6 +1,7 @@
 // v0 AI: weighted random by situation (see vault "AI Opponent"). Always keeps some randomness.
 import { legalActions, resolveTurn } from './engine'
 import { COMBOS } from './combos'
+import { overdriveAdd } from './styles'
 import type { Action, CardType, GameState, Side, StatusKind } from './types'
 import { other } from './types'
 
@@ -65,6 +66,7 @@ const STATUS_VALUE: Partial<Record<StatusKind, number>> = {
   noStrike: -4,
   noCharge: -3,
   silence: -3,
+  skillSilence: -2,
   vulnerable: -5,
 }
 
@@ -104,7 +106,9 @@ function score(state: GameState, side: Side, w: AiWeights): number {
     const hp = (100 * (p.hp + shield)) / Math.max(1, p.maxHp)
     const full = p.hand.length >= state.rules.handMax ? w.fullField : 1
     // cards on the Field are loaded dmg: worth a share of their dmg as % of the opponent's life bar
-    const field = (w.fieldValue * full * 100 * p.hand.reduce((t, c) => t + c.def.dmg, 0)) / Math.max(1, victim.maxHp)
+    // Sonic Bliz Overdrive: the Energy bar turns into +N dmg on every card of a no-S Field of 3+
+    const loaded = p.hand.reduce((t, c) => t + c.def.dmg, 0) + overdriveAdd(state, s) * p.hand.length
+    const field = (w.fieldValue * full * 100 * loaded) / Math.max(1, victim.maxHp)
     const status = p.statuses.reduce((t, x) => t + (STATUS_VALUE[x.kind] ?? 0) * Math.max(1, x.turns), 0)
     const stacks = Object.values(p.comboData ?? {}).reduce((t, n) => t + n, 0)
     return hp + field + w.combo * comboPotential(state, s) + w.status * (status + 2 * stacks) + w.res * (p.res ?? 0)

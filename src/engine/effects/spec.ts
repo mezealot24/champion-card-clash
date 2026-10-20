@@ -16,7 +16,7 @@ export const HOOKS: Hook[] = ['modify', 'onHit', 'onResolve', 'onHeld', 'onDraw'
 export type CondSpec =
   | { c: 'enemyHandAtLeast'; n: number }
   | { c: 'enemyHandEmpty' }
-  | { c: 'handCompare'; op: '<' | '=' | '>' }
+  | { c: 'handCompare'; op: '<' | '<=' | '=' | '>' }
   | { c: 'enemyAction'; a: 'strike' | 'block' | 'charge' }
   | { c: 'selfAction'; a: 'strike' | 'block' | 'charge' }
   | { c: 'tookDmg'; n: number }
@@ -39,6 +39,11 @@ export type CondSpec =
   | { c: 'prevIs'; type: CardType }
   | { c: 'facingIs'; type: CardType }
   | { c: 'fieldHas'; who: 'self' | 'enemy'; type: CardType; n: number }
+  // Mage redesign (2026-10-19): every card on that Field is this type (Field not empty)
+  | { c: 'fieldAll'; who: 'self' | 'enemy'; type: CardType }
+  // Pyromancer (2026-10-17)
+  | { c: 'ignite'; who: 'self' | 'enemy'; op: '>=' | '<'; n: number }
+  | { c: 'chill'; who: 'self' | 'enemy'; op: '>=' | '<'; n: number }
 
 export type ActSpec =
   | { a: 'draw' | 'heal' | 'loseHp'; who: P.Who; n: number; per?: P.Per }
@@ -52,6 +57,11 @@ export type ActSpec =
   | { a: 'steal' }
   | { a: 'cut'; which: P.CutWhich; n: number }
   | { a: 'gainRes'; who: P.Who; n: number; per?: P.Per }
+  | { a: 'ignite'; who: P.Who; n: number; per?: P.Per }
+  | { a: 'chill'; who: P.Who; n: number; per?: P.Per }
+  | { a: 'consumeIgnite'; who: P.Who; burn?: boolean }
+  // ⟡ Infuse (Mage, 2026-10-19): n stacks of the card owner's Style element (Pyromancer Ignite, Cryomancer Chill)
+  | { a: 'infuse'; who: P.Who; n: number }
 
 /**
  * One rule = when [hook], if all [if], do all [do]. A card can have several rules.
@@ -88,6 +98,9 @@ function cond(s: CondSpec): Cond {
     case 'prevIs': return P.prevIs(s.type)
     case 'facingIs': return P.facingIs(s.type)
     case 'fieldHas': return P.fieldHas(s.who, s.type, s.n)
+    case 'fieldAll': return P.fieldAll(s.who, s.type)
+    case 'ignite': return P.igniteCmp(s.who, s.op, s.n)
+    case 'chill': return P.chillCmp(s.who, s.op, s.n)
     // a condition this build doesn't know never passes (old builds reading newer DB rows)
     default: return () => false
   }
@@ -108,6 +121,10 @@ function act(s: ActSpec): Act {
     case 'steal': return P.steal
     case 'cut': return P.cut(s.which, s.n)
     case 'gainRes': return P.gainRes(s.who, s.n, s.per)
+    case 'ignite': return P.ignite(s.who, s.n, s.per)
+    case 'chill': return P.chill(s.who, s.n, s.per)
+    case 'consumeIgnite': return P.consumeIgnite(s.who, s.burn)
+    case 'infuse': return P.infuse(s.who, s.n)
     // an action this build doesn't know does nothing
     default: return () => {}
   }
@@ -122,7 +139,7 @@ export function normalizeSpec(spec: EffectSpec): EffectSpec {
   )
 }
 
-const BAD_FOR_SELF: StatusKind[] = ['noStrike', 'noBlock', 'noCharge', 'silence']
+const BAD_FOR_SELF: StatusKind[] = ['noStrike', 'noBlock', 'noCharge', 'silence', 'skillSilence']
 /**
  * A drawback = an action that only hurts its own side (e.g. lose HP, Max HP −, can't Block, lose resource).
  * Q 2026-10-15: an S card you couldn't pay for still pays its drawbacks; everything else is off.
@@ -135,6 +152,8 @@ export function isDrawback(a: ActSpec): boolean {
     case 'gainRes':
     case 'blockNow': return a.n < 0
     case 'status': return BAD_FOR_SELF.includes(a.kind) || (a.kind === 'blockPlus' && (a.n ?? 1) < 0)
+    // Infuse is the card's payoff, never a drawback (an unpaid S card doesn't Infuse)
+    case 'infuse': return false
     default: return false
   }
 }

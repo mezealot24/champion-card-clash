@@ -1,3 +1,4 @@
+import type { Tuning } from './tuning'
 // Pure game types: no React, no Supabase. The engine only reads these.
 import type { EffectSpec } from './effects/spec'
 
@@ -14,6 +15,8 @@ export type CardDef = {
   effectSpec?: EffectSpec | null // cards.effect_json; wins over code in effects/registry.ts
   /** Resource cost paid when it fires in a Strike chain (engine/resources.ts). Null on an S card = class default. */
   cost?: number | null
+  /** cards.style_only: "MG:1" = only under that Style, "!MG:1" = under every Style but that one, null = always (see inStyleDeck). */
+  styleOnly?: string | null
 }
 
 /** One physical card in a game. uid is unique even for copies. */
@@ -34,7 +37,9 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  * shield = absorbs n dmg from hits before HP; lasts until used up or its turns run out
  * parry = the next n hits that get past your Block are deflected and deal 0, nothing goes back (this turn; Q 2026-10-17: a Block is 2 Parries)
  */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark'
+/** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts. chill = Cryomancer's slow (n = stacks, CHILL_*).
+ * frozen = marker for "can't Strike this turn" (lasts 1 turn longer than its noStrike so cards can read it). skillSilence = Skill cards' effects off (Bitter Cold). subZero = next Strike: every clean hit gives 1 Chill (Arcane Sub-Zero) */
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 export type Status = { kind: StatusKind; turns: number; n?: number }
 
@@ -53,6 +58,8 @@ export type PlayerState = {
   comboData?: Record<string, number>
   /** Silenced this turn (from a silence status active when the turn started). */
   silenced?: boolean
+  /** Skill cards' effects off this turn (from a skillSilence status active when the turn started). */
+  skillSilenced?: boolean
   /** Cards drawn since the last shuffle; the deck reshuffles once a whole deck's worth is drawn. */
   drawsSinceShuffle?: number
   /** Class resource (Mana / Rage / Energy), see engine/resources.ts. Tank has none (pays HP). */
@@ -106,6 +113,8 @@ export type GameState = {
   blockStreak: number
   winner: Side | 'draw' | null
   rules: RulesConfig
+  /** Champion + Style numbers this game runs on (engine/tuning.ts); missing = defaults */
+  tuning?: Tuning
   rngSeed: number
   log: string[] // human-readable, newest last
   /** Events of the last turn only (reset by resolveTurn). */

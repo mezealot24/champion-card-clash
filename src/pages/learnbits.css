@@ -1,0 +1,27 @@
+/* Combo tracker + compact card text (LearnBits.tsx). Uses the arena's tokens (arena.css). */
+
+/* Lane left column: foe combo on top, log in the middle, your combo at the bottom */
+.arena .lane-left { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 0; height: 100%; padding: 3px 0; position: relative; }
+.arena .lane-left .log { -webkit-line-clamp: 2; }
+.arena .combo-track { padding-left: 10px; position: relative; }
+.arena .ct-row { display: flex; align-items: center; gap: 5px; background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; max-width: 100%; }
+.arena .ct-pips { display: flex; gap: 2px; flex: none; }
+.arena .ct-pip { width: 16px; height: 16px; border-radius: 5px; border: 2px solid var(--ink); display: grid; place-items: center; font: 10px var(--display); font-style: normal; line-height: 1; background: var(--arena-2); color: var(--muted); opacity: .75; }
+.arena .ct-pip.on.t-P { background: var(--tP); } .arena .ct-pip.on.t-K { background: var(--tK); } .arena .ct-pip.on.t-S { background: var(--tS); }
+.arena .ct-pip.on { color: var(--ink); opacity: 1; box-shadow: 0 0 6px currentColor; }
+.arena .ct-name { font: 800 8.5px var(--body); text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arena .ct-row.ready .ct-name { color: var(--gold); }
+.arena .ct-row.ready .ct-pips { animation: ct-ready 1s ease-in-out infinite; }
+@keyframes ct-ready { 50% { filter: brightness(1.3); transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .arena .ct-row.ready .ct-pips { animation: none; } }
+.arena .ct-pop { position: absolute; left: 8px; z-index: 30; width: 230px; background: var(--arena-2); border: 2px solid var(--ink); border-radius: 10px; box-shadow: 0 3px 0 var(--ink); padding: 6px 8px; font-size: 10px; line-height: 1.3; color: var(--text); cursor: pointer; }
+.arena .combo-track.me .ct-pop { bottom: 22px; }
+.arena .combo-track.enemy .ct-pop { top: 22px; }
+.arena .ct-pop p { margin: 0; } .arena .ct-pop p + p { margin-top: 4px; }
+.arena .ct-pop b { color: var(--gold); }
+
+/* Compact card rule: tag + condition, then gain (green) / cost (red) */
+.arena .card .fx .crule .gain, .arena .card .fx .crule .cost-l { display: block; font-weight: 900; font-size: 9.5px; line-height: 1.15; margin-top: 1px; }
+.arena .card .fx .crule .gain { color: #11703f; }
+.arena .card .fx .crule .cost-l { color: #c21d3b; }
+.arena .sheet .big .card .fx .crule .gain, .arena .sheet .big .card .fx .crule .cost-l { font-size: 12.5px; }

@@ -3,8 +3,9 @@
 import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, TurnEvent } from './types'
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
-import { getStyle } from './styles'
+import { getStyle, healAfterIgnite } from './styles'
 import { resourceOf } from './resources'
+import { resolveTuning, tuningOf, type Tuning, type TuningOverrides } from './tuning'
 
 // --- seeded RNG (mulberry32) so a match can be replayed from its seed ---
 export function nextRandom(state: GameState): number {
@@ -34,37 +35,50 @@ export type ChampionSetup = {
 export function createGame(
   p1: ChampionSetup,
   p2: ChampionSetup,
-  opts: { seed?: number; rules?: Partial<RulesConfig> } = {},
+  opts: { seed?: number; rules?: Partial<RulesConfig>; tuning?: Tuning | TuningOverrides } = {},
 ): GameState {
+  // overrides from the DB (any subset) are filled in with the defaults
+  const tuning = resolveTuning(opts.tuning as TuningOverrides | undefined)
   const state: GameState = {
     turn: 1,
-    players: { p1: emptyPlayer(p1, 'p1'), p2: emptyPlayer(p2, 'p2') },
+    players: { p1: emptyPlayer(p1, 'p1', tuning), p2: emptyPlayer(p2, 'p2', tuning) },
     blockStreak: 0,
     winner: null,
     rules: { ...DEFAULT_RULES, ...opts.rules },
+    tuning,
     rngSeed: opts.seed ?? Date.now() | 0,
     log: [],
   }
   for (const side of ['p1', 'p2'] as const) {
     const p = state.players[side]
     const style = getStyle(p.style)
-    style?.setup?.(p)
+    style?.setup?.(p, tuning)
     p.deck = shuffle(state, p.deck) // shuffle once; afterwards order is learnable
-    drawCards(state, side, state.rules.startHand + (style?.startDraw ?? 0))
+    drawCards(state, side, state.rules.startHand + (style?.startDraw?.(tuning) ?? 0))
   }
   return state
 }
 
-function emptyPlayer(setup: ChampionSetup, side: Side): PlayerState {
+/**
+ * cards.style_only: "MG:1" = only in the deck under that Style (Pyromancer's own cards);
+ * "!MG:1" = in the deck under every Style but that one (the cards those replace). Null = always.
+ */
+export function inStyleDeck(def: CardDef, style?: string): boolean {
+  const k = def.styleOnly
+  if (!k) return true
+  return k.startsWith('!') ? k.slice(1) !== style : k === style
+}
+
+function emptyPlayer(setup: ChampionSetup, side: Side, t: Tuning): PlayerState {
   return {
     championId: setup.championId,
     hp: setup.hpStart,
     maxHp: setup.hpMax,
     hand: [],
-    deck: setup.deck.map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
+    deck: setup.deck.filter((def) => inStyleDeck(def, setup.style)).map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
     statuses: [],
     style: setup.style,
-    res: resourceOf(setup.championId)?.start ?? 0,
+    res: resourceOf(setup.championId, t)?.start ?? 0,
   }
 }
 
@@ -72,7 +86,7 @@ function emptyPlayer(setup: ChampionSetup, side: Side): PlayerState {
 /** A chain card whose resource cost couldn't be paid this turn keeps only its drawbacks (Q 2026-10-15). */
 export function effectOf(state: GameState, side: Side, card: CardInst) {
   const p = state.players[side]
-  return p.silenced ? undefined : getEffect(card.def, !!p.unpaid?.includes(card.uid))
+  return p.silenced || (p.skillSilenced && card.def.type === 'S') ? undefined : getEffect(card.def, !!p.unpaid?.includes(card.uid))
 }
 
 /**
@@ -95,7 +109,7 @@ export function drawCards(state: GameState, side: Side, n: number): number {
       const keep = Math.min(p.deck.length, state.rules.handMax)
       p.deck = [...shuffle(state, p.deck.slice(0, p.deck.length - keep)), ...p.deck.slice(p.deck.length - keep)]
       p.drawsSinceShuffle = 0
-      log(state, `${side} จั่วครบ deck แล้ว: สับ deck ใหม่`)
+      log(state, `${side} drew the whole deck: deck reshuffled`)
     }
     effectOf(state, side, card)?.onDraw?.({ state, self: side, enemy: side === 'p1' ? 'p2' : 'p1', card, pending: null })
   }
@@ -112,11 +126,12 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
   }
 }
 
-/** Heal up to Max HP; returns HP actually gained. A side already at 0 HP is down for good:
+/** Heal up to Max HP (Ignite cuts it by 25%); returns HP actually gained. A side already at 0 HP is down for good:
  *  heals later in the same turn (After action, Hold, combos, Omnivamp) can't bring it back (Q 2026-10-17). */
 export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   if (p.hp <= 0) return 0
+  n = healAfterIgnite(p, n, tuningOf(state))
   const before = p.hp
   p.hp = Math.min(p.maxHp, p.hp + n)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
@@ -128,6 +143,7 @@ export function loseHp(state: GameState, side: Side, n: number, from: 'hit' | 'f
   const p = state.players[side]
   const before = p.hp
   p.hp = Math.max(0, p.hp - n)
+  if (p.hp < before) getStyle(p.style)?.onHpLoss?.(state, side)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })
   if (from === 'hit' || p.hp >= before) return
   p.otherDmg ??= { foe: 0, self: 0 }

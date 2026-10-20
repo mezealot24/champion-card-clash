@@ -1,6 +1,6 @@
 // "vs ตุ๊กตา": the opponent's pick comes from Claude through the Artifact `sample` capability, one call per turn.
 // The page asks before the player's pick is sent anywhere, so Claude never sees it.
-import { legalActions, resourceOf, STYLES, type Action, type GameState, type PlayerState, type Side } from '../engine'
+import { legalActions, resourceOf, STYLES, tuningOf, type Action, type GameState, type PlayerState, type Side } from '../engine'
 import type { Sample } from './claude'
 
 export type TuktahMove = { action: Action; line: string }
@@ -14,12 +14,12 @@ const RULES = `Champion Card Clash rules (short):
 - Charge vs Block: charger draws for free. Charge vs Charge: both draw. Block vs Block 3 times in a row: both Fields are discarded.
 - Charging with a full Field (5) draws nothing. Card effects and Styles below can change all of this.`
 
-function side(p: PlayerState, label: string, styleText: Record<string, string>) {
-  const res = resourceOf(p.championId)
+function side(game: GameState, p: PlayerState, label: string, styleText: Record<string, string>) {
+  const res = resourceOf(p.championId, game.tuning)
   const field = p.hand.map((c, i) => `  slot ${i + 1}: ${c.def.id} ${c.def.type} ${c.def.dmg} dmg${c.grow ? ` (+${c.grow})` : ''}${c.def.effectText ? ` | ${c.def.effectText}` : ''}`)
   return [
     `${label}: ${p.championId}${p.style ? ` · Style ${STYLES[p.style]?.name ?? p.style}: ${styleText[p.style] ?? ''}` : ''}`,
-    `  HP ${p.hp}/${p.maxHp}${res && !res.payWithHp ? ` · ${res.name} ${p.res ?? 0}/${res.cap}` : ''}${p.statuses.length ? ` · statuses: ${p.statuses.map((s) => `${s.kind}${s.n != null ? ` ${s.n}` : ''} (${s.turns}t)`).join(', ')}` : ''}${p.comboData?.conqueror ? ` · Conqueror ${p.comboData.conqueror}/6` : ''}`,
+    `  HP ${p.hp}/${p.maxHp}${res && !res.payWithHp ? ` · ${res.name} ${p.res ?? 0}/${res.cap}` : ''}${p.statuses.length ? ` · statuses: ${p.statuses.map((s) => `${s.kind}${s.n != null ? ` ${s.n}` : ''} (${s.turns}t)`).join(', ')}` : ''}${p.comboData?.conqueror ? ` · Conqueror ${p.comboData.conqueror}/${tuningOf(game)['BR:2'].conquerorMax}` : ''}`,
     `  Field (${p.hand.length}/5):`,
     ...(field.length ? field : ['  (empty)']),
   ].join('\n')
@@ -34,8 +34,8 @@ export function tuktahPrompt(game: GameState, me: Side, history: { mine: Action;
 ${RULES}
 
 Turn ${game.turn + 1}. Block-vs-Block streak: ${game.blockStreak}.
-${side(game.players[me], 'YOU (Tuktah)', styleText)}
-${side(game.players[foe], 'Q (opponent)', styleText)}
+${side(game, game.players[me], 'YOU (Tuktah)', styleText)}
+${side(game, game.players[foe], 'Q (opponent)', styleText)}
 
 Recent turns (oldest first):
 ${past || '  (none yet)'}
@@ -44,13 +44,42 @@ Your legal actions now: ${legal.join(', ')}.
 Pick one. Reply with JSON only: {"action": "strike" | "block" | "charge", "line": "<one short playful Thai trash-talk line in a female voice (ending with ค่ะ/คะ/นะคะ, calling yourself หนู), max 60 characters, must NOT reveal or hint at your pick>"}`
 }
 
-export async function askTuktah(sample: Sample, game: GameState, me: Side, history: { mine: Action; theirs: Action }[], styleText: Record<string, string> = {}): Promise<TuktahMove | null> {
+/** Why a turn had no pick from Tuktah (a SampleError code, or 'illegal' / 'unreadable' for an answer we couldn't use). */
+export type TuktahMiss = { miss: string; line?: string }
+
+const pickFrom = (raw: unknown): { action?: string; line?: string } | null => {
+  if (raw && typeof raw === 'object') return raw as { action?: string; line?: string }
+  const m = String(raw ?? '').match(/\{[\s\S]*\}/)
+  if (!m) return null
   try {
-    const out = await sample.json<{ action?: string; line?: string }>(tuktahPrompt(game, me, history, styleText), { modelTier: 'default', cache: false })
-    const action = String(out?.action ?? '').toLowerCase() as Action
-    if (!legalActions(game, me).includes(action)) return null
-    return { action, line: String(out?.line ?? '').slice(0, 80) }
+    return JSON.parse(m[0])
   } catch {
     return null
   }
+}
+
+/**
+ * One pick from Claude. Uses the quick tier: the default tier thinks for 5-60 s before it answers, which read as
+ * "Tuktah dropped out" mid-match. A reply that isn't clean JSON gets one plain-text retry (never a loop); an illegal
+ * pick keeps Tuktah's line and lets the page fall back to the AI's pick.
+ */
+export async function askTuktah(sample: Sample, game: GameState, me: Side, history: { mine: Action; theirs: Action }[], styleText: Record<string, string> = {}): Promise<TuktahMove | TuktahMiss> {
+  const prompt = tuktahPrompt(game, me, history, styleText)
+  let out: { action?: string; line?: string } | null = null
+  try {
+    out = pickFrom(await sample.json(prompt, { modelTier: 'quick', cache: false }))
+  } catch (e) {
+    const code = (e as { code?: string })?.code ?? 'upstream_error'
+    if (!['invalid_json', 'empty_completion', 'upstream_error'].includes(code) || typeof sample !== 'function') return { miss: code }
+    try {
+      out = pickFrom((await sample(prompt, { modelTier: 'quick', cache: false })).text)
+    } catch (e2) {
+      return { miss: (e2 as { code?: string })?.code ?? 'upstream_error' }
+    }
+  }
+  if (!out) return { miss: 'unreadable' }
+  const action = String(out.action ?? '').toLowerCase() as Action
+  const line = String(out.line ?? '').slice(0, 80)
+  if (!legalActions(game, me).includes(action)) return { miss: 'illegal', line }
+  return { action, line }
 }

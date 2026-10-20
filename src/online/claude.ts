@@ -28,6 +28,7 @@ export type Query = {
 export type CollRef = Query & { doc(id?: string): DocRef }
 export type Db = { doc(path: string): DocRef; collection(path: string): CollRef }
 export type User = { id(): Promise<string | null> }
-export type Sample = {
-  json<T = unknown>(input: string, opts?: { modelTier?: 'quick' | 'default' | 'complex'; cache?: boolean }): Promise<T>
+type SampleOpts = { modelTier?: 'quick' | 'default' | 'complex'; cache?: boolean }
+export type Sample = ((input: string, opts?: SampleOpts) => Promise<{ text: string; truncated: boolean }>) & {
+  json<T = unknown>(input: string, opts?: SampleOpts): Promise<T>
 }
