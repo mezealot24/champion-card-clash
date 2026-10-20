@@ -156,7 +156,7 @@ describe('0 HP stays down (Q 2026-10-17)', () => {
     expect(s.log.some((l) => /TK-0(01|13): self heals/.test(l))).toBe(false)
   })
 
-  it('Second Wind does not revive a Tank at 0 HP', () => {
+  it('Lifeline does not revive a Tank at 0 HP', () => {
     const g = game([tk('TK-001')], [plain(60)])
     g.players.p1.style = 'TK:1'
     const s = resolveTurn(g, { p1: 'strike', p2: 'strike' })

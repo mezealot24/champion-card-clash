@@ -52,9 +52,9 @@ export type PlayerState = {
   statuses: Status[]
   /** Chosen Style (passive), key "CHAMP:slot" in engine/styles.ts. */
   style?: string
-  /** Style bookkeeping (e.g. Second Wind already spent). */
+  /** Style bookkeeping (e.g. Lifeline already spent). */
   styleData?: Record<string, number>
-  /** Signature combo bookkeeping (e.g. Bruiser Conqueror stacks). */
+  /** Signature combo bookkeeping (e.g. Bruiser Momentum stacks). */
   comboData?: Record<string, number>
   /** Silenced this turn (from a silence status active when the turn started). */
   silenced?: boolean

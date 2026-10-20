@@ -99,7 +99,7 @@ export type StyleDef = {
   beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[]) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
-  /** Strike chains only: right after Before action combos, before Conqueror and any hit (e.g. Juggernaut stacks) */
+  /** Strike chains only: right after Before action combos, before Momentum and any hit (e.g. Juggernaut stacks) */
   strikeStart?: (state: GameState, side: Side, chain: CardInst[]) => void
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
@@ -140,16 +140,16 @@ function infuseChain(state: GameState, side: Side, r: ChainReport, element: stri
   say(state, side, `⟡ Infuse: ${r.paidSkills} paid Skill card${r.paidSkills === 1 ? '' : 's'} → enemy gets ${element}${k ? ` (${k} stacks)` : ''}`)
 }
 
-/** Overgrowth: +1 dmg per hpPerDmg (20) Max HP grown */
+/** Titan Bloom: +1 dmg per hpPerDmg (20) Max HP grown */
 export const overgrowthDmg = (p: PlayerState, t: Tuning) => Math.floor((p.styleData?.grown ?? 0) / t['TK:2'].hpPerDmg)
 
 export const STYLES: Record<string, StyleDef> = {
   /**
-   * Tank · Second Wind: when hit while HP is red (below hpPct = 30%), heal healPctPerHit = 4% of missing HP per hit landed this turn.
+   * Tank · Lifeline: when hit while HP is red (below hpPct = 30%), heal healPctPerHit = 4% of missing HP per hit landed this turn.
    * Works only during the first stretch in the red: once HP is back in the green (30%+), it's off for the game (Q nerf 2026-10-16, was 60%).
    */
   'TK:1': {
-    name: 'Second Wind',
+    name: 'Lifeline',
     afterHits: (state, side, r) => {
       const p = state.players[side]
       const t = tuningOf(state)
@@ -175,13 +175,13 @@ export const STYLES: Record<string, StyleDef> = {
   },
 
   /**
-   * Tank · Overgrowth: starts with the Tank's normal HP / Max HP, same as Second Wind (Q 2026-10-16; was Max HP 210). Each time attacked: +1 per hit taken,
+   * Tank · Titan Bloom: starts with the Tank's normal HP / Max HP, same as Lifeline (Q 2026-10-16; was Max HP 210). Each time attacked: +1 per hit taken,
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
    * Q buff 2026-10-16: every 20 Max HP grown this way = +1 dmg on every card you strike with (Max HP lost later doesn't undo it).
    */
   'TK:2': {
-    name: 'Overgrowth',
+    name: 'Titan Bloom',
     afterHits: (state, side, r) => {
       if (!r.attacked) return
       const p = state.players[side]
@@ -190,13 +190,13 @@ export const STYLES: Record<string, StyleDef> = {
       if (gain <= 0) return
       p.maxHp += gain
       p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
-      say(state, side, `Overgrowth: Max HP +${gain} → ${p.maxHp}`)
+      say(state, side, `Titan Bloom: Max HP +${gain} → ${p.maxHp}`)
     },
     beforeHits: (state, side, bonus) => {
       const n = overgrowthDmg(state.players[side], tuningOf(state))
       if (!n) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += n
-      say(state, side, `Overgrowth: all cards +${n} dmg`)
+      say(state, side, `Titan Bloom: all cards +${n} dmg`)
     },
   },
 }
@@ -214,8 +214,8 @@ Object.assign(STYLES, {
     },
   },
   /**
-   * Bruiser · Juggernaut (Q 2026-10-16, Conqueror + Tenacity merged; name by Claude).
-   * Every Strike: +1 Conqueror stack per card in the chain, before it hits (max 6; see applyConqueror in combos.ts).
+   * Bruiser · Juggernaut (Q 2026-10-16, Momentum + Tenacity merged; name by Claude).
+   * Every Strike: +1 Momentum stack per card in the chain, before it hits (max 6; see applyConqueror in combos.ts).
    * When the stacks reach max: Tenacity for the next 2 turns (a charge break can't throw away the slot 1 card).
    * Every turn you Block: −1 stack. Charge keeps the stacks (no gain, no loss; Q 2026-10-16 22:03Z).
    */
@@ -229,7 +229,7 @@ Object.assign(STYLES, {
       const n = Math.min(max, was + chain.length)
       if (n === was) return
       p.comboData = { ...p.comboData, conqueror: n }
-      say(state, side, `Juggernaut: Conqueror ${n}/${max}${n === max ? ' (Omnivamp)' : ''}`)
+      say(state, side, `Juggernaut: Momentum ${n}/${max}${n === max ? ' (Lifesteal)' : ''}`)
       if (n === max) {
         p.styleData = { ...p.styleData, tenacityFrom: state.turn }
         say(state, side, `Juggernaut: Tenacity ${f.tenacityTurns} turns (slot 1 safe from charge break)`)
@@ -246,7 +246,7 @@ Object.assign(STYLES, {
       const f = tuningOf(state)['BR:2']
       const left = Math.max(0, n - f.blockLoss)
       p.comboData = { ...p.comboData, conqueror: left }
-      say(state, side, `Juggernaut: Block, Conqueror ${left}/${f.conquerorMax}`)
+      say(state, side, `Juggernaut: Block, Momentum ${left}/${f.conquerorMax}`)
     },
   },
 } satisfies Record<string, StyleDef>)
@@ -276,11 +276,11 @@ Object.assign(STYLES, {
     // Acceleration (Q 2026-10-16, replaces Extra Hits): Strike meets Strike → Energy full + draw 2 at the end of the turn
     dualStrike: { draw: (t) => t['AS:1'].dualDraw, fillRes: true },
   },
-  /** Assassin · Coup de grâce: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg,
+  /** Assassin · Fatal Rhythm: every 4th attack (counted across turns, blocked ones too) is a Critical: 3x dmg,
    *  4x while the enemy's HP is in the red (below 30% of Max HP at the start of the Strike, like the HP bar).
    *  A blocked Critical still deals 50% (engine dealtOf). */
   'AS:2': {
-    name: 'Coup de grâce',
+    name: 'Fatal Rhythm',
     beforeHits: (state, side, _bonus, mult, crit) => {
       const p = state.players[side]
       const enemy = state.players[side === 'p1' ? 'p2' : 'p1']
@@ -291,7 +291,7 @@ Object.assign(STYLES, {
         if ((before + i + 1) % f.every === 0) {
           mult[i] *= x
           crit.add(i)
-          say(state, side, `Coup de grâce Critical: slot ${i + 1} (attack #${before + i + 1}) dmg x${x}`)
+          say(state, side, `Fatal Rhythm Critical: slot ${i + 1} (attack #${before + i + 1}) dmg x${x}`)
         }
       })
       p.styleData = { ...p.styleData, attacks: before + mult.length }

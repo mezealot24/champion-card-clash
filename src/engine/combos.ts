@@ -143,7 +143,7 @@ export function checkCombos(state: GameState, side: Side, hits: ComboHit[], when
 export const conquerorOf = (state: GameState, side: Side) => state.players[side].comboData?.conqueror ?? 0
 
 /**
- * Conqueror stacks (Bruiser · Juggernaut Style, styles.ts; was the S > K > K combo until Q 2026-10-16):
+ * Momentum stacks (Bruiser · Juggernaut Style, styles.ts; was the S > K > K combo until Q 2026-10-16):
  * +stack dmg on every slot of this side's chain;
  * at max stack, a charge break makes the opponent's hits deal 30% more.
  */
@@ -160,11 +160,11 @@ export function applyConqueror(
   if (bonus) for (let i = 0; i < bonus.length; i++) bonus[i] += n * f.dmgPerStack
   if (n >= f.conquerorMax && actions[side] === 'charge' && enemyMult && f.chargeBreakTakenPct) {
     for (let i = 0; i < enemyMult.length; i++) enemyMult[i] *= 1 + f.chargeBreakTakenPct / 100
-    say(state, side, `Conqueror: charge break hit, takes +${f.chargeBreakTakenPct}% dmg`)
+    say(state, side, `Momentum: charge break hit, takes +${f.chargeBreakTakenPct}% dmg`)
   }
 }
 
-/** Omnivamp: % of each hit's dmg healed back (0 when not at max Conqueror). */
+/** Lifesteal: % of each hit's dmg healed back (0 when not at max Momentum). */
 export const lifestealPct = (state: GameState, side: Side) => {
   const f = tuningOf(state)['BR:2']
   return conquerorOf(state, side) >= f.conquerorMax ? f.omnivampPct : 0

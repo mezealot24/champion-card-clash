@@ -37,7 +37,7 @@ const SPEEDS = [1, 1.5, 2]
 /** Signature combo banner time at 1x speed (was 1.3 s, players couldn't read it) */
 const BANNER_MS = 3200
 /** Banner text per signature combo (champion · pattern). */
-/** Juggernaut: Conqueror stacks full (6) lights the fighter up. */
+/** Juggernaut: Momentum stacks full (6) lights the fighter up. */
 const conqMax = (g: GameState, s: Side) => (g.players[s].comboData?.conqueror ?? 0) >= tuningOf(g)['BR:2'].conquerorMax
 const COMBO_TEXT: Record<string, [string, string]> = {
   'TK:P > K > P': ['SECOND HELPING', 'Heal 10% of your HP'],
@@ -762,7 +762,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
     // frozen is only a marker for cards (the No Strike chip shows the freeze); Frozen Tomb's chip stands for its No Strike / No Charge
     ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) => statusChip(s, frozen)),
     ...(p.comboData?.conqueror
-      ? [{ label: conqMax(game, side) ? '🔥 Conqueror MAX' : `Conqueror ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: `Juggernaut stacks: +1 dmg per stack on every chain card. At ${conqMaxN}: Omnivamp and Tenacity for a few turns. Blocking loses a stack.` }]
+      ? [{ label: conqMax(game, side) ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: `Juggernaut stacks: +1 dmg per stack on every chain card. At ${conqMaxN}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.` }]
       : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
     ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: `If this side Strikes now with no S card, every chain card gets +${overdriveAdd(game, side)} dmg and all Energy is spent.` }] : []),

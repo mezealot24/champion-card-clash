@@ -23,7 +23,7 @@ export const TUNING_FIELDS = {
     { key: 'comboHealPct', label: 'P+K+P combo heal %', def: 10, min: 0, max: 100, help: '% of current HP healed when the enemy Blocks one of the combo cards' },
   ],
   'TK:1': [
-    { key: 'hpPct', label: 'Second Wind HP line %', def: 30, min: 1, max: 100, help: 'Heals only while HP is below this % of Max HP' },
+    { key: 'hpPct', label: 'Lifeline HP line %', def: 30, min: 1, max: 100, help: 'Heals only while HP is below this % of Max HP' },
     { key: 'healPctPerHit', label: 'Heal % of missing HP per hit', def: 4, min: 0, max: 100 },
   ],
   'TK:2': [
@@ -54,10 +54,10 @@ export const TUNING_FIELDS = {
     { key: 'slots', label: 'Fury slots (from slot 1)', def: 2, min: 0, max: 5 },
   ],
   'BR:2': [
-    { key: 'conquerorMax', label: 'Conqueror max stacks', def: 6, min: 1 },
-    { key: 'dmgPerStack', label: 'Dmg per Conqueror stack', def: 1 },
+    { key: 'conquerorMax', label: 'Momentum max stacks', def: 6, min: 1 },
+    { key: 'dmgPerStack', label: 'Dmg per Momentum stack', def: 1 },
     { key: 'tenacityTurns', label: 'Tenacity turns', def: 2, min: 0 },
-    { key: 'omnivampPct', label: 'Omnivamp % at max stacks', def: 10, min: 0, max: 100 },
+    { key: 'omnivampPct', label: 'Lifesteal % at max stacks', def: 10, min: 0, max: 100 },
     { key: 'chargeBreakTakenPct', label: 'Extra dmg % taken on charge break at max', def: 30, min: 0 },
     { key: 'blockLoss', label: 'Stacks lost per Block', def: 1, min: 0 },
   ],

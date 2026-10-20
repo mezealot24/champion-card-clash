@@ -128,7 +128,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
           <thead>
             <tr>
               <th title="Plays in battle">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 10 Rage, Assassin 1 Energy, Tank 10 HP)">Cost</th>
-              <th title='"MG:1" = only under that Style · "!MG:1" = every Style but that one · empty = always'>Style</th><th>TCT</th><th>Copies</th><th>Effect</th><th />
+              <th title='"MG:1" = only under that Style · "!MG:1" = every Style but that one · empty = always'>Style</th><th title="Original damage before conversion">Base</th><th>Copies</th><th>Effect</th><th />
             </tr>
           </thead>
           <tbody>

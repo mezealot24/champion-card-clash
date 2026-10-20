@@ -79,7 +79,7 @@ button.tag.on { background: var(--accent); color: var(--on-accent); border-color
 .effect-builder select { width: auto; }
 .effect-builder .hint { margin: 0; font-size: 12px; }
 
-/* Juggernaut: Conqueror stacks full → the fighter's panel burns */
+/* Juggernaut: Momentum stacks full → the fighter's panel burns */
 .panel.conq-max { border-color: #ff7a2f; animation: conq-burn 1.2s ease-in-out infinite; }
 .conq-tag { color: #ff7a2f; font-weight: 700; }
 @keyframes conq-burn { 50% { box-shadow: 0 0 18px 4px rgba(255, 122, 47, .55); } }
