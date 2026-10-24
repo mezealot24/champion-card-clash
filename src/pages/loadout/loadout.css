@@ -1,33 +1,47 @@
 /* Loadout screen. Sits inside .select (same night palette, --tint = the Champion's colour). */
 .lo { padding-bottom: 0; --buff: #5fd38d; --pen: #ff7a6b; }
-.lo-head { background: none; border: 0; padding: 0; display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
-.lo-beta { font-size: 12px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--s-gold); }
+.lo-head { background: none; border: 0; padding: 0; display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
+.lo-head h1 { flex: 1; min-width: 0; }
+.lo-beta { align-self: flex-start; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--s-gold); text-align: right; }
 .lo-note { margin: 0; font-size: 13px; color: var(--s-muted); }
+.lo-pips { margin-left: auto; display: inline-flex; gap: 4px; align-self: center; }
+.lo-pips i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--tint); }
+.lo-pips i.on { background: var(--tint); box-shadow: 0 0 6px var(--tint); }
 
 .lo-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
 .lo-opt { display: flex; flex-direction: column; gap: 6px; text-align: left; background: var(--s-panel-2); color: var(--s-text); border: 2px solid transparent; border-radius: 12px; padding: 10px 12px; }
-.lo-opt.on { border-color: var(--tint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 25%, transparent); }
-.lo-opt b { font-size: 15px; font-weight: 800; }
+.lo-opt.on { border-color: var(--tint); box-shadow: 0 0 0 3px color-mix(in srgb, var(--tint) 25%, transparent); background: color-mix(in srgb, var(--tint) 12%, var(--s-panel-2)); }
+.lo-opt b { display: flex; justify-content: space-between; gap: 6px; font-size: 15px; font-weight: 800; }
+.lo-check { font-style: normal; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--tint); color: #150f29; font-size: 12px; }
 .lo-line { display: flex; gap: 6px; font-size: 13px; line-height: 1.4; }
 .lo-line i { flex: none; font-style: normal; font-size: 10px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; padding: 1px 6px; border-radius: 6px; height: fit-content; margin-top: 1px; }
 .lo-line.up i { background: color-mix(in srgb, var(--buff) 22%, transparent); color: var(--buff); }
 .lo-line.down i { background: color-mix(in srgb, var(--pen) 22%, transparent); color: var(--pen); }
 
+/* Ascendancy: two branches as tracks, nodes joined top to bottom */
 .lo-tree { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.lo-branch { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.lo-branch h3 { margin: 0; text-align: center; font: 800 12px/1.2 'Nunito', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--s-muted); }
-.lo-node { display: flex; flex-direction: column; gap: 2px; text-align: left; background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--s-line); border-radius: 12px; padding: 8px 10px; }
-.lo-node b { display: flex; justify-content: space-between; gap: 6px; font-size: 14px; font-weight: 800; }
-.lo-node b i { font-style: normal; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--s-muted); }
+.lo-branch { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.lo-branch h3 { margin: 0; text-align: center; font: 800 12px/1.2 'Nunito', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--tint); }
+.lo-node { position: relative; display: flex; flex-direction: column; gap: 3px; text-align: left; background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--s-line); border-radius: 12px; padding: 8px 9px; }
+.lo-node + .lo-node::before { content: ''; position: absolute; left: 19px; top: -12px; width: 3px; height: 10px; background: var(--s-line); border-radius: 2px; }
+.lo-node.taken + .lo-node::before { background: var(--tint); }
+.lo-node b { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 800; line-height: 1.2; }
+.lo-node b i { margin-left: auto; font-style: normal; font-size: 9px; letter-spacing: .8px; text-transform: uppercase; color: var(--s-muted); }
+.lo-tier { flex: none; font-style: normal; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 900;
+  border: 2px solid var(--s-line); color: var(--s-muted); }
 .lo-node span { font-size: 12.5px; line-height: 1.35; color: var(--s-muted); overflow-wrap: anywhere; }
-.lo-node.avail { border-color: var(--tint); }
+.lo-node.avail { border-color: color-mix(in srgb, var(--tint) 70%, var(--s-line)); }
+.lo-node.avail .lo-tier { border-color: var(--tint); color: var(--tint); }
 .lo-node.taken { border-color: var(--tint); background: color-mix(in srgb, var(--tint) 22%, var(--s-panel-2)); }
+.lo-node.taken .lo-tier { background: var(--tint); border-color: var(--tint); color: #150f29; }
 .lo-node.taken span { color: var(--s-text); }
-.lo-node.locked { opacity: .45; }
-.lo-node.cap { border-radius: 4px 16px 4px 16px; }
+.lo-node.locked { opacity: .62; cursor: default; }
+.lo-node.cap { border-style: double; border-width: 3px; }
+.lo-node.cap .lo-tier { color: var(--s-gold); border-color: var(--s-gold); }
+.lo-node.cap.taken .lo-tier { background: var(--s-gold); color: #150f29; }
 
 .lo-ghost { align-self: flex-start; background: none; border: 2px solid var(--s-line); color: var(--s-text); border-radius: 12px; padding: 8px 12px; font-weight: 800; }
 .lo-ghost:disabled { opacity: .4; cursor: default; }
-.lo-foot { position: sticky; bottom: 0; background: var(--s-bg); border-top: 1px solid var(--s-line); margin: 0 -16px; padding: 10px 16px 14px; }
+.lo-foot { position: sticky; bottom: 0; z-index: 2; background: var(--s-bg); border-top: 1px solid var(--s-line); margin: 0 -14px; padding: 10px 14px 14px; }
 .lo-foot > div { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .lo-foot .start { flex: 1 1 160px; font-size: 20px; padding: 8px; }

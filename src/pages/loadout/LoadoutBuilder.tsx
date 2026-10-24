@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { MINORS, OATHS, TREES, validAsc, type PieceData } from '../../engine'
 import { champColor } from '../fighters'
+import { Portrait } from '../select/Portrait'
 import { loadLoadout, saveLoadout, type SavedLoadout } from './loadout'
 import './loadout.css'
 
@@ -36,7 +37,10 @@ export function LoadoutBuilder(props: {
 
   const pick = (p: PieceData, group: string, on: boolean, onPick: () => void) => (
     <button key={p.id} type="button" className={`lo-opt${on ? ' on' : ''}`} aria-pressed={on} onClick={onPick}>
-      <b>{p.name}</b>
+      <b>
+        {p.name}
+        {on && <i className="lo-check">✓</i>}
+      </b>
       <span className="lo-line up">
         <i>Boon</i>
         {fill(p.text, group)}
@@ -53,16 +57,25 @@ export function LoadoutBuilder(props: {
   return (
     <div className="select lo" style={{ '--tint': champColor(champ) } as React.CSSProperties}>
       <header className="lo-head">
+        <Portrait champ={champ} style={style} bust className="head-art" />
         <h1>
           <small>Loadout</small>
           {props.champName}
+          {props.styleName && <span className="head-style">{props.styleName}</span>}
         </h1>
         <span className="lo-beta">Beta: everything open</span>
       </header>
 
       <section className="box">
         <h2>
-          Ascendancy <span>{style ? `${props.styleName ?? style} · ${taken.length} / ${points} points` : 'needs a Style'}</span>
+          Ascendancy <span>{style ? `${taken.length} / ${points} points` : 'needs a Style'}</span>
+          {tree && (
+            <span className="lo-pips" aria-hidden="true">
+              {Array.from({ length: points }, (_, i) => (
+                <i key={i} className={i < taken.length ? 'on' : undefined} />
+              ))}
+            </span>
+          )}
         </h2>
         {!tree ? (
           <p className="lo-note">Pick a Style on the Champion screen to grow its tree.</p>
@@ -89,6 +102,7 @@ export function LoadoutBuilder(props: {
                             onClick={() => toggleNode(n.id)}
                           >
                             <b>
+                              <em className="lo-tier">{n.id[1] === '4' ? '★' : n.id[1]}</em>
                               {n.name}
                               <i>{n.id[1] === '4' ? 'Capstone' : `T${n.id[1]}`}</i>
                             </b>
