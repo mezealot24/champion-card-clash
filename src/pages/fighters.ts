@@ -70,6 +70,14 @@ function ensureSpriteCss() {
   document.head.appendChild(el)
 }
 
+/** Class of the pose sheet for a Champion / Style (its CSS injected), or null when it only has the SVG doll. */
+export function spriteClassOf(champId: string, style?: string | null): string | null {
+  const key = spriteKey(champId, style)
+  if (!key) return null
+  ensureSpriteCss()
+  return spriteClass(key)
+}
+
 /** Inner HTML of a fighter: aura, the drawing, the guard bubble. */
 export function fighterHTML(champId: string, style?: string | null): string {
   const key = spriteKey(champId, style)
