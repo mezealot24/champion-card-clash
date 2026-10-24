@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { buildDeck, createGame, fillText, isEffectMissing, legalActions, MINORS, OATHS, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
+import { buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
@@ -50,6 +50,8 @@ export function Battle({ data }: { data: BattleData }) {
   const [tutorial, setTutorial] = useState(false)
   const [deckEdit, setDeckEdit] = useState(false)
   const [loadoutEdit, setLoadoutEdit] = useState(false)
+  // the AI's loadout for this match (rolled at random each start)
+  const [foeLoadout, setFoeLoadout] = useState<Loadout | undefined>()
   // new match = new id, so the turn timer restarts even when the turn number repeats
   const [match, setMatch] = useState(0)
   const [settings] = useGameSettings()
@@ -96,7 +98,10 @@ export function Battle({ data }: { data: BattleData }) {
     setHistory([])
     setMatch((m) => m + 1)
     const myStyle = styleKey('p1') || undefined
-    setGame(createGame({ ...setup(picks.p1), deck: buildDeck(myDeck(picks.p1, myStyle).rows), style: myStyle, loadout: loadoutFor(picks.p1, myStyle, ascPoints) }, { ...setup(picks.p2), style: styleKey('p2') || undefined }, gameOpts))
+    const foeStyle = styleKey('p2') || undefined
+    const foeL = randomLoadout(picks.p2, foeStyle, ascPoints)
+    setFoeLoadout(foeL)
+    setGame(createGame({ ...setup(picks.p1), deck: buildDeck(myDeck(picks.p1, myStyle).rows), style: myStyle, loadout: loadoutFor(picks.p1, myStyle, ascPoints) }, { ...setup(picks.p2), style: foeStyle, loadout: foeL }, gameOpts))
   }
 
   async function play(action: Action) {
@@ -232,7 +237,7 @@ export function Battle({ data }: { data: BattleData }) {
         styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
         styleTexts={{
           p1: [styleText[game.players.p1.style ?? ''] ?? '', ...loadoutLines(game.players.p1.championId, game.players.p1.style, myLoadout).map((l) => `${l.label}: ${l.value}.`)].filter(Boolean).join(' '),
-          p2: styleText[game.players.p2.style ?? ''] ?? '',
+          p2: [styleText[game.players.p2.style ?? ''] ?? '', ...loadoutLines(game.players.p2.championId, game.players.p2.style, foeLoadout).map((l) => `${l.label}: ${l.value}.`)].filter(Boolean).join(' '),
         }}
         settingsExtra={<TimerSetting />}
         onAction={play}
