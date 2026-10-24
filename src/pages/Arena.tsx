@@ -18,7 +18,7 @@ import {
   type TurnEvent,
 } from '../engine'
 import { describeSpec } from '../engine/effects/describe'
-import { champColor, fighterHTML } from './fighters'
+import { champColor, fighterHTML, type Pose } from './fighters'
 import { ComboTracker, CompactFx } from './LearnBits'
 import './arena.css'
 
@@ -97,6 +97,7 @@ export function Arena(props: {
   const foe = props.foe ?? 'AI'
   const stageRef = useRef<HTMLDivElement>(null)
   const fxRef = useRef<HTMLDivElement>(null)
+  const poseTimers = useRef(new WeakMap<Element, number>())
   const [scale, setScale] = useState(1)
   const [portrait, setPortrait] = useState(false)
   const [portraitOk, setPortraitOk] = useState(false)
@@ -201,18 +202,18 @@ export function Arena(props: {
 
   // ---------- Champion poses (AI stands left facing right, you stand right facing left) ----------
   const facing = (side: Side) => (side === 'p2' ? 1 : -1)
+  // Sprite Champions swap to a pose frame (.pose-P etc, see arena.css) for a moment; SVG dolls ignore it
+  const showPose = (f: Element, pose: Pose, ms: number) => {
+    if (!f.querySelector('.sprite')) return
+    f.className = f.className.replace(/ ?pose-\S+/g, '') + ` pose-${pose}`
+    clearTimeout(poseTimers.current.get(f))
+    poseTimers.current.set(f, window.setTimeout(() => f.classList.remove(`pose-${pose}`), ms / k()))
+  }
   const charAttack = (side: Side, type: string) => {
     const f = fighter(side)
     if (!f) return
     const d = facing(side)
-    const sprite = f.querySelector('.sprite')
-    if (sprite) {
-      // restart the attack strip even if the last one is still playing
-      f.classList.remove('casting')
-      void (f as HTMLElement).offsetWidth
-      f.classList.add('casting')
-      wait(800).then(() => f.classList.remove('casting'))
-    }
+    showPose(f, type as Pose, 520)
     const limb = f.querySelector(type === 'K' ? '.leg-f' : '.arm-f')
     const ang = type === 'K' ? -80 : type === 'P' ? -95 : -145
     anim(f, [{ transform: 'none' }, { transform: `translateX(${-8 * d}px) rotate(${-6 * d}deg)`, offset: 0.3 }, { transform: `translateX(${38 * d}px) rotate(${4 * d}deg)`, offset: 0.62 }, { transform: 'none' }], 520, { easing: 'cubic-bezier(.5,0,.3,1)' })
@@ -226,6 +227,8 @@ export function Arena(props: {
   }
   const charHit = (side: Side) => {
     const d = facing(side)
+    const hitF = fighter(side)
+    if (hitF) showPose(hitF, 'hit', 420)
     return anim(fighter(side), [
       { transform: 'none', filter: 'none' },
       { transform: `translateX(${-12 * d}px) rotate(${-10 * d}deg)`, filter: 'brightness(1.6) sepia(1) saturate(6) hue-rotate(-40deg)', offset: 0.25 },
@@ -238,6 +241,7 @@ export function Arena(props: {
     const f = fighter(side)
     if (!f) return
     anim(f.querySelector('.aura'), [{ opacity: 0, transform: 'scale(.7)' }, { opacity: 1, transform: 'scale(1.1)', offset: 0.5 }, { opacity: 0, transform: 'scale(1.3)' }], 700)
+    showPose(f, 'charge', 700)
     anim(f.querySelector('.bob'), [{ transform: 'none' }, { transform: 'translateY(5px) scaleY(.86)', offset: 0.4 }, { transform: 'translateY(-4px) scaleY(1.06)', offset: 0.75 }, { transform: 'none' }], 700)
   }
   const charCombo = async (side: Side) => {
@@ -564,11 +568,11 @@ export function Arena(props: {
               <ComboTracker game={game} side="p1" cards={view.p1.field.filter((v) => !v.gone).map((v) => v.card)} />
             </div>
             <div className="vs">
-              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
+              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${down && down !== 'p2' ? ' pose-win' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
               <TokenView side="p2" tok={tok} playing={playing} foe={foe} />
               <div className="verdict">{hits || tok.verdict}</div>
               <TokenView side="p1" tok={tok} playing={playing} locked={locked} foe={foe} />
-              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
+              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${down && down !== 'p1' ? ' pose-win' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
             </div>
           </div>
           <div className="side">
