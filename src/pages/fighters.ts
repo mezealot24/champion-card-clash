@@ -1,9 +1,12 @@
 // Placeholder Champion drawings (chibi, side view, facing right) for the battle screen.
 // Parts carry classes the arena animates: .bob (whole body), .arm-f (front arm + weapon), .leg-f (front leg).
 // Real art can replace these later as long as it keeps the same part classes.
-// A Style with a sprite sheet (SPRITES) draws that instead: idle loops, .casting plays the attack strip once.
-import pyroIdle from './sprites/mg-pyro-idle.webp?inline'
-import pyroAttack from './sprites/mg-pyro-attack.webp?inline'
+// A Champion or Style with a pose sheet (SPRITES) draws that instead; the arena picks the pose (see POSES).
+import asSheet from './sprites/as.webp?inline'
+import brSheet from './sprites/br.webp?inline'
+import tkSheet from './sprites/tk.webp?inline'
+import pyroSheet from './sprites/mg-1.webp?inline'
+import cryoSheet from './sprites/mg-2.webp?inline'
 
 export const CHAMP_COLOR: Record<string, string> = { TK: '#1fc6a6', AS: '#a96bff', BR: '#ff6a3d', MG: '#4f9dff' }
 export const champColor = (id: string) => CHAMP_COLOR[id] ?? '#b8acd8'
@@ -48,11 +51,14 @@ function parts(id: string, col: string) {
   }
 }
 
-// Strips: 25 frames side by side, each 272x192 with the feet at y 184 and the body centred (scaled down in arena.css)
-const SPRITES: Record<string, { idle: string; attack: string }> = {
-  'MG:1': { idle: pyroIdle, attack: pyroAttack },
-}
-const spriteClass = (style: string) => `sprite-${style.replace(':', '-')}`
+// Pose sheets: 8 frames side by side in POSES order, each 320x270, body centred at x 160 with the feet at y 262.
+// Art is placeholder until Beta (Q's generated sheets), so swapping a file here is all a new look needs.
+export const POSES = ['idle', 'P', 'K', 'S', 'block', 'charge', 'hit', 'win'] as const
+export type Pose = (typeof POSES)[number]
+// key: a Style ("MG:1") first, else the Champion ("AS")
+const SPRITES: Record<string, string> = { AS: asSheet, BR: brSheet, TK: tkSheet, 'MG:1': pyroSheet, 'MG:2': cryoSheet }
+const spriteKey = (champId: string, style?: string | null) => (style && SPRITES[style] ? style : SPRITES[champId] ? champId : null)
+const spriteClass = (key: string) => `sprite-${key.replace(':', '-')}`
 
 // The sheets are big data URLs: put them in one <style> instead of every fighter's markup
 let spriteCss = false
@@ -60,17 +66,16 @@ function ensureSpriteCss() {
   if (spriteCss || typeof document === 'undefined') return
   spriteCss = true
   const el = document.createElement('style')
-  el.textContent = Object.entries(SPRITES)
-    .map(([style, s]) => `.${spriteClass(style)}{--idle:url(${s.idle});--attack:url(${s.attack})}`)
-    .join('')
+  el.textContent = Object.entries(SPRITES).map(([key, url]) => `.${spriteClass(key)}{--sheet:url(${url})}`).join('')
   document.head.appendChild(el)
 }
 
 /** Inner HTML of a fighter: aura, the drawing, the guard bubble. */
 export function fighterHTML(champId: string, style?: string | null): string {
-  if (style && SPRITES[style]) {
+  const key = spriteKey(champId, style)
+  if (key) {
     ensureSpriteCss()
-    return `<i class="aura"></i><div class="sprite ${spriteClass(style)}" aria-hidden="true"></div><i class="guard"></i>`
+    return `<i class="aura"></i><div class="sprite ${spriteClass(key)}" aria-hidden="true"></div><i class="guard"></i>`
   }
   const col = champColor(champId)
   const { head, body, weapon } = parts(champId, col)

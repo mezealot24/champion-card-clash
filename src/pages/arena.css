@@ -124,15 +124,22 @@
 .arena .fighter .aura { position: absolute; inset: -10px -8px 0; border-radius: 45%; background: radial-gradient(circle at 50% 60%, rgba(255,200,74,.7), transparent 65%); opacity: 0; }
 .arena .fighter.down svg { transform: rotate(-85deg) translate(-14px, 8px); }
 .arena .fighter.me.down svg { transform: scaleX(-1) rotate(-85deg) translate(-14px, 8px); }
-.arena .sprite { position: absolute; z-index: 1; left: -61.5px; top: -46.5px; width: 187px; height: 132px; pointer-events: none;
-  background: var(--idle) 0 0 / 4675px 132px no-repeat; animation: arena-sprite calc(2.4s / var(--k)) steps(25) infinite; }
-.arena .fighter.casting .sprite { background-image: var(--attack); animation: arena-sprite-once calc(800ms / var(--k)) steps(25, jump-none) 1 both; }
+.arena .sprite { position: absolute; z-index: 1; left: -32px; top: -24.8px; width: 128px; height: 108px; pointer-events: none;
+  background: var(--sheet) 0 0 / 1024px 108px no-repeat; transform-origin: 50% 97%; animation: arena-breathe calc(1.6s / var(--k)) ease-in-out infinite; }
+@keyframes arena-breathe { 50% { scale: 1 .97; } }
+.arena .fighter.pose-P .sprite { background-position-x: -128px; }
+.arena .fighter.pose-K .sprite { background-position-x: -256px; }
+.arena .fighter.pose-S .sprite { background-position-x: -384px; }
+.arena .fighter.guarding .sprite { background-position-x: -512px; }
+.arena .fighter.pose-charge .sprite { background-position-x: -640px; }
+.arena .fighter.pose-hit .sprite, .arena .fighter.down .sprite { background-position-x: -768px; }
+.arena .fighter.pose-win .sprite { background-position-x: -896px; }
 .arena .fighter.me .sprite { transform: scaleX(-1); }
-.arena .fighter.down .sprite { transform: rotate(-85deg) translate(-14px, 8px); animation-play-state: paused; }
+.arena .fighter.down .sprite { transform: rotate(-85deg) translate(-14px, 8px); animation: none; }
 .arena .fighter.me.down .sprite { transform: scaleX(-1) rotate(-85deg) translate(-14px, 8px); }
 .arena .fighter.conq-max .sprite { filter: drop-shadow(0 0 5px rgba(255,106,61,.9)); }
-@keyframes arena-sprite { to { background-position: -4675px 0; } }
-@keyframes arena-sprite-once { to { background-position: -4488px 0; } }
+/* the sprite's own frame shows the guard, so only the doll needs the bubble */
+.arena .fighter:has(.sprite) .guard { display: none; }
 
 /* Side column */
 .arena .side { grid-area: side; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 12px 12px 4px; position: relative; z-index: 5; gap: 6px; }
