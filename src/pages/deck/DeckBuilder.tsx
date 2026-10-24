@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import type { CardType } from '../../engine'
 import { champColor } from '../fighters'
+import { Portrait } from '../select/Portrait'
 import { countOf, deckPool, deckProblems, defaultList, loadDeck, pickTarget, saveDeck, styleCards, type DeckList, type DeckRow, type DeckRules } from './deck'
 import './deck.css'
 
@@ -22,6 +23,8 @@ export function DeckBuilder(props: {
   const [list, setList] = useState<DeckList>(() => loadDeck(champ) ?? defaultList(rows))
   const [type, setType] = useState<CardType | ''>('')
   const [onlyPicked, setOnlyPicked] = useState(false)
+  // card whose full effect text is shown (long texts are cut to two lines)
+  const [open, setOpen] = useState<string | null>(null)
   const pool = deckPool(rows)
   const target = pickTarget(rows, style, rules)
   const n = countOf(list)
@@ -35,9 +38,11 @@ export function DeckBuilder(props: {
   return (
     <div className="select deckb" style={{ '--tint': champColor(champ) } as React.CSSProperties}>
       <header className="deckb-head">
+        <Portrait champ={champ} style={style} bust className="head-art" />
         <h1>
           <small>Deck builder</small>
           {props.champName}
+          {props.styleName && <span className="head-style">{props.styleName}</span>}
         </h1>
         <div className={`deckb-count${n === target ? ' ok' : ''}`} aria-live="polite">
           <b>
@@ -71,13 +76,16 @@ export function DeckBuilder(props: {
           return (
             <li key={r.id} className={c ? 'in' : ''}>
               <span className={`deckb-type t-${r.type}`}>{r.type}</span>
-              <div className="deckb-card">
-                <b>{r.name ?? r.id}</b>
-                <span className="deckb-stats">
-                  {r.dmg} dmg{r.cost != null ? ` · cost ${r.cost}` : ''}
-                </span>
+              <button type="button" className={`deckb-card${open === r.id ? ' open' : ''}`} aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? null : r.id)}>
+                <b>
+                  {r.name ?? r.id}
+                  <span className="deckb-stats">
+                    <i>{r.dmg} dmg</i>
+                    {r.cost != null && <i>cost {r.cost}</i>}
+                  </span>
+                </b>
                 {r.effect && <span className="deckb-text">{r.effect}</span>}
-              </div>
+              </button>
               <div className="deckb-step">
                 <button type="button" aria-label={`Remove ${r.name ?? r.id}`} disabled={c === 0} onClick={() => set(r.id, c - 1)}>
                   −
