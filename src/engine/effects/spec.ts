@@ -186,11 +186,11 @@ export function compileSpec(spec: EffectSpec): CardEffect {
       if (!spent(ctx) && conds.every((c) => c(ctx))) fire(ctx)
     }
     if (rule.hook === 'onDraw') {
-      // onDraw has no chain: only actions without conditions make sense there
+      // onDraw has no chain: only conditions that read the card or the sides work there (e.g. enteredAt = drawn into slot N)
       const prev = out.onDraw
       out.onDraw = (ctx) => {
         prev?.(ctx)
-        if (!spent(ctx)) fire(ctx)
+        if (!spent(ctx) && conds.every((c) => (c as unknown as (x: BaseCtx) => boolean)(ctx))) fire(ctx)
       }
     } else {
       const key = rule.hook === 'onHeld' && rule.at === 'before' ? 'onHeldBefore' : rule.hook

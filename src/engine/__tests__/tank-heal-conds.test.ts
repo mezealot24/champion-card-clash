@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createGame, resolveTurn } from '../index'
 import { describeSpec } from '../effects/describe'
+import { drawCards } from '../state'
 import type { CardDef, CardInst, CardType, EffectSpec, GameState } from '../index'
 
 let uid = 0
@@ -22,6 +23,30 @@ describe('Tank heal conditions', () => {
     const spec: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'enteredAt', n: 2 }], do: heal10 }]
     expect(resolveTurn(game([card(spec, 2)]), { p1: 'block', p2: 'block' }).players.p1.hp).toBe(60)
     expect(resolveTurn(game([card(spec, 1)]), { p1: 'block', p2: 'block' }).players.p1.hp).toBe(50)
+  })
+
+  it('onDraw reads drawn into slot N: heals right as it lands in that slot (Q 2026-10-25)', () => {
+    const spec: EffectSpec = [{ hook: 'onDraw', if: [{ c: 'enteredAt', n: 2 }], do: heal10 }]
+    const top = (field: CardInst[]) => {
+      const s = game(field)
+      s.players.p1.deck = [{ uid: `d${uid++}`, def: { id: 'AA-002', type: 'P', dmg: 1, effectText: '', effectSpec: spec } }, ...s.players.p1.deck]
+      drawCards(s, 'p1', 1)
+      return s.players.p1.hp
+    }
+    expect(top([foe('P')])).toBe(60) // lands in slot 2
+    expect(top([])).toBe(50) // slot 1
+  })
+
+  it('onDraw + facing card: needs an enemy card in the slot it lands in', () => {
+    const spec: EffectSpec = [{ hook: 'onDraw', if: [{ c: 'enteredAt', n: 1 }, { c: 'hasFacing' }], do: heal10 }]
+    const draw = (enemy: CardInst[]) => {
+      const s = game([], enemy)
+      s.players.p1.deck = [{ uid: `d${uid++}`, def: { id: 'AA-003', type: 'S', dmg: 1, effectText: '', effectSpec: spec } }, ...s.players.p1.deck]
+      drawCards(s, 'p1', 1)
+      return s.players.p1.hp
+    }
+    expect(draw([foe('P')])).toBe(60)
+    expect(draw([])).toBe(50)
   })
 
   it('hit by a Kick counts only Kicks that got through', () => {
