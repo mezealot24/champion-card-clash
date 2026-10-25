@@ -19,6 +19,7 @@ import {
 } from '../engine'
 import { describeSpec } from '../engine/effects/describe'
 import { champColor, fighterHTML, type Pose } from './fighters'
+import { newChain, strikePose, type ChainCount } from './strikePoses'
 import { ComboTracker, CompactFx } from './LearnBits'
 import './arena.css'
 
@@ -209,11 +210,11 @@ export function Arena(props: {
     clearTimeout(poseTimers.current.get(f))
     poseTimers.current.set(f, window.setTimeout(() => f.classList.remove(`pose-${pose}`), ms / k()))
   }
-  const charAttack = (side: Side, type: string) => {
+  const charAttack = (side: Side, type: string, pose: Pose) => {
     const f = fighter(side)
     if (!f) return
     const d = facing(side)
-    showPose(f, type as Pose, 520)
+    showPose(f, pose, 520)
     const limb = f.querySelector(type === 'K' ? '.leg-f' : '.arm-f')
     const ang = type === 'K' ? -80 : type === 'P' ? -95 : -145
     anim(f, [{ transform: 'none' }, { transform: `translateX(${-8 * d}px) rotate(${-6 * d}deg)`, offset: 0.3 }, { transform: `translateX(${38 * d}px) rotate(${4 * d}deg)`, offset: 0.62 }, { transform: 'none' }], 520, { easing: 'cubic-bezier(.5,0,.3,1)' })
@@ -249,6 +250,7 @@ export function Arena(props: {
     if (!f) return
     const d = facing(side)
     const p = pos(f)
+    showPose(f, 'signature', 800)
     for (let i = 0; i < 3; i++) {
       const g = add(`<div class="ghostimg" style="left:${p.x}px;top:${p.y}px">${f.querySelector('svg, .sprite')!.outerHTML}</div>`)
       if (side === 'p1') (g.firstChild as HTMLElement).style.transform = 'scaleX(-1)'
@@ -288,10 +290,18 @@ export function Arena(props: {
     let tail: Promise<unknown> = Promise.resolve()
     const count: Record<Side, number> = { p1: 0, p2: 0 }
     const events = next.events ?? []
+    // Strike chains: each card picks its own frame (strikePoses.ts), with a dash in before the first and a backstep after
+    const chainLen: Record<Side, number> = { p1: 0, p2: 0 }
+    for (const ev of events) if (ev.k === 'hit') chainLen[ev.side]++
+    const chain: Record<Side, ChainCount> = { p1: newChain(), p2: newChain() }
+    const struck: Record<Side, number> = { p1: 0, p2: 0 }
     for (const [i, ev] of events.entries()) {
       if (ev.k !== 'hp') await tail
       tail = Promise.resolve()
-      if (ev.k === 'hit') tail = (await hit(ev, count)).done
+      if (ev.k === 'hit') {
+        const n = struck[ev.side]++
+        tail = (await hit(ev, count, strikePose(chain[ev.side], ev.type, n, chainLen[ev.side], ev.crit), n === 0)).done
+      }
       else if (ev.k === 'hp') hpChange(ev)
       else if (ev.k === 'sweep') await sweep(ev.side, ev.uids)
       else if (ev.k === 'discard') {
@@ -302,6 +312,9 @@ export function Arena(props: {
       else if (ev.k === 'combo') await combo(ev.side, ev.name, next)
     }
     await tail
+    const backs = SIDES.filter((side) => struck[side] > 0).map((side) => fighter(side))
+    for (const f of backs) if (f) showPose(f, 'backstep', 380)
+    if (backs.length) await wait(300)
     for (const side of SIDES) guard(side, false)
 
     // Styles that showed up in this turn's log
@@ -330,7 +343,7 @@ export function Arena(props: {
     props.onDone()
   }
 
-  async function hit(ev: Extract<TurnEvent, { k: 'hit' }>, count: Record<Side, number>): Promise<{ done: Promise<unknown> }> {
+  async function hit(ev: Extract<TurnEvent, { k: 'hit' }>, count: Record<Side, number>, pose: Pose, first: boolean): Promise<{ done: Promise<unknown> }> {
     const foe = other(ev.side)
     const el = cardEl(ev.uid)
     const target = fighter(foe)
@@ -340,7 +353,12 @@ export function Arena(props: {
     const dy = (b.y - a.y) * 0.55
     const slot = el?.parentElement
     if (slot) slot.style.zIndex = '10'
-    charAttack(ev.side, ev.type)
+    const me = fighter(ev.side)
+    if (first && me?.querySelector('.sprite')) {
+      showPose(me, 'dash', 200)
+      await wait(180)
+    }
+    charAttack(ev.side, ev.type, pose)
     const dash = anim(el, [
       { transform: 'none' },
       { transform: `translateY(${ev.side === 'p1' ? -16 : 16}px) scale(1.08) rotate(-4deg)`, offset: 0.35 },
@@ -408,6 +426,8 @@ export function Arena(props: {
 
   async function discard(side: Side, uid: string, reason: string, keepGap = false) {
     if (!viewRef.current[side].field.some((c) => c.card.uid === uid)) return
+    const f = fighter(side)
+    if (f && reason === 'Charge break') showPose(f, 'stunned', 700)
     commit((v) => ({ ...v, [side]: { ...v[side], field: v[side].field.map((c) => (c.card.uid === uid ? { ...c, gone: reason } : c)) } }))
     const el = cardEl(uid)
     anim(el, [{ filter: 'brightness(1)' }, { filter: 'brightness(1.8) saturate(2)' }, { filter: 'brightness(1)' }], 300)
@@ -511,6 +531,8 @@ export function Arena(props: {
   const legal = legalActions(game, 'p1')
   const lastLines = game.log.filter((l) => l.startsWith(`T${game.turn - 1} `)).slice(-3)
   const readable = (l: string) => l.replace(/^T\d+ /, '').replace(/\bp1\b/g, 'You').replace(/\bp2\b/g, foe)
+  // HP at 30% or less: a sprite Champion stands in its hurt stance (arena.css .low)
+  const lowHp = (side: Side) => !down && view[side].hp > 0 && view[side].hp <= game.players[side].maxHp * 0.3
 
   return (
     <div className="arena" style={{ '--k': skip.current ? 12 : speed } as React.CSSProperties}>
@@ -568,11 +590,11 @@ export function Arena(props: {
               <ComboTracker game={game} side="p1" cards={view.p1.field.filter((v) => !v.gone).map((v) => v.card)} />
             </div>
             <div className="vs">
-              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${down && down !== 'p2' ? ' pose-win' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
+              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${lowHp('p2') ? ' low' : ''}${down && down !== 'p2' ? ' pose-win' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
               <TokenView side="p2" tok={tok} playing={playing} foe={foe} />
               <div className="verdict">{hits || tok.verdict}</div>
               <TokenView side="p1" tok={tok} playing={playing} locked={locked} foe={foe} />
-              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${down && down !== 'p1' ? ' pose-win' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
+              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${lowHp('p1') ? ' low' : ''}${down && down !== 'p1' ? ' pose-win' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
             </div>
           </div>
           <div className="side">

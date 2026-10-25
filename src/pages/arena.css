@@ -125,18 +125,30 @@
 .arena .fighter.down svg { transform: rotate(-85deg) translate(-14px, 8px); }
 .arena .fighter.me.down svg { transform: scaleX(-1) rotate(-85deg) translate(-14px, 8px); }
 .arena .sprite { position: absolute; z-index: 1; left: -32px; top: -24.8px; width: 128px; height: 108px; pointer-events: none;
-  background: var(--sheet) 0 0 / 1024px 108px no-repeat; transform-origin: 50% 97%; animation: arena-breathe calc(1.6s / var(--k)) ease-in-out infinite; }
+  background: var(--sheet) 0 0 / 3072px 108px no-repeat; transform-origin: 50% 97%; animation: arena-breathe calc(1.6s / var(--k)) ease-in-out infinite; }
 @keyframes arena-breathe { 50% { scale: 1 .97; } }
-.arena .fighter.pose-P .sprite { background-position-x: -128px; }
-.arena .fighter.pose-K .sprite { background-position-x: -256px; }
-.arena .fighter.pose-S .sprite { background-position-x: -384px; }
+/* frames in POSES order (fighters.ts), 128px apart; the low-HP stance comes first so any pose overrides it */
+.arena .fighter.low .sprite { background-position-x: -1664px; }
 .arena .fighter.guarding .sprite { background-position-x: -512px; }
-.arena .fighter.pose-charge .sprite { background-position-x: -640px; }
-.arena .fighter.pose-hit .sprite, .arena .fighter.down .sprite { background-position-x: -768px; }
+.arena .fighter.pose-hit .sprite { background-position-x: -768px; }
 .arena .fighter.pose-win .sprite { background-position-x: -896px; }
+.arena .fighter.pose-charge .sprite { background-position-x: -640px; }
+.arena .fighter.pose-P .sprite { background-position-x: -128px; }
+.arena .fighter.pose-P2 .sprite { background-position-x: -2048px; }
+.arena .fighter.pose-P3 .sprite { background-position-x: -2176px; }
+.arena .fighter.pose-Pfin .sprite { background-position-x: -2304px; }
+.arena .fighter.pose-K .sprite { background-position-x: -256px; }
+.arena .fighter.pose-K2 .sprite { background-position-x: -2432px; }
+.arena .fighter.pose-K3 .sprite { background-position-x: -2560px; }
+.arena .fighter.pose-S .sprite { background-position-x: -384px; }
+.arena .fighter.pose-S2 .sprite { background-position-x: -2688px; }
+.arena .fighter.pose-crit .sprite { background-position-x: -1152px; }
+.arena .fighter.pose-signature .sprite { background-position-x: -1024px; }
+.arena .fighter.pose-stunned .sprite { background-position-x: -1792px; }
+.arena .fighter.pose-dash .sprite { background-position-x: -2816px; }
+.arena .fighter.pose-backstep .sprite { background-position-x: -2944px; }
 .arena .fighter.me .sprite { transform: scaleX(-1); }
-.arena .fighter.down .sprite { transform: rotate(-85deg) translate(-14px, 8px); animation: none; }
-.arena .fighter.me.down .sprite { transform: scaleX(-1) rotate(-85deg) translate(-14px, 8px); }
+.arena .fighter.down .sprite { background-position-x: -1920px; animation: none; }
 .arena .fighter.conq-max .sprite { filter: drop-shadow(0 0 5px rgba(255,106,61,.9)); }
 /* the sprite's own frame shows the guard, so only the doll needs the bubble */
 .arena .fighter:has(.sprite) .guard { display: none; }

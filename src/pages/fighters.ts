@@ -2,11 +2,11 @@
 // Parts carry classes the arena animates: .bob (whole body), .arm-f (front arm + weapon), .leg-f (front leg).
 // Real art can replace these later as long as it keeps the same part classes.
 // A Champion or Style with a pose sheet (SPRITES) draws that instead; the arena picks the pose (see POSES).
-import asSheet from './sprites/as.webp?inline'
-import brSheet from './sprites/br.webp?inline'
-import tkSheet from './sprites/tk.webp?inline'
-import pyroSheet from './sprites/mg-1.webp?inline'
-import cryoSheet from './sprites/mg-2.webp?inline'
+import asSheet from './sprites/as.webp'
+import brSheet from './sprites/br.webp'
+import tkSheet from './sprites/tk.webp'
+import pyroSheet from './sprites/mg-1.webp'
+import cryoSheet from './sprites/mg-2.webp'
 
 export const CHAMP_COLOR: Record<string, string> = { TK: '#1fc6a6', AS: '#a96bff', BR: '#ff6a3d', MG: '#4f9dff' }
 export const champColor = (id: string) => CHAMP_COLOR[id] ?? '#b8acd8'
@@ -51,16 +51,20 @@ function parts(id: string, col: string) {
   }
 }
 
-// Pose sheets: 8 frames side by side in POSES order, each 320x270, body centred at x 160 with the feet at y 262.
-// Art is placeholder until Beta (Q's generated sheets), so swapping a file here is all a new look needs.
-export const POSES = ['idle', 'P', 'K', 'S', 'block', 'charge', 'hit', 'win'] as const
+// Pose sheets: 24 frames side by side in POSES order, each 320x270, drawing centred at x 160 with the feet at y 262
+// (scripts/cut-pose-sheets.py builds them from Q's atlases). Art is placeholder until Beta, so swapping a file here is all a new look needs.
+export const POSES = [
+  'idle', 'P', 'K', 'S', 'block', 'charge', 'hit', 'win',
+  'signature', 'crit', 'power', 'mechanic', 'exhaust', 'low', 'stunned', 'ko',
+  'P2', 'P3', 'Pfin', 'K2', 'K3', 'S2', 'dash', 'backstep',
+] as const
 export type Pose = (typeof POSES)[number]
 // key: a Style ("MG:1") first, else the Champion ("AS")
 const SPRITES: Record<string, string> = { AS: asSheet, BR: brSheet, TK: tkSheet, 'MG:1': pyroSheet, 'MG:2': cryoSheet }
 const spriteKey = (champId: string, style?: string | null) => (style && SPRITES[style] ? style : SPRITES[champId] ? champId : null)
 const spriteClass = (key: string) => `sprite-${key.replace(':', '-')}`
 
-// The sheets are big data URLs: put them in one <style> instead of every fighter's markup
+// One <style> holds every sheet's URL; a browser only fetches the ones a drawn fighter uses
 let spriteCss = false
 function ensureSpriteCss() {
   if (spriteCss || typeof document === 'undefined') return
