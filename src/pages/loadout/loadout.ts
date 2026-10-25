@@ -1,10 +1,12 @@
-// Player loadout saved on this device, per Champion (no player accounts yet): Oath and Ascendancy nodes per Style.
+// Player loadout saved on this device, per Champion (no player accounts yet): the picked Style (path), Oath and
+// Ascendancy nodes per Style. Q 2026-10-25: a Style and a full tree are required (no "no Style"); a save from before
+// that has no style, so the player picks one on the Path step (readiness below).
 // A Minor saved before 2026-10-25 is dropped (Sigil II is off). A tree saved for an older rev of its Style (TreeData.rev,
 // e.g. Bruiser v2) starts empty.
 // Everything is open in Beta (Q 2026-10-20); points per Style = game_config asc_points (default 5) + the tree's bonusPoints.
 import { OATHS, TREES, treePoints, validAsc, type Loadout } from '../../engine'
 
-export type SavedLoadout = { oath?: string; minor?: string; asc?: Record<string, string[]>; ascRev?: Record<string, number> }
+export type SavedLoadout = { style?: string; oath?: string; minor?: string; asc?: Record<string, string[]>; ascRev?: Record<string, number> }
 
 export const DEFAULT_ASC_POINTS = 5
 
@@ -52,4 +54,34 @@ export function loadoutFor(champ: string, style: string | undefined, points: num
   const asc = validAsc(nodes, pts, style) ? nodes : []
   if (!oath && !asc.length) return undefined
   return { oath, asc, points: pts }
+}
+
+/** The saved Style when it is still one of the Champion's playable Styles (old saves have none). */
+export function savedStyle(saved: SavedLoadout, playable: string[]): string | undefined {
+  return saved.style && playable.includes(saved.style) ? saved.style : undefined
+}
+
+/** Pre-battle steps in order (Q 2026-10-25): Champion → Path (Style + Ascendancy) → Oath → Deck → Fight. */
+export const STEPS = ['champion', 'path', 'oath', 'deck', 'fight'] as const
+export type Step = (typeof STEPS)[number]
+
+/** What is still missing before a fight: a Style, every Ascendancy point spent, an Oath. */
+export function loadoutGaps(champ: string, style: string | undefined, points: number, saved: SavedLoadout): { style: boolean; asc: number; oath: boolean } {
+  const pts = treePoints(style, points)
+  const nodes = (style && saved.asc?.[style]) || []
+  const taken = style && TREES[style] && validAsc(nodes, pts, style) ? nodes.length : 0
+  return {
+    style: !style,
+    // a Style with no tree in the engine has nothing to spend
+    asc: style && TREES[style] ? pts - taken : 0,
+    oath: !!OATHS[champ]?.length && !OATHS[champ].some((o) => o.id === saved.oath),
+  }
+}
+
+/** The first step that still needs the player (or 'fight' when all is set). Deck always has a legal default. */
+export function firstOpenStep(champ: string, style: string | undefined, points: number, saved: SavedLoadout): Step {
+  const g = loadoutGaps(champ, style, points, saved)
+  if (g.style || g.asc > 0) return 'path'
+  if (g.oath) return 'oath'
+  return 'fight'
 }

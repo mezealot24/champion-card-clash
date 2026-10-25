@@ -1,8 +1,5 @@
-/* Loadout screen. Sits inside .select (same night palette, --tint = the Champion's colour). */
-.lo { padding-bottom: 0; --buff: #5fd38d; --pen: #ff7a6b; }
-.lo-head { background: none; border: 0; padding: 0; display: flex; align-items: center; gap: 12px; flex-wrap: nowrap; }
-.lo-head h1 { flex: 1; min-width: 0; }
-.lo-beta { align-self: flex-start; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--s-gold); text-align: right; }
+/* Loadout pieces (Ascendancy tree, Oath) on the pre-battle steps. Sit inside .select (same night palette, --tint = the Champion's colour). */
+.select { --buff: #5fd38d; --pen: #ff7a6b; }
 .lo-note { margin: 0; font-size: 13px; color: var(--s-muted); }
 .lo-pips { margin-left: auto; display: inline-flex; gap: 4px; align-self: center; }
 .lo-pips i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--tint); }
@@ -44,6 +41,4 @@
 
 .lo-ghost { align-self: flex-start; background: none; border: 2px solid var(--s-line); color: var(--s-text); border-radius: 12px; padding: 8px 12px; font-weight: 800; }
 .lo-ghost:disabled { opacity: .4; cursor: default; }
-.lo-foot { position: sticky; bottom: 0; z-index: 2; background: var(--s-bg); border-top: 1px solid var(--s-line); margin: 0 -14px; padding: 10px 14px 14px; }
-.lo-foot > div { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.lo-foot .start { flex: 1 1 160px; font-size: 20px; padding: 8px; }
+.lo-row { display: flex; gap: 8px; flex-wrap: wrap; }
