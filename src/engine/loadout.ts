@@ -238,7 +238,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnyieldingMax')),
     hooks: {
       beforeHits: (state, side, bonus) => {
-        const n = endurance(state.players[side]) * amt(state, side)
+        // Q 18:55: Unyielding also runs at Endurance power (25%)
+        const n = Math.floor((endurance(state.players[side]) * amt(state, side) * num(state, side, 'TK:1', 'ascEndurancePower')) / 100)
         if (!n) return
         for (let i = 0; i < bonus.length; i++) bonus[i] += n
         say(state, side, `Unyielding: every chain card +${n} dmg`)

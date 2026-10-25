@@ -107,7 +107,7 @@ export const TREES: Record<string, TreeData> = {
         ['ascEnduranceRegen', 'regen % Max HP per Endurance', 1],
         ['ascEndurancePower', 'Endurance effect % (cut + regen)', 25, 0, 100],
       ]),
-      multi('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance. Endurance max +{ascUnyieldingMax}.', [
+      multi('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance, at {ascEndurancePower}% strength (rounded down). Endurance max +{ascUnyieldingMax}.', [
         ['ascUnyielding', 'dmg per Endurance', 2],
         ['ascUnyieldingMax', 'max Endurance +', 1],
       ]),
