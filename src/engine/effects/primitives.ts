@@ -16,7 +16,7 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
 }
 
 /** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
-export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'maxHpPct' | 'missingHpPct' | 'enemyIgnite' | 'enemyChill'
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'missingHp5' | 'maxHpPct' | 'missingHpPct' | 'enemyIgnite' | 'enemyChill'
 
 export function perCount(ctx: BaseCtx, per?: Per): number {
   if (!per) return 1
@@ -34,6 +34,10 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
     case 'missingHp10': {
       const p = ctx.state.players[ctx.self]
       return Math.max(0, Math.floor((p.maxHp - p.hp) / 10))
+    }
+    case 'missingHp5': {
+      const p = ctx.state.players[ctx.self]
+      return Math.max(0, Math.floor((p.maxHp - p.hp) / 5))
     }
     // 1% of your Max HP / missing HP (fractional; the action rounds down), e.g. "heal 5 per maxHpPct" = 5% of Max HP
     case 'maxHpPct': return ctx.state.players[ctx.self].maxHp / 100
@@ -155,9 +159,10 @@ function eachTarget(ctx: ChainCtx, target: DmgTarget, onlyType: CardType | undef
 }
 
 export const addDmg =
-  (target: DmgTarget, base: number, onlyType?: CardType, per?: Per): Act =>
+  (target: DmgTarget, base: number, onlyType?: CardType, per?: Per, max?: number): Act =>
   (ctx) => {
-    const n = Math.floor(base * perCount(ctx, per))
+    const raw = Math.floor(base * perCount(ctx, per))
+    const n = max != null ? Math.min(max, raw) : raw
     eachTarget(ctx, target, onlyType, ctx.bonus, ctx.enemyBonus, (arr, i) => (arr[i] += n))
   }
 
@@ -425,6 +430,13 @@ const hitsInOf = (ctx: ChainCtx, pick: (h: HitIn) => boolean, type?: CardType) =
 export const hitBy = (n: number, type?: CardType): Cond => (ctx) => hitsInOf(ctx, (h) => h.landed, type) >= n
 export const blockedType = (n: number, type?: CardType): Cond => (ctx) => hitsInOf(ctx, (h) => h.blocked, type) >= n
 
+/** no enemy card at this card's slot */
+export const noFacing: Cond = (ctx) => !hasFacing(ctx)
+/** you lost HP earlier this turn or last turn (hits, your own cards, anything) */
+export const lostHp: Cond = (ctx) => {
+  const p = ctx.state.players[ctx.self]
+  return p.lostHpTurn === ctx.state.turn - 1 || !!ctx.state.events?.some((e) => e.k === 'hp' && e.side === ctx.self && e.delta < 0)
+}
 export const hpAtMost = (n: number): Cond => (ctx) => ctx.state.players[ctx.self].hp <= n
 export const hpNotAbove: Cond = (ctx) => ctx.state.players[ctx.self].hp <= ctx.state.players[ctx.enemy].hp
 /** you / the opponent are Silenced this turn */

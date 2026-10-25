@@ -25,6 +25,7 @@ export const PER_LABEL: Record<Per, string> = {
   chainK: 'Kick in your chain',
   chainS: 'Skill in your chain',
   missingHp10: '10 HP you are missing',
+  missingHp5: '5 HP you are missing',
   maxHpPct: '1% of your Max HP',
   missingHpPct: '1% of your missing HP',
   enemyIgnite: 'Ignite stack on opponent',
@@ -47,6 +48,8 @@ export function describeCond(c: CondSpec): string {
     case 'chainLength': return c.op === '=' ? `your chain has ${cards(c.n)}` : `your chain has ${c.n}+ cards`
     case 'slotIs': return `this card is in slot ${c.n}`
     case 'hasFacing': return 'there is a facing card'
+    case 'noFacing': return 'there is no facing card'
+    case 'lostHp': return 'you lost HP this turn or last turn'
     case 'facingSameType': return 'facing card is the same type'
     case 'tookDmg': return c.n <= 1 ? 'you take dmg from a hit this turn' : `you take ${c.n}+ dmg from hits this turn`
     case 'hpAtMost': return `your HP ≤ ${c.n}`
@@ -100,7 +103,7 @@ export function describeAct(a: ActSpec, now = false): string {
     case 'grow': return `this card gains ${signed(a.n)} dmg ${a.dur === 'next' ? 'on its next attack' : 'for the rest of the game'}${a.stack ? ' (stacks)' : ''}`
     case 'addDmg': {
       const what = a.target === 'enemyAll' && a.onlyType ? `all opponent's ${TYPE[a.onlyType]} cards` : `${describeTarget(a.target)}${a.onlyType ? ` (${TYPE[a.onlyType]} only)` : ''}`
-      return `${what} ${signed(a.n)} dmg` + per(a.per)
+      return `${what} ${signed(a.n)} dmg` + per(a.per) + (a.max != null ? ` (max ${signed(a.max)})` : '')
     }
     case 'blockNow': {
       const n = Math.abs(a.n)
