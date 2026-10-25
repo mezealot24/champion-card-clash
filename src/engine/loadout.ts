@@ -83,6 +83,25 @@ const freshFreeze = (state: GameState, side: Side, bit: number) => {
 }
 /** Endurance stacks (Tank Lifeline v2) */
 const endurance = (p: PlayerState) => p.perkData?.endurance ?? 0
+function gainEndurance(state: GameState, side: Side, why: string) {
+  const p = state.players[side]
+  if (p.perkData?.enduranceAt === state.turn && p.perkData?.enduranceWhy) return // once a turn
+  const max = num(state, side, 'TK:1', 'ascEnduranceMax')
+  const n = Math.min(max, endurance(p) + 1)
+  p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, enduranceWhy: 1 }
+  say(state, side, `Unflinching (${why}): Endurance ${n}/${max}`)
+}
+/** Unrelenting: dmg still to drain, one entry per coming turn (perkData only holds numbers: drain0, drain1, …) */
+const drainQueue = (p: PlayerState) => {
+  const out: number[] = []
+  for (let i = 0; i < (p.perkData?.drain ?? 0); i++) out.push(p.perkData?.[`drain${i}`] ?? 0)
+  return out
+}
+const setDrain = (p: PlayerState, due: number[]) => {
+  const d: Record<string, number> = { drain: due.length }
+  due.forEach((n, i) => (d[`drain${i}`] = n))
+  p.perkData = { ...p.perkData, ...d }
+}
 /** Fatal Rhythm nodes: remember this turn's Critical count (Style beforeHits runs first, so crit is filled) */
 const critSeen: NonNullable<StyleDef['beforeHits']> = (state, side, _b, _m, crit) => {
   const p = state.players[side]
@@ -203,23 +222,26 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         const p = state.players[side]
         // Q 2026-10-25: an Ignite burn this turn counts as 1 hit (vs Pyromancer)
         const hits = r.hitsTaken + (igniteStacks(p) > 0 ? 1 : 0)
-        if (hits < 2 || p.hp <= 0) return
-        const max = num(state, side, 'TK:1', 'ascEnduranceMax')
-        const n = Math.min(max, endurance(p) + (p.perks?.includes('asc:TK:1:A3') ? 2 : 1))
-        p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn }
-        say(state, side, `Unflinching: Endurance ${n}/${max}`)
+        if (hits >= 2 && p.hp > 0) gainEndurance(state, side, 'took 2+ hits')
       },
-      hitCut: (state, side) => endurance(state.players[side]),
-      endTurn: (state, side) => {
+      hitCut: (state, side) => endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut'),
+      endTurn: (state, side, action) => {
         const p = state.players[side]
-        if (endurance(p) && state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
+        if (action === 'charge' && p.hp > 0) gainEndurance(state, side, 'Charge')
+        const n = endurance(p)
+        if (!n) return
+        if (state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
           p.perkData = { ...p.perkData, endurance: 0 }
           say(state, side, 'Unflinching: Endurance fades')
+          return
         }
+        const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
+        if (got) say(state, side, `Unflinching: ${n} Endurance regen ${got}`)
       },
     },
   }),
   'TK:1:A2': (amt) => ({
+    tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnyieldingMax')),
     hooks: {
       beforeHits: (state, side, bonus) => {
         const n = endurance(state.players[side]) * amt(state, side)
@@ -229,16 +251,35 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
+  // Unrelenting (Q 2026-10-25, like Death's Dance): hit dmg taken this turn comes back and drains over the next turns
   'TK:1:A3': () => ({
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnrelenting')),
     hooks: {
+      actionStart: (state, side) => {
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, preHitHp: p.hp }
+      },
+      afterHits: (state, side) => {
+        const p = state.players[side]
+        const lost = (p.perkData?.preHitHp ?? p.hp) - p.hp
+        if (lost <= 0) return
+        p.hp += lost
+        const turns = Math.max(1, num(state, side, 'TK:1', 'ascUnrelentingTurns'))
+        const due = [...(p.perkData?.drain !== undefined ? drainQueue(p) : [])]
+        for (let i = 0; i < turns; i++) due[i] = (due[i] ?? 0) + Math.floor(lost / turns) + (i < lost % turns ? 1 : 0)
+        setDrain(p, due)
+        say(state, side, `Unrelenting: ${lost} hit dmg will drain over ${turns} turns`)
+      },
       endTurn: (state, side) => {
         const p = state.players[side]
-        const n = endurance(p)
-        if (!n || p.hp <= 0 || pctHp(p) >= RED_PCT) return
-        p.perkData = { ...p.perkData, endurance: 0 }
-        const got = styleHeal(state, side, n * num(state, side, 'TK:1', 'ascUnrelentingHeal'))
-        say(state, side, `Unrelenting: ${n} Endurance → heals ${got}`)
+        const due = drainQueue(p)
+        if (!due.length) return
+        const [now, ...rest] = due
+        setDrain(p, rest)
+        if (now > 0) {
+          hurt(state, side, now)
+          say(state, side, `Unrelenting: drains ${now}`)
+        }
       },
     },
   }),
@@ -321,7 +362,14 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     tune: (t, v) => {
       add(t, 'TK:2', 'maxHpCap', v(k))
       add(t, 'TK:2', 'perHitTaken', v('ascAncientHit'))
-      add(t, 'TK:2', 'hpPerDmg', 1_000_000) // Cost: no Titan Bloom dmg
+    },
+    hooks: {
+      endTurn: (state, side, action) => {
+        const p = state.players[side]
+        if (action !== 'charge' || p.hp <= 0) return
+        const got = styleHeal(state, side, num(state, side, 'TK:2', 'ascAncientHeal') + Math.floor(((p.maxHp - p.hp) * num(state, side, 'TK:2', 'ascAncientPct')) / 100))
+        if (got) say(state, side, `Ancient: Charge heals ${got}`)
+      },
     },
   }),
   // Titan Bloom · Bramble

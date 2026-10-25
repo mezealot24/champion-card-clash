@@ -158,7 +158,7 @@ describe('randomLoadout', () => {
 
   describe('Tank v2 Ascendancy', () => {
     const tk = (style: string, asc: string[]) => game('TK', { asc, points: 6 }, style, 'TK')
-    it('Endurance: 2+ hits give a stack, each cuts 1 dmg per hit, capped, fades', () => {
+    it('Endurance: Charge or 2+ hits give a stack, each cuts 2 dmg per hit, regens, capped, fades', () => {
       let s = tk('TK:1', ['A1'])
       for (let i = 0; i < 4; i++) {
         s.players.p2.hand = [hit(10), hit(10)]
@@ -167,10 +167,16 @@ describe('randomLoadout', () => {
       expect(s.players.p1.perkData?.endurance).toBe(3)
       const hp = s.players.p1.hp
       s.players.p2.hand = [hit(10), hit(10)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(hp - s.players.p1.hp).toBe(14)
-      for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      expect(hp - s.players.p1.hp).toBeLessThanOrEqual(8)
+      expect(s.log.some((l) => l.includes('Endurance'))).toBe(true)
+      for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
       expect(s.players.p1.perkData?.endurance).toBe(0)
+    })
+    it('Endurance: Charge alone gives a stack', () => {
+      let s = tk('TK:1', ['A1'])
+      s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
+      expect(s.players.p1.perkData?.endurance).toBe(1)
     })
     it('Unflinching: an Ignite burn counts as a hit', () => {
       let s = tk('TK:1', ['A1'])
@@ -179,18 +185,27 @@ describe('randomLoadout', () => {
       s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
       expect(s.players.p1.perkData?.endurance).toBe(1)
     })
-    it('Unrelenting: 2 Endurance at a time, max 5, turned into a heal in the red', () => {
+    it('Unrelenting: max 3+1+2, hit dmg drains over 3 turns instead of landing at once', () => {
       let s = tk('TK:1', ['A1', 'A2', 'A3'])
-      expect((tuningOf(s, 'p1')['TK:1'] as Record<string, number>).ascEnduranceMax).toBe(5)
+      expect((tuningOf(s, 'p1')['TK:1'] as Record<string, number>).ascEnduranceMax).toBe(6)
       expect((tuningOf(s, 'p2')['TK:1'] as Record<string, number>).ascEnduranceMax).toBe(3)
-      s.players.p2.hand = [hit(10), hit(10)]
+      const hp = s.players.p1.hp
+      s.players.p2.hand = [hit(30)]
+      s = resolveTurn(s, { p1: 'block', p2: 'block' })
+      s.players.p2.hand = [hit(30)]
       s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.players.p1.perkData?.endurance).toBe(2)
-      s.players.p1.hp = 50
-      s.players.p2.hand = [hit(10), hit(10)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.players.p1.perkData?.endurance).toBe(0)
-      expect(s.log.some((l) => l.includes('Unrelenting: 4 Endurance'))).toBe(true)
+      const lost1 = hp - s.players.p1.hp
+      expect(lost1).toBeLessThan(30)
+      for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
+      expect(s.players.p1.perkData?.drain ?? 0).toBe(0)
+      expect(hp - s.players.p1.hp).toBeGreaterThan(lost1)
+    })
+    it('Ancient: each Charge heals 4 + 4% missing HP', () => {
+      let s = tk('TK:2', ['A1', 'A2', 'A3'])
+      s.players.p1.hp = 100
+      s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
+      expect(s.players.p1.hp).toBeGreaterThan(100)
+      expect(s.log.some((l) => l.includes('Ancient'))).toBe(true)
     })
     it('Untiring heals per stopped hit, up to its cap', () => {
       let s = tk('TK:1', ['B1', 'B2'])
@@ -206,12 +221,14 @@ describe('randomLoadout', () => {
       s = resolveTurn(s, { p1: 'strike', p2: 'block' })
       expect(s.players.p2.hp).toBeLessThan(250)
     })
-    it('Time of Need: removes every debuff and heals 4 + 5% missing HP, cap −100', () => {
+    it('Time of Need: every 5 turns removes every debuff and heals 4 + 5% missing HP, cap −100', () => {
       let s = tk('TK:2', ['D1', 'D2', 'D3'])
       expect(tuningOf(s, 'p1')['TK:2'].maxHpCap).toBe(400)
       s.players.p1.hp = 150
       s.players.p1.statuses.push({ kind: 'noCharge', turns: 99 }, { kind: 'chill', turns: 99, n: 3 })
-      for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
+      for (let i = 0; i < 4; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
+      expect(s.players.p1.statuses.some((x) => x.kind === 'chill' || x.kind === 'noCharge')).toBe(true)
+      s = resolveTurn(s, { p1: 'block', p2: 'block' })
       expect(s.players.p1.statuses.some((x) => x.kind === 'chill' || x.kind === 'noCharge')).toBe(false)
       expect(s.log.some((l) => l.includes('Time of Need'))).toBe(true)
     })

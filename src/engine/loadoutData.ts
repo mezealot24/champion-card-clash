@@ -98,14 +98,20 @@ export const TREES: Record<string, TreeData> = {
     depth: 3,
     bonusPoints: 1,
     nodes: [
-      multi('A1', 'Unflinching', 'Each turn 2+ hits reach you (an Ignite burn counts as 1), gain 1 Endurance (max {ascEnduranceMax}). Each Endurance: hits that reach you deal 1 less dmg. Endurance fades after {ascEnduranceTurns} turns without a new one.', [
+      // Q 2026-10-25 (after sim): Endurance = −dmg per hit + HP regen per charge; gained by Charge or by taking 2+ hits
+      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Each Endurance: hits that reach you deal {ascEnduranceCut} less dmg, and you regain {ascEnduranceRegen}% Max HP at the end of every turn. Endurance fades after {ascEnduranceTurns} turns without a new one.', [
         ['ascEnduranceMax', 'max Endurance', 3, 1],
         ['ascEnduranceTurns', 'turns before it fades', 3, 1],
+        ['ascEnduranceCut', 'dmg cut per hit, per Endurance', 2],
+        ['ascEnduranceRegen', 'regen % Max HP per Endurance', 1],
       ]),
-      node('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance.', 'ascUnyielding', 'dmg per Endurance', 1),
-      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}, and you gain 2 at a time. While your HP is in the red, at the end of the turn all your Endurance turns into a heal: {ascUnrelentingHeal} per stack.', 'The Endurance you heal with is gone, dmg cut and all.', [
+      multi('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance. Endurance max +{ascUnyieldingMax}.', [
+        ['ascUnyielding', 'dmg per Endurance', 2],
+        ['ascUnyieldingMax', 'max Endurance +', 1],
+      ]),
+      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. Hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'TBD (Q to pick).', [
         ['ascUnrelenting', 'max Endurance +', 2],
-        ['ascUnrelentingHeal', 'heal per Endurance', 4],
+        ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
       ]),
       node('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%.', 'ascEarlyRally', 'HP line % +', 5),
       multi('B2', 'Untiring', 'Each hit your Block stops heals {ascUntiring}, up to {ascUntiringCap} a turn.', [
@@ -134,9 +140,12 @@ export const TREES: Record<string, TreeData> = {
     nodes: [
       node('A1', 'Taproot', 'Titan Bloom: +{ascTaproot} Max HP per facing pair.', 'ascTaproot', 'per facing +', 1),
       node('A2', 'Seedling', 'Start the match with {ascSeedling} Max HP already grown.', 'ascSeedling', 'Max HP grown at start', 20),
-      capstone('A3', 'Ancient', 'Titan Bloom cap +{ascAncient} and +{ascAncientHit} Max HP per hit taken.', 'Titan Bloom gives no dmg.', [
+      // Q 2026-10-25 (after sim): no Cost (Bloom was worse than no tree); Charge heals instead
+      multi('A3', 'Ancient', 'Titan Bloom cap +{ascAncient} and +{ascAncientHit} Max HP per hit taken. Each time you Charge, heal {ascAncientHeal} + {ascAncientPct}% of your missing HP.', [
         ['ascAncient', 'cap +', 100],
         ['ascAncientHit', 'per hit taken +', 2],
+        ['ascAncientHeal', 'Charge heal', 4],
+        ['ascAncientPct', 'Charge heal % of missing HP', 4, 0, 100],
       ]),
       node('B1', 'Bark Guard', 'Titan Bloom: +{ascBarkGuard} Max HP per hit Blocked.', 'ascBarkGuard', 'per hit Blocked +', 1),
       node('B2', 'Thorns', 'Each hit your Block stops deals {ascThorns} dmg back.', 'ascThorns', 'dmg back per hit', 2),
@@ -157,7 +166,7 @@ export const TREES: Record<string, TreeData> = {
       node('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} Max HP per debuff stack (end of turn).', 'ascLivingBark', 'per debuff stack +', 1),
       node('D2', 'Rooted', 'While you have 3+ debuff stacks, hits that reach you deal {ascRooted} less dmg.', 'ascRooted', 'dmg cut per hit', 2),
       capstone('D3', 'Time of Need', 'Every {ascTimeOfNeed} turns, at the end of the turn, remove every debuff on you and heal {ascTimeOfNeedHeal} + {ascTimeOfNeedPct}% of your missing HP.', 'Titan Bloom cap −{ascTimeOfNeedCost}.', [
-        ['ascTimeOfNeed', 'every N turns', 3, 1],
+        ['ascTimeOfNeed', 'every N turns', 5, 1],
         ['ascTimeOfNeedHeal', 'heal', 4],
         ['ascTimeOfNeedPct', 'heal % of missing HP', 5, 0, 100],
         ['ascTimeOfNeedCost', 'Cost: cap −', 100],
