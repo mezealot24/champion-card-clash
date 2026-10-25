@@ -109,8 +109,9 @@ export const TREES: Record<string, TreeData> = {
         ['ascUnyielding', 'dmg per Endurance', 2],
         ['ascUnyieldingMax', 'max Endurance +', 1],
       ]),
-      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. Hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'TBD (Q to pick).', [
+      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. Hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'When you Block, only the first hit is fully stopped: each later blocked hit still deals {ascUnrelentingLeak}% dmg.', [
         ['ascUnrelenting', 'max Endurance +', 2],
+        ['ascUnrelentingLeak', '% dmg of blocked hits after the first', 50, 0],
         ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
       ]),
       node('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%.', 'ascEarlyRally', 'HP line % +', 5),

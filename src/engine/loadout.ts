@@ -255,6 +255,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   'TK:1:A3': () => ({
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnrelenting')),
     hooks: {
+      blockLeakPct: (state, side) => num(state, side, 'TK:1', 'ascUnrelentingLeak'),
       actionStart: (state, side) => {
         const p = state.players[side]
         p.perkData = { ...p.perkData, preHitHp: p.hp }

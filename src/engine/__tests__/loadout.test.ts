@@ -207,6 +207,14 @@ describe('randomLoadout', () => {
       expect(s.players.p1.hp).toBeGreaterThan(100)
       expect(s.log.some((l) => l.includes('Ancient'))).toBe(true)
     })
+    it('Unrelenting Cost: the 2nd blocked hit still deals 50%', () => {
+      let s = tk('TK:1', ['A1', 'A2', 'A3'])
+      const hp = s.players.p1.hp
+      s.players.p2.hand = [hit(20), hit(20)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      expect(s.log.some((l) => l.includes('Unrelenting: 10 hit dmg'))).toBe(true)
+      expect(s.players.p1.hp).toBeLessThanOrEqual(hp)
+    })
     it('Untiring heals per stopped hit, up to its cap', () => {
       let s = tk('TK:1', ['B1', 'B2'])
       s.players.p1.hp = 200

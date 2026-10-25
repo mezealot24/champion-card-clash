@@ -123,6 +123,8 @@ export type StyleDef = {
   lifesteal?: (state: GameState, side: Side) => number
   /** dmg taken off every hit that gets past this side's Block */
   hitCut?: (state: GameState, side: Side) => number
+  /** Cost: every hit this side's Block stops after the first still deals this % of its dmg */
+  blockLeakPct?: (state: GameState, side: Side) => number
   /** extra cards a Charge that isn't broken draws, decided per turn */
   extraChargeDraw?: (state: GameState, side: Side) => number
   /** Energy Surge switches on at this much less than a full bar (Wraith Form) */

@@ -315,7 +315,17 @@ function resolveStrikes(
   const ts = (side: Side) => tuningOf(state, side)
   const throughPct = (side: Side, i: number) =>
     Math.min(100, Math.max(guardBreak[side] ? ts(side).BR.guardCrushBlockedPct : 0, crit[side].has(i) ? ts(side)['AS:2'].blockedCritPct : 0))
-  const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : Math.floor((dmgOf(side, i) * throughPct(side, i)) / 100))
+  // loadout Costs that make a side's Block leak: every blocked hit after its first still deals N% (Unrelenting)
+  const blockLeak = { p1: 0, p2: 0 }
+  for (const side of SIDES) blockLeak[side] = hooksOf(state.players[side]).reduce((t, h) => Math.max(t, h.blockLeakPct?.(state, side) ?? 0), 0)
+  const leakPct = (side: Side, i: number) => {
+    if (!blockLeak[other(side)]) return 0
+    let earlier = 0
+    for (let j = 0; j < i; j++) if (isBlocked(side, j)) earlier++
+    return earlier >= 1 ? blockLeak[other(side)] : 0
+  }
+  const dealtOf = (side: Side, i: number) =>
+    !isBlocked(side, i) ? dmgOf(side, i) : Math.floor((dmgOf(side, i) * Math.min(100, Math.max(throughPct(side, i), leakPct(side, i)))) / 100)
 
   // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
   const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }
