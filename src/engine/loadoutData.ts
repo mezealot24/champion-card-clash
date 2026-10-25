@@ -1,5 +1,5 @@
-// Loadout content (design/customization-options-2026-10-18.md): Sigil I · Oath (per Champion, Boon + Cost),
-// Sigil II · Minor (shared, small, no cost) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down; Mage and Tank: 4 branches × 3).
+// Loadout content (design/customization-options-2026-10-18.md): Sigil · Oath (per Champion, no Cost since Q 2026-10-25),
+// Sigil II · Minor (shared, small; off in the UI since 2026-10-25) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down; Mage and Tank: 4 branches × 3).
 // Names and numbers started as the Game Designer mockup's placeholders; nodes the engine can't do cheaply were swapped
 // for ones it can. Every number is a tuning field (Admin): Oaths in the Champion's class group, nodes in their Style's
 // group, Minors in game_config (minor_* keys). Text says {key} for its own group's numbers, like Style text.
@@ -11,34 +11,37 @@ export type PieceData = {
   name: string
   /** what you get */
   text: string
-  /** what you pay (Oaths) */
+  /** what you pay (Ascendancy capstones) */
   cost?: string
   fields: LoadoutField[]
 }
 
 const f = (key: string, label: string, def: number, min = 0, max?: number): LoadoutField => ({ key, label, def, min, ...(max !== undefined ? { max } : {}) })
 
-/** Sigil I · Oath, by Champion. Numbers live in the Champion's class group (champions.params). */
+/**
+ * Sigil · Oath, by Champion: the one Sigil a player picks (Q 2026-10-25: no Cost; 3 Oaths per class, each a different
+ * way to play). Numbers live in the Champion's class group (champions.params).
+ */
 export const OATHS: Record<string, PieceData[]> = {
   TK: [
-    { id: 'o1', name: 'Bulwark Oath', text: 'Your first Block of the match stops every hit.', cost: 'Your S cards cost {bulwarkCostPct}% more HP.', fields: [f('bulwarkCostPct', 'Oath Bulwark: S cost +%', 50)] },
-    { id: 'o2', name: 'Deep Roots', text: '+{deepRootsHp} Max HP and start HP.', cost: 'Your Field holds {deepRootsField} cards.', fields: [f('deepRootsHp', 'Oath Deep Roots: Max HP +', 40), f('deepRootsField', 'Oath Deep Roots: Field slots', 4, 1, 5)] },
-    { id: 'o3', name: 'Thornhide', text: 'Each hit your Block stops deals {thornDmg} dmg back to the striker.', cost: 'Your Block stops {thornBlockLoss} hit fewer.', fields: [f('thornDmg', 'Oath Thornhide: dmg back per blocked hit', 4), f('thornBlockLoss', 'Oath Thornhide: Block stops fewer', 1)] },
+    { id: 'o1', name: 'Bulwark Oath', text: 'Your first Block of the match stops every hit.', fields: [] },
+    { id: 'o2', name: 'Deep Roots', text: '+{deepRootsHp} Max HP and start HP.', fields: [f('deepRootsHp', 'Oath Deep Roots: Max HP +', 40)] },
+    { id: 'o3', name: 'Thornhide', text: 'Each hit your Block stops deals {thornDmg} dmg back to the striker.', fields: [f('thornDmg', 'Oath Thornhide: dmg back per blocked hit', 4)] },
   ],
   BR: [
-    { id: 'o1', name: 'Bloodlust', text: 'Lifesteal {bloodlustPct}% while your HP is below {bloodlustHpPct}%.', cost: 'Your Field holds {bloodlustField} cards.', fields: [f('bloodlustPct', 'Oath Bloodlust: Lifesteal %', 25, 0, 100), f('bloodlustHpPct', 'Oath Bloodlust: HP line %', 30, 1, 100), f('bloodlustField', 'Oath Bloodlust: Field slots', 4, 1, 5)] },
-    { id: 'o2', name: 'Hot Blood', text: 'Start the match with {hotBloodRage} Rage.', cost: '−{hotBloodHp} Max HP.', fields: [f('hotBloodRage', 'Oath Hot Blood: Rage at start +', 10), f('hotBloodHp', 'Oath Hot Blood: Max HP −', 20)] },
-    { id: 'o3', name: 'Iron Hide', text: 'Every hit that reaches you deals {ironHideCut} less dmg.', cost: 'You gain {ironHideRage} less Rage per hit taken.', fields: [f('ironHideCut', 'Oath Iron Hide: dmg cut per hit', 2), f('ironHideRage', 'Oath Iron Hide: Rage per hit taken −', 1)] },
+    { id: 'o1', name: 'Bloodlust', text: 'Lifesteal {bloodlustPct}% while your HP is below {bloodlustHpPct}%.', fields: [f('bloodlustPct', 'Oath Bloodlust: Lifesteal %', 25, 0, 100), f('bloodlustHpPct', 'Oath Bloodlust: HP line %', 30, 1, 100)] },
+    { id: 'o2', name: 'Hot Blood', text: 'Start the match with {hotBloodRage} Rage.', fields: [f('hotBloodRage', 'Oath Hot Blood: Rage at start +', 10)] },
+    { id: 'o3', name: 'Iron Hide', text: 'Every hit that reaches you deals {ironHideCut} less dmg.', fields: [f('ironHideCut', 'Oath Iron Hide: dmg cut per hit', 2)] },
   ],
   AS: [
-    { id: 'o1', name: 'Shadow Edge', text: 'Chain slot 1 deals +{shadowEdgeDmg} dmg.', cost: '−{shadowEdgeHp} Max HP.', fields: [f('shadowEdgeDmg', 'Oath Shadow Edge: slot 1 dmg +', 6), f('shadowEdgeHp', 'Oath Shadow Edge: Max HP −', 20)] },
-    { id: 'o2', name: 'Quickdraw', text: 'Start the match with {quickdrawCards} more cards on your Field.', cost: 'Energy cap −{quickdrawCap}.', fields: [f('quickdrawCards', 'Oath Quickdraw: cards at start +', 2, 0, 5), f('quickdrawCap', 'Oath Quickdraw: Energy cap −', 1)] },
-    { id: 'o3', name: 'Vanish', text: 'Start the match with Parry {vanishParry}: the first hits that get past your Block deal 0.', cost: 'Start the match with {vanishEnergy} Energy.', fields: [f('vanishParry', 'Oath Vanish: Parry at start', 2), f('vanishEnergy', 'Oath Vanish: Energy at start', 0)] },
+    { id: 'o1', name: 'Shadow Edge', text: 'Chain slot 1 deals +{shadowEdgeDmg} dmg.', fields: [f('shadowEdgeDmg', 'Oath Shadow Edge: slot 1 dmg +', 6)] },
+    { id: 'o2', name: 'Quickdraw', text: 'Start the match with {quickdrawCards} more cards on your Field.', fields: [f('quickdrawCards', 'Oath Quickdraw: cards at start +', 2, 0, 5)] },
+    { id: 'o3', name: 'Vanish', text: 'Start the match with Parry {vanishParry}: the first hits that get past your Block deal 0.', fields: [f('vanishParry', 'Oath Vanish: Parry at start', 2)] },
   ],
   MG: [
-    { id: 'o1', name: 'Overcharge', text: 'Mana cap +{overchargeCap}.', cost: 'Your Block stops {overchargeBlockLoss} hit fewer.', fields: [f('overchargeCap', 'Oath Overcharge: Mana cap +', 2), f('overchargeBlockLoss', 'Oath Overcharge: Block stops fewer', 1)] },
-    { id: 'o2', name: 'Arcane Ward', text: 'Start the match with Shield {arcaneWardShield}.', cost: 'Your S cards cost {arcaneWardCost} more Mana.', fields: [f('arcaneWardShield', 'Oath Arcane Ward: Shield at start', 20), f('arcaneWardCost', 'Oath Arcane Ward: S cost +', 1)] },
-    { id: 'o3', name: 'Glass Focus', text: 'All your cards deal +{glassFocusDmg} dmg.', cost: '−{glassFocusHp} Max HP.', fields: [f('glassFocusDmg', 'Oath Glass Focus: all cards dmg +', 3), f('glassFocusHp', 'Oath Glass Focus: Max HP −', 20)] },
+    { id: 'o1', name: 'Overcharge', text: 'Mana cap +{overchargeCap}.', fields: [f('overchargeCap', 'Oath Overcharge: Mana cap +', 2)] },
+    { id: 'o2', name: 'Arcane Ward', text: 'Start the match with Shield {arcaneWardShield}.', fields: [f('arcaneWardShield', 'Oath Arcane Ward: Shield at start', 20)] },
+    { id: 'o3', name: 'Arcane Focus', text: 'All your cards deal +{glassFocusDmg} dmg.', fields: [f('glassFocusDmg', 'Oath Arcane Focus: all cards dmg +', 2)] },
   ],
 }
 

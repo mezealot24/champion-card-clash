@@ -33,7 +33,6 @@ const addMaxHp = (p: PlayerState, n: number) => {
   p.maxHp = Math.max(1, p.maxHp + n)
   p.hp = Math.max(1, Math.min(p.maxHp, p.hp + n))
 }
-const field = (p: PlayerState, n: number) => (p.fieldMax = Math.min(p.fieldMax ?? 5, n))
 const cost = (p: PlayerState, pct: number, flat: number) => {
   const c = (p.costMod ??= { pct: 0, flat: 0 })
   c.pct += pct
@@ -85,10 +84,9 @@ const endurance = (p: PlayerState) => p.perkData?.endurance ?? 0
 /** Fury is on for this Strike (Bruiser Style 1) */
 const furyOn = (state: GameState, side: Side) => pctHp(state.players[side]) < num(state, side, 'BR:1', 'hpPct')
 
-// ---------------- Sigil I · Oath ----------------
+// ---------------- Sigil · Oath (no Cost, Q 2026-10-25) ----------------
 const OATH_FX: Record<string, Piece> = {
   'TK:o1': {
-    setup: (p, v) => cost(p, v('bulwarkCostPct'), 0),
     hooks: {
       actionStart: (state, side, action) => {
         if (action === 'block' && once(state.players[side], 'bulwark')) {
@@ -99,10 +97,9 @@ const OATH_FX: Record<string, Piece> = {
       blockBonus: (state, side) => (state.players[side].perkData?.bulwarkTurn === state.turn ? 99 : 0),
     },
   },
-  'TK:o2': { setup: (p, v) => (addMaxHp(p, v('deepRootsHp')), field(p, v('deepRootsField'))) },
+  'TK:o2': { setup: (p, v) => addMaxHp(p, v('deepRootsHp')) },
   'TK:o3': {
     hooks: {
-      blockBonus: (state, side) => -num(state, side, 'TK', 'thornBlockLoss'),
       afterHits: (state, side, r) => {
         const n = r.hitsBlocked * num(state, side, 'TK', 'thornDmg')
         if (n <= 0) return
@@ -111,29 +108,21 @@ const OATH_FX: Record<string, Piece> = {
       },
     },
   },
-  'BR:o1': {
-    setup: (p, v) => field(p, v('bloodlustField')),
-    hooks: { lifesteal: (state, side) => (pctHp(state.players[side]) < num(state, side, 'BR', 'bloodlustHpPct') ? num(state, side, 'BR', 'bloodlustPct') : 0) },
-  },
-  'BR:o2': { tune: (t, v) => add(t, 'BR', 'start', v('hotBloodRage')), setup: (p, v) => addMaxHp(p, -v('hotBloodHp')) },
-  'BR:o3': { tune: (t, v) => add(t, 'BR', 'perHitTaken', -v('ironHideRage')), hooks: { hitCut: (state, side) => num(state, side, 'BR', 'ironHideCut') } },
+  'BR:o1': { hooks: { lifesteal: (state, side) => (pctHp(state.players[side]) < num(state, side, 'BR', 'bloodlustHpPct') ? num(state, side, 'BR', 'bloodlustPct') : 0) } },
+  'BR:o2': { tune: (t, v) => add(t, 'BR', 'start', v('hotBloodRage')) },
+  'BR:o3': { hooks: { hitCut: (state, side) => num(state, side, 'BR', 'ironHideCut') } },
   'AS:o1': {
-    setup: (p, v) => addMaxHp(p, -v('shadowEdgeHp')),
     hooks: {
       beforeHits: (state, side, bonus) => {
         if (bonus.length) bonus[0] += num(state, side, 'AS', 'shadowEdgeDmg')
       },
     },
   },
-  'AS:o2': { tune: (t, v) => add(t, 'AS', 'cap', -v('quickdrawCap')), hooks: { startDraw: (t) => (t as Record<string, Record<string, number>>).AS.quickdrawCards ?? 0 } },
-  'AS:o3': {
-    tune: (t, v) => add(t, 'AS', 'start', Math.min(0, v('vanishEnergy') - t.AS.start)),
-    setup: (p, v) => status(p, 'parry', v('vanishParry')),
-  },
-  'MG:o1': { tune: (t, v) => add(t, 'MG', 'cap', v('overchargeCap')), hooks: { blockBonus: (state, side) => -num(state, side, 'MG', 'overchargeBlockLoss') } },
-  'MG:o2': { setup: (p, v) => (status(p, 'shield', v('arcaneWardShield')), cost(p, 0, v('arcaneWardCost'))) },
+  'AS:o2': { hooks: { startDraw: (t) => (t as Record<string, Record<string, number>>).AS.quickdrawCards ?? 0 } },
+  'AS:o3': { setup: (p, v) => status(p, 'parry', v('vanishParry')) },
+  'MG:o1': { tune: (t, v) => add(t, 'MG', 'cap', v('overchargeCap')) },
+  'MG:o2': { setup: (p, v) => status(p, 'shield', v('arcaneWardShield')) },
   'MG:o3': {
-    setup: (p, v) => addMaxHp(p, -v('glassFocusHp')),
     hooks: {
       beforeHits: (state, side, bonus) => {
         const n = num(state, side, 'MG', 'glassFocusDmg')
@@ -790,7 +779,7 @@ export function applyLoadout(p: PlayerState, l: Loadout | undefined, gameTuning:
   if (res && !res.payWithHp) p.res = Math.min(res.cap, res.start)
 }
 
-/** A random full loadout for the AI: any Oath, any Minor, and all points spent down random branches of its Style's tree. */
+/** A random full loadout for the AI: any Oath (no Minor: Sigil II is off, Q 2026-10-25), and all points spent down random branches of its Style's tree. */
 export function randomLoadout(champ: string, style: string | undefined, points: number, rand: () => number = Math.random): Loadout {
   const pick = <T,>(xs: T[]): T | undefined => xs[Math.floor(rand() * xs.length)]
   const asc: string[] = []
@@ -803,5 +792,5 @@ export function randomLoadout(champ: string, style: string | undefined, points: 
       asc.push(id)
     }
   }
-  return { oath: pick(OATHS[champ] ?? [])?.id, minor: pick(MINORS)?.id, asc, points: pts }
+  return { oath: pick(OATHS[champ] ?? [])?.id, asc, points: pts }
 }

@@ -1,7 +1,8 @@
-// Loadout screen: Sigil I · Oath (Boon + Cost), Sigil II · Minor, and the Ascendancy tree of the picked Style.
+// Loadout screen: one Sigil (the Champion's Oath, no Cost) and the Ascendancy tree of the picked Style.
+// Q 2026-10-25: Sigil II · Minor is off (the engine still knows the Minors, nothing offers them).
 // Mockup: Game Designer thread (claude.ai/artifact/QWLfQ4bSXFxz6BMXUwQAB6). All open in Beta, saved per Champion.
 import { useState } from 'react'
-import { MINORS, OATHS, TREES, treePoints, treeShape, validAsc, type PieceData } from '../../engine'
+import { OATHS, TREES, treePoints, treeShape, validAsc, type PieceData } from '../../engine'
 import { champColor } from '../fighters'
 import { Portrait } from '../select/Portrait'
 import { loadLoadout, saveLoadout, type SavedLoadout } from './loadout'
@@ -132,21 +133,13 @@ export function LoadoutBuilder(props: {
 
       <section className="box">
         <h2>
-          Sigil I · Oath <span>{props.champName} only · Boon + Cost</span>
+          Sigil · Oath <span>{props.champName} only · pick one</span>
         </h2>
         <div className="lo-opts">
           {oaths.map((o) => pick(o, champ, l.oath === o.id, () => setL({ ...l, oath: l.oath === o.id ? undefined : o.id })))}
         </div>
       </section>
 
-      <section className="box">
-        <h2>
-          Sigil II · Minor <span>shared · small bonus</span>
-        </h2>
-        <div className="lo-opts">
-          {MINORS.map((m) => pick(m, 'MINOR', l.minor === m.id, () => setL({ ...l, minor: l.minor === m.id ? undefined : m.id })))}
-        </div>
-      </section>
 
       <footer className="lo-foot">
         <div>

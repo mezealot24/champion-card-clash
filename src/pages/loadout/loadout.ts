@@ -1,6 +1,7 @@
-// Player loadout saved on this device, per Champion (no player accounts yet): Oath, Minor, and Ascendancy nodes per Style.
+// Player loadout saved on this device, per Champion (no player accounts yet): Oath and Ascendancy nodes per Style.
+// A Minor saved before 2026-10-25 is dropped (Sigil II is off).
 // Everything is open in Beta (Q 2026-10-20); points per Style = game_config asc_points (default 5) + the tree's bonusPoints.
-import { MINORS, OATHS, treePoints, validAsc, type Loadout } from '../../engine'
+import { OATHS, treePoints, validAsc, type Loadout } from '../../engine'
 
 export type SavedLoadout = { oath?: string; minor?: string; asc?: Record<string, string[]> }
 
@@ -36,10 +37,9 @@ export function saveLoadout(champ: string, l: SavedLoadout) {
 /** What the engine gets for this Champion and Style (pieces that no longer exist are dropped). */
 export function loadoutFor(champ: string, style: string | undefined, points: number, saved = loadLoadout(champ)): Loadout | undefined {
   const oath = OATHS[champ]?.some((o) => o.id === saved.oath) ? saved.oath : undefined
-  const minor = MINORS.some((m) => m.id === saved.minor) ? saved.minor : undefined
   const nodes = style ? (saved.asc?.[style] ?? []) : []
   const pts = treePoints(style, points)
   const asc = validAsc(nodes, pts, style) ? nodes : []
-  if (!oath && !minor && !asc.length) return undefined
-  return { oath, minor, asc, points: pts }
+  if (!oath && !asc.length) return undefined
+  return { oath, asc, points: pts }
 }

@@ -60,11 +60,11 @@ describe('loadout', () => {
     expect(tuningOf(s, 'p2')['TK:1'].hpPct).toBe(30)
   })
 
-  it('Deep Roots: +40 Max HP, Field holds 4', () => {
+  it('Deep Roots: +40 Max HP, no Cost (Field still holds 5)', () => {
     let s = game('TK', { oath: 'o2' })
     expect(s.players.p1.maxHp).toBe(290)
     for (let i = 0; i < 6; i++) s = resolveTurn(s, { p1: 'charge', p2: 'block' })
-    expect(s.players.p1.hand.length).toBe(4)
+    expect(s.players.p1.hand.length).toBe(5)
   })
 
   it('Bulwark Oath: the first Block stops every hit, then Blocks are normal', () => {
@@ -84,19 +84,19 @@ describe('loadout', () => {
     expect(s.players.p1.hp).toBe(210 - 16)
   })
 
-  it('Hot Blood starts with 10 Rage and 20 less Max HP; Head Start adds 1 resource', () => {
+  it('Hot Blood starts with 10 Rage and no Max HP Cost; Head Start adds 1 resource', () => {
     const s = game('BR', { oath: 'o2', minor: 'm2' })
     expect(s.players.p1.res).toBe(11)
-    expect(s.players.p1.maxHp).toBe(190)
+    expect(s.players.p1.maxHp).toBe(210)
   })
 
-  it('Arcane Ward: Shield 20 at the start, S cards cost 1 more Mana', () => {
+  it('Arcane Ward: Shield 20 at the start, S cards cost no more Mana', () => {
     let s = game('MG', { oath: 'o2' })
     expect(s.players.p1.statuses.find((x) => x.kind === 'shield')?.n).toBe(20)
     s.players.p1.res = 2
     s.players.p1.hand = [hit(5, 'S')]
     s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-    expect(s.players.p1.res).toBe(2) // default S cost 2 + 1 = 3 > 2: unpaid
+    expect(s.players.p1.res).toBeLessThan(2) // paid the normal cost
   })
 
   it('Unbroken: a knockout hit leaves the Tank at 1 HP once', () => {
@@ -120,7 +120,7 @@ describe('randomLoadout', () => {
       for (let i = 0; i < 30; i++) {
         const l = randomLoadout(champ, style, 5)
         expect(OATHS[champ].some((o) => o.id === l.oath)).toBe(true)
-        expect(MINORS.some((m) => m.id === l.minor)).toBe(true)
+        expect(l.minor).toBeUndefined() // Sigil II · Minor is off
         expect(l.asc).toHaveLength(treePoints(style, 5))
         expect(validAsc(l.asc!, treePoints(style, 5), style)).toBe(true)
       }
