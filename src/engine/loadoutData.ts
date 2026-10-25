@@ -1,5 +1,5 @@
 // Loadout content (design/customization-options-2026-10-18.md): Sigil · Oath (per Champion, no Cost since Q 2026-10-25),
-// Sigil II · Minor (shared, small; off in the UI since 2026-10-25) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down; Mage, Tank, Assassin: 4 branches × 3).
+// Sigil II · Minor (shared, small; off in the UI since 2026-10-25) and the Ascendancy tree of each Style (v2 since 2026-10-25: 4 branches × 3 nodes, the last a capstone with a Cost).
 // Names and numbers started as the Game Designer mockup's placeholders; nodes the engine can't do cheaply were swapped
 // for ones it can. Every number is a tuning field (Admin): Oaths in the Champion's class group, nodes in their Style's
 // group, Minors in game_config (minor_* keys). Text says {key} for its own group's numbers, like Style text.
@@ -56,8 +56,9 @@ export const MINORS: PieceData[] = [
 /**
  * branches: one name per branch, ids A.., B.., C.., D.. in order. depth: nodes per branch (default 4), the last is the capstone.
  * bonusPoints: points this tree gets on top of game_config asc_points (Mage v2: +1, Q 2026-10-25).
+ * rev: bump when the nodes change meaning, so trees saved on a device for an older version start empty.
  */
-export type TreeData = { branches: string[]; nodes: PieceData[]; depth?: number; bonusPoints?: number }
+export type TreeData = { branches: string[]; nodes: PieceData[]; depth?: number; bonusPoints?: number; rev?: number }
 
 const node = (id: string, name: string, text: string, key: string, label: string, def: number, min = 0, max?: number): PieceData => ({
   id,
@@ -163,30 +164,86 @@ export const TREES: Record<string, TreeData> = {
       ]),
     ],
   },
+  /**
+   * Bruiser v2 (Q 2026-10-25, design/bruiser-ascendancy-v2-2026-10-25.md): same shape as Mage / Tank / Assassin v2.
+   * Fury from PoE Berserker + Sett (Payback spends the Rage you already have) + Precision ideas; Juggernaut from
+   * Gladiator + Slayer + Resolve ideas. Names are our own (no LoL rune / PoE notable names). Everything that stacks has a cap.
+   */
   'BR:1': {
-    branches: ['Frenzy', 'Blood Rush'],
+    branches: ['Carnage', 'Blood Rite', 'Payback', 'Comeback'],
+    depth: 3,
+    bonusPoints: 1,
+    rev: 2,
     nodes: [
-      node('A1', 'Short Fuse', 'Fury HP line +{ascA1}%.', 'ascA1', 'HP line % +', 5),
-      node('A2', 'Heavy Hands', 'Fury bonus +{ascA2} dmg.', 'ascA2', 'bonus dmg +', 2),
-      node('A3', 'Wide Swing', 'Fury reaches {ascA3} more chain slot.', 'ascA3', 'slots +', 1),
-      node('A4', 'Blood Frenzy', 'Below {ascA4}% HP, the Fury bonus counts twice.', 'ascA4', 'HP line %', 25, 1, 100),
-      node('B1', 'Seething', '+{ascB1} Rage per clean hit.', 'ascB1', 'Rage per clean hit +', 1),
-      node('B2', 'Bloodletting', 'Lifesteal {ascB2}% while Fury is on.', 'ascB2', 'Lifesteal %', 10, 0, 100),
-      node('B3', 'Hardened', '+{ascB3} Max HP and start HP.', 'ascB3', 'Max HP +', 15),
-      node('B4', 'Unstoppable', 'While Fury is on, chain slot 1 ignores Block.', 'ascB4', 'slots that ignore Block', 1, 0, 5),
+      node('A1', 'Short Fuse', 'Fury HP line +{ascShortFuse}%.', 'ascShortFuse', 'HP line % +', 5),
+      node('A2', 'Heavy Hands', 'Fury bonus +{ascHeavyHands} dmg.', 'ascHeavyHands', 'bonus dmg +', 2),
+      capstone('A3', 'Bloodbath', 'Fury reaches every chain slot.', 'While Fury is on, hits that reach you deal +{ascBloodbathCost} dmg.', [
+        ['ascBloodbathCost', 'Cost: dmg taken + per hit', 2],
+      ]),
+      node('B1', 'Seething', '+{ascSeething} Rage per clean hit.', 'ascSeething', 'Rage per clean hit +', 1),
+      multi('B2', 'War Cry', 'When you Strike, chain slot 1 +1 dmg per {ascWarCry} Rage you have (max +{ascWarCryCap}).', [
+        ['ascWarCry', 'Rage per +1 dmg', 5, 1],
+        ['ascWarCryCap', 'dmg cap', 4],
+      ]),
+      capstone('B3', 'Blood Rite', 'Rage cap +{ascBloodRite} and you never lose Rage on a quiet turn.', 'At the end of every turn, lose 1 HP per {ascBloodRiteCost} Rage you have (never below 1 HP).', [
+        ['ascBloodRite', 'Rage cap +', 10],
+        ['ascBloodRiteCost', 'Cost: Rage per 1 HP lost', 5, 1],
+      ]),
+      node('C1', 'One-Two', 'Every 2nd P card in your chain deals +{ascOneTwo} dmg.', 'ascOneTwo', 'dmg + on every 2nd P', 3),
+      multi('C2', 'Wind Up', 'Charge while you have Rage: you are Wound Up. Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left, +{ascPayback} dmg per Rage. If a hit reaches you the turn you wind up, Wound Up is lost and you gain {ascFlinchRage} Rage.', [
+        ['ascPayback', 'dmg per Rage', 1],
+        ['ascFlinchRage', 'Rage when interrupted', 10],
+      ]),
+      capstone('C3', 'Knockout', 'Your Payback ignores Block and gives you Shield equal to {ascKnockout}% of the Rage it spent.', 'Fury bonus −{ascKnockoutCost} dmg.', [
+        ['ascKnockout', 'Shield % of Rage spent', 50, 0, 100],
+        ['ascKnockoutCost', 'Cost: Fury bonus −', 4],
+      ]),
+      node('D1', 'Bloodletting', 'Lifesteal {ascBloodletting}% while Fury is on.', 'ascBloodletting', 'Lifesteal %', 10, 0, 100),
+      node('D2', 'Underdog', 'While the enemy has more HP than you, your cards deal +{ascUnderdog} dmg.', 'ascUnderdog', 'dmg +', 1),
+      capstone('D3', 'Rally', 'When one Strike takes {ascRally}%+ of the enemy\'s Max HP, heal {ascRallyHeal} + {ascRallyPct}% of your missing HP.', 'Fury HP line −{ascRallyCost}%.', [
+        ['ascRally', 'enemy Max HP % needed', 15, 1, 100],
+        ['ascRallyHeal', 'heal', 4, 4],
+        ['ascRallyPct', 'heal % of missing HP', 10, 0, 100],
+        ['ascRallyCost', 'Cost: Fury HP line % −', 10],
+      ]),
     ],
   },
   'BR:2': {
-    branches: ['Momentum', 'Ironclad'],
+    branches: ['Arena', 'Verdict', 'Hunger', 'Bulwark'],
+    depth: 3,
+    bonusPoints: 1,
+    rev: 2,
     nodes: [
-      node('A1', 'Warm Up', 'Start the match with {ascA1} Momentum stack.', 'ascA1', 'stacks at start', 1),
-      node('A2', 'Pile On', 'Conqueror max stacks +{ascA2}.', 'ascA2', 'max stacks +', 1),
-      node('A3', 'Hungry Steel', 'Max-stack Lifesteal +{ascA3}%.', 'ascA3', 'Lifesteal % +', 5),
-      node('A4', 'Iron Tide', 'Tenacity lasts {ascA4} more turn.', 'ascA4', 'turns +', 1),
-      node('B1', 'Unshaken', 'A Block costs {ascB1} fewer Momentum stacks.', 'ascB1', 'stacks lost −', 1),
-      node('B2', 'Plated', '+{ascB2} Max HP and start HP.', 'ascB2', 'Max HP +', 10),
-      node('B3', 'Braced', 'At max stacks, a charge break hurts {ascB3}% less.', 'ascB3', 'extra dmg % −', 20),
-      node('B4', 'Steamroller', 'At max stacks, chain slot 1 ignores Block.', 'ascB4', 'slots that ignore Block', 1, 0, 5),
+      node('A1', 'Unshaken', 'A Block costs {ascUnshaken} fewer Momentum.', 'ascUnshaken', 'stacks lost −', 1),
+      node('A2', 'Riposte', "When your Block stops every hit, your next Strike's slot 1 deals +{ascRiposte} dmg (doesn't stack).", 'ascRiposte', 'slot 1 dmg +', 4),
+      capstone('A3', 'Retaliation', 'Each hit your Block stops gives +1 Momentum (max {ascRetaliation} a turn).', 'Lifesteal at max Momentum −{ascRetaliationCost}%.', [
+        ['ascRetaliation', 'Momentum per turn (cap)', 2],
+        ['ascRetaliationCost', 'Cost: Lifesteal % −', 5],
+      ]),
+      node('B1', 'Cleave', 'While the enemy is in the red (30% HP), your cards deal +{ascCleave} dmg.', 'ascCleave', 'dmg +', 2),
+      node('B2', 'Bloodhound', 'Once per match, when your Strike puts the enemy in the red, gain {ascBloodhound} Momentum.', 'ascBloodhound', 'Momentum +', 3),
+      capstone('B3', 'Final Verdict', 'At max Momentum, a Strike that leaves the enemy at {ascVerdict}% Max HP or less finishes them.', 'Momentum max +{ascVerdictCost}.', [
+        ['ascVerdict', 'finish at % Max HP', 15, 0, 50],
+        ['ascVerdictCost', 'Cost: max stacks +', 1],
+      ]),
+      node('C1', 'Hungry Steel', 'Max-Momentum Lifesteal +{ascHungrySteel}%.', 'ascHungrySteel', 'Lifesteal % +', 5),
+      node('C2', 'Gorged', 'While you have Lifesteal from Momentum, hits that reach you deal {ascGorged} less dmg.', 'ascGorged', 'dmg cut per hit', 2),
+      capstone('C3', 'Insatiable', 'Momentum Lifesteal works from {ascInsatiable} stacks, not only at max.', '−{ascInsatiableCost} Max HP.', [
+        ['ascInsatiable', 'stacks needed', 3, 1],
+        ['ascInsatiableCost', 'Cost: Max HP −', 20],
+      ]),
+      node('D1', 'Plating', 'After a turn a hit reaches you, hits that reach you next turn deal {ascPlating} less dmg.', 'ascPlating', 'dmg cut per hit', 2),
+      multi('D2', 'Iron Grip', 'Every {ascIronGrip} turns, your next Strike heals {ascIronGripHeal} and gives +{ascIronGripHp} Max HP (max +{ascIronGripCap} a match).', [
+        ['ascIronGrip', 'every N turns', 3, 1],
+        ['ascIronGripHeal', 'heal', 4, 4],
+        ['ascIronGripHp', 'Max HP +', 2],
+        ['ascIronGripCap', 'Max HP cap a match', 10],
+      ]),
+      capstone('D3', 'Quake', 'When Momentum reaches max: for {ascQuakeTurns} turns hits that reach you deal {ascQuake} less, then the enemy loses {ascQuakeDmg} HP.', 'No Tenacity.', [
+        ['ascQuake', 'dmg cut per hit', 3],
+        ['ascQuakeTurns', 'turns', 2, 1],
+        ['ascQuakeDmg', 'HP lost by the enemy', 10],
+      ]),
     ],
   },
   /**
