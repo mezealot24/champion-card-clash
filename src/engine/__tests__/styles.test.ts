@@ -1,4 +1,4 @@
-// Tank Styles: Lifeline (TK:1) and Titan Bloom (TK:2).
+// Tank Styles: Iron Will (TK:1) and Titan Bloom (TK:2).
 import { describe, expect, it } from 'vitest'
 import { createGame, resolveTurn } from '../index'
 import type { CardDef, CardInst, GameState } from '../index'
@@ -12,33 +12,25 @@ function game(style: string, hp: number, maxHp = 100): GameState {
   return createGame({ championId: 'TK', hpStart: hp, hpMax: maxHp, deck, style }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1 })
 }
 
-describe('Lifeline', () => {
-  it('heals 4% of missing HP per hit taken while HP is red (below 30%)', () => {
-    const s = game('TK:1', 30)
-    s.players.p2.hand = [hit(10), hit(10)]
-    // 30 - 20 = 10 → missing 90 → 4% x 2 hits = 7.2 → 7
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(17)
+describe('Iron Will', () => {
+  it('starts with 1 Endurance and carries the Costs (heal −50%, S cost 10% current HP)', () => {
+    const s = game('TK:1', 100)
+    expect(s.players.p1.perkData?.endurance).toBe(1)
+    expect(s.players.p1.perkData?.healPct).toBe(50)
+    expect(s.players.p1.costMod?.hpPct).toBe(10)
   })
 
-  it('does nothing in the green (30%+) or when no hit lands', () => {
-    const s = game('TK:1', 40)
-    s.players.p2.hand = [hit(10)]
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(30)
-    const b = game('TK:1', 20)
-    b.players.p2.hand = [hit(10)]
-    expect(resolveTurn(b, { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(20)
+  it('blocked hits after the first still deal 50%', () => {
+    const s = game('TK:1', 100)
+    s.players.p2.hand = [hit(20), hit(20)]
+    expect(resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(90)
   })
 
-  it('switches off for good once HP is back in the green', () => {
-    let s = game('TK:1', 25)
-    s.players.p2.hand = [hit(1)]
-    s = resolveTurn(s, { p1: 'block', p2: 'charge' }) // red, no hit
-    s.players.p1.hp = 30
-    s = resolveTurn(s, { p1: 'block', p2: 'block' })
-    expect(s.players.p1.styleData?.spent).toBe(1)
-    s.players.p1.hp = 20
-    s.players.p2.hand = [hit(10)]
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(10)
+  it('Endurance fades, then Vulnerable 25% next turn', () => {
+    let s = game('TK:1', 100)
+    for (let i = 0; i < 4; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
+    expect(s.players.p1.perkData?.endurance).toBe(0)
+    expect(s.players.p1.statuses.some((x) => x.kind === 'vulnerable' && x.n === 25)).toBe(true)
   })
 })
 

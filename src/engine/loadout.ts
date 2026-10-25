@@ -82,7 +82,7 @@ function gainEndurance(state: GameState, side: Side, why: string, src = 'flinch'
   const p = state.players[side]
   const at = `endAt_${src}`
   if (p.perkData?.[at] === state.turn) return // once a turn per source
-  const max = num(state, side, 'TK:1', 'ascEnduranceMax')
+  const max = num(state, side, 'TK:1', 'ascEnduranceMax') + (p.perkData?.endMaxBonus ?? 0)
   const n = Math.min(max, endurance(p) + by)
   p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, [at]: state.turn }
   say(state, side, `Endurance (${why}): ${n}/${max}`)
@@ -250,7 +250,6 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   'TK:1:A3': () => ({
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnrelenting')),
     hooks: {
-      blockLeakPct: (state, side) => num(state, side, 'TK:1', 'ascUnrelentingLeak'),
       actionStart: (state, side) => {
         const p = state.players[side]
         p.perkData = { ...p.perkData, preHitHp: p.hp }
@@ -306,17 +305,25 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
+  // Second Wind (Q 2026-10-25 19:06): once, when HP drops below the HP line: Endurance max +2 and full,
+  // then for N turns regen (flat + % missing HP) per Endurance at the end of the turn
   'TK:1:B3': () => ({
-    setup: (p, v) => {
-      p.perkData = { ...p.perkData, healPct: 100 - v('ascSecondWindHealCut') }
-    },
     hooks: {
+      onHpLoss: (state, side) => {
+        const p = state.players[side]
+        if (p.hp <= 0 || pctHp(p) >= num(state, side, 'TK:1', 'hpPct') || !once(p, 'secondWind')) return
+        const bonus = num(state, side, 'TK:1', 'ascSecondWindMax')
+        const max = num(state, side, 'TK:1', 'ascEnduranceMax') + (p.perkData?.endMaxBonus ?? 0) + bonus
+        p.perkData = { ...p.perkData, endMaxBonus: (p.perkData?.endMaxBonus ?? 0) + bonus, endurance: max, enduranceAt: state.turn, windUntil: state.turn + num(state, side, 'TK:1', 'ascSecondWindTurns') - 1 }
+        say(state, side, `Second Wind: Endurance ${max}/${max}`)
+      },
       endTurn: (state, side) => {
         const p = state.players[side]
-        if (p.hp > 0) gainEndurance(state, side, 'Second Wind', 'wind')
-        if (!p.styleData?.spent || !once(p, 'secondWind')) return
-        p.styleData = { ...p.styleData, spent: 0, below: 0 }
-        say(state, side, 'Second Wind: Lifeline can switch on once more')
+        if ((p.perkData?.windUntil ?? 0) < state.turn || p.hp <= 0) return
+        const n = endurance(p)
+        const per = num(state, side, 'TK:1', 'ascSecondWind') + Math.floor(((p.maxHp - p.hp) * num(state, side, 'TK:1', 'ascSecondWindPct')) / 100)
+        const got = styleHeal(state, side, per * n)
+        if (got) say(state, side, `Second Wind: regen ${got} (${n} Endurance)`)
       },
     },
   }),
@@ -344,10 +351,6 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   // Grasp of the Undying (Q 2026-10-25 15:21): a knockout leaves you on 1 HP and Undying for N turns (can't drop below 1);
   // Undying cards deal +X% Max HP each; when it ends, heal the bonus dmg that landed
   'TK:1:C3': () => ({
-    setup: (p, v) => {
-      const c = (p.costMod ??= { pct: 0, flat: 0 })
-      c.hpPct = v('ascUndyingCost')
-    },
     hooks: {
       onHpLoss: (state, side) => {
         const p = state.players[side]
@@ -422,8 +425,6 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         if (!n || !bonus.length) return
         for (let i = 0; i < bonus.length; i++) bonus[i] += n * amt(state, side)
         p.perkData = { ...p.perkData, endurance: 0 }
-        const v = num(state, side, 'TK:1', 'ascUnleashedVuln')
-        if (v > 0) p.statuses.push({ kind: 'vulnerable', turns: 1, n: v })
         say(state, side, `Unleashed: spends ${n} Endurance, every card +${n * amt(state, side)} dmg`)
       },
     },
@@ -1276,27 +1277,6 @@ for (const [style, tree] of Object.entries(TREES))
     const make = NODE_FX[`${style}:${n.id}`]
     if (make) PIECES[`asc:${style}:${n.id}`] = { group: style, ...make((state, side) => num(state, side, style, key), key) }
   }
-// Endurance itself (Tank Lifeline): one piece however many nodes give it, so the cut / regen count once
-PIECES['asc:TK:1:END'] = {
-  group: 'TK:1',
-  hooks: {
-    // Q 2026-10-25 18:47: Endurance effects at ascEndurancePower% (25) of their full size
-    hitCut: (state, side) => Math.floor((endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut') * num(state, side, 'TK:1', 'ascEndurancePower')) / 100),
-    endTurn: (state, side) => {
-      const p = state.players[side]
-      const n = endurance(p)
-      if (!n) return
-      if (state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
-        p.perkData = { ...p.perkData, endurance: 0 }
-        say(state, side, 'Endurance fades')
-        return
-      }
-      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen') * num(state, side, 'TK:1', 'ascEndurancePower')) / 10000))
-      if (got) say(state, side, `Endurance: ${n} regen ${got}`)
-    },
-  },
-}
-const GIVES_ENDURANCE = ['A1', 'B1', 'B2', 'B3', 'C1', 'D1', 'D2']
 for (const [k, piece] of Object.entries(PIECES)) if (piece.hooks) PERK_HOOKS[k] = { name: k, ...piece.hooks }
 
 const LETTERS = 'ABCDEFGH'
@@ -1327,7 +1307,6 @@ export function perkKeys(champ: string, style: string | undefined, l: Loadout | 
   if (l.minor && PIECES[`minor:${l.minor}`]) out.push(`minor:${l.minor}`)
   // id order (A1 < A2 < A3 < B1 …): a capstone's tune lands after its branch's nodes
   if (style && l.asc && validAsc(l.asc, l.points ?? treePoints(style, 5), style)) for (const id of [...l.asc].sort()) if (PIECES[`asc:${style}:${id}`]) out.push(`asc:${style}:${id}`)
-  if (style === 'TK:1' && out.some((k) => GIVES_ENDURANCE.some((id) => k === `asc:TK:1:${id}`))) out.push('asc:TK:1:END')
   return out
 }
 

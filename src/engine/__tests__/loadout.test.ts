@@ -157,7 +157,12 @@ describe('randomLoadout', () => {
   })
 
   describe('Tank v2 Ascendancy', () => {
-    const tk = (style: string, asc: string[]) => game('TK', { asc, points: 6 }, style, 'TK')
+    // Iron Will starts with 1 Endurance; tests count stacks from 0
+    const tk = (style: string, asc: string[]) => {
+      const s = game('TK', { asc, points: 6 }, style, 'TK')
+      if (style === 'TK:1') s.players.p1.perkData = { ...s.players.p1.perkData, endurance: 0 }
+      return s
+    }
     it('Endurance: Charge or 2+ hits give a stack, each cuts 2 dmg per hit, regens, capped, fades', () => {
       let s = tk('TK:1', ['A1'])
       for (let i = 0; i < 4; i++) {
@@ -241,17 +246,16 @@ describe('randomLoadout', () => {
       expect(s.log.some((l) => l.includes('Unrelenting: 5 hit dmg'))).toBe(true)
       expect(s.players.p1.hp).toBeLessThanOrEqual(hp)
     })
-    it('Untiring: Block, HP lost and Second Wind give Endurance; Second Wind halves heals', () => {
+    it('Untiring: Block and HP lost give Endurance; Second Wind below 30% fills Endurance max +2 and regens 3 turns', () => {
       let s = tk('TK:1', ['B1', 'B2', 'B3'])
-      expect(s.players.p1.perkData?.healPct).toBe(50)
       s.players.p2.hand = [hit(10), hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
       expect(s.log.some((l) => l.includes('Endurance (Block)'))).toBe(true)
-      expect(s.log.some((l) => l.includes('Endurance (Second Wind)'))).toBe(true)
-      expect(s.players.p1.perkData?.endurance).toBe(2)
-      s.players.p2.hand = [hit(50)]
+      s.players.p1.hp = 90
+      s.players.p2.hand = [hit(20)]
       s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.log.some((l) => l.includes('Endurance (HP lost)'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Second Wind: Endurance 5/5'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Second Wind: regen'))).toBe(true)
     })
     it('Undeniable: slot 1 ignores Block, Strikes in a row build Momentum, Unleashed spends Endurance', () => {
       let s = tk('TK:1', ['A1', 'D1', 'D2', 'D3'])

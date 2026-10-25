@@ -199,30 +199,44 @@ export function debuffStacks(p: PlayerState): number {
 
 export const STYLES: Record<string, StyleDef> = {
   /**
-   * Tank · Lifeline: when hit while HP is red (below hpPct = 30%), heal healPctPerHit = 4% of missing HP per hit landed this turn.
-   * Works only during the first stretch in the red: once HP is back in the green (30%+), it's off for the game (Q nerf 2026-10-16, was 60%).
+   * Tank · Iron Will (Q 2026-10-25 19:06, was Lifeline / Second Wind): plays with Endurance. Starts with startEndurance;
+   * each Endurance cuts hit dmg and regens (at ascEndurancePower%), fades after ascEnduranceTurns without a new one.
+   * Carries the 4 Lifeline Ascendancy Costs: blocked hits after the first leak costLeakPct%, heals −costHealCut%,
+   * S cards cost costSHpPct% of current HP, and Vulnerable costVulnPct% next turn when Endurance runs out.
    */
   'TK:1': {
-    name: 'Lifeline',
-    afterHits: (state, side, r) => {
+    name: 'Iron Will',
+    setup: (p, t) => {
+      const f = t['TK:1']
+      p.perkData = { ...p.perkData, endurance: f.startEndurance, enduranceAt: 1, healPct: 100 - f.costHealCut }
+      if (f.costSHpPct > 0) (p.costMod ??= { pct: 0, flat: 0 }).hpPct = f.costSHpPct
+    },
+    hitCut: (state, side) => {
+      const f = tuningOf(state, side)['TK:1'] as unknown as Record<string, number>
+      return Math.floor(((state.players[side].perkData?.endurance ?? 0) * f.ascEnduranceCut * f.ascEndurancePower) / 100)
+    },
+    blockLeakPct: (state, side) => tuningOf(state, side)['TK:1'].costLeakPct,
+    // Endurance at the start of the turn (after last turn's loadout gains), for the Vulnerable Cost
+    actionStart: (state, side) => {
       const p = state.players[side]
-      const f = tuningOf(state, side)['TK:1']
-      if (p.styleData?.spent || r.hitsTaken === 0 || p.hp <= 0 || pctHp(p) >= f.hpPct) return
-      const n = healAfterIgnite(p, Math.floor(((p.maxHp - p.hp) * f.healPctPerHit * r.hitsTaken) / 100), tuningOf(state, other(side)))
-      const before = p.hp
-      p.hp = Math.min(p.maxHp, p.hp + n)
-      if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
-      p.styleData = { ...p.styleData, below: 1 }
-      say(state, side, `Second Wind: heal ${n} (${f.healPctPerHit}% of missing HP x ${r.hitsTaken} hits)`)
+      p.perkData = { ...p.perkData, endWas: p.perkData?.endurance ?? 0 }
     },
     endTurn: (state, side) => {
       const p = state.players[side]
-      if (p.styleData?.spent) return
-      const line = tuningOf(state, side)['TK:1'].hpPct
-      if (pctHp(p) < line) p.styleData = { ...p.styleData, below: 1 }
-      else if (p.styleData?.below) {
-        p.styleData = { ...p.styleData, spent: 1 }
-        say(state, side, `Second Wind: HP back above ${line}%, off for good`)
+      const f = tuningOf(state, side)['TK:1'] as unknown as Record<string, number>
+      const n = p.perkData?.endurance ?? 0
+      if (n && state.turn - (p.perkData?.enduranceAt ?? 0) >= f.ascEnduranceTurns) {
+        p.perkData = { ...p.perkData, endurance: 0 }
+        say(state, side, 'Endurance fades')
+      } else if (n) {
+        const got = styleHeal(state, side, Math.floor((p.maxHp * n * f.ascEnduranceRegen * f.ascEndurancePower) / 10000))
+        if (got) say(state, side, `Endurance: ${n} regen ${got}`)
+      }
+      // Cost: Vulnerable next turn when Endurance runs out (faded or spent)
+      const now = p.perkData?.endurance ?? 0
+      if (now === 0 && (p.perkData?.endWas ?? 0) > 0 && f.costVulnPct > 0) {
+        p.statuses.push({ kind: 'vulnerable', turns: 1, n: f.costVulnPct })
+        say(state, side, `Iron Will: out of Endurance, Vulnerable ${f.costVulnPct}%`)
       }
     },
   },
