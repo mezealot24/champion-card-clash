@@ -48,8 +48,9 @@ export const igniteBurn = (p: PlayerState, t: Tuning) => {
   const f = t['MG:1']
   return n * f.igniteFlat + Math.floor((p.maxHp * n * f.ignitePctMaxHp) / 100)
 }
+/** also a loadout heal cut (perkData.healPct, e.g. Second Wind's Cost) */
 export const healAfterIgnite = (p: PlayerState, n: number, t: Tuning) =>
-  Math.floor((n * (100 - Math.min(t['MG:1'].healCutMax, t['MG:1'].healCutPerStack * igniteStacks(p)))) / 100)
+  Math.floor((n * (100 - Math.min(t['MG:1'].healCutMax, t['MG:1'].healCutPerStack * igniteStacks(p))) * (p.perkData?.healPct ?? 100)) / 10000)
 
 /** Add n Ignite stacks to a side (capped) and reset its timer. Returns the stacks it has now. */
 export function addIgnite(state: GameState, side: Side, n: number): number {
@@ -104,6 +105,8 @@ export type StyleDef = {
   strikeStart?: (state: GameState, side: Side, chain: CardInst[]) => void
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
+  /** this side was hit while Charging (Charge break), after the Field card is lost */
+  onChargeBreak?: (state: GameState, side: Side) => void
   /** Dual Strike (both sides Strike this turn): at the end of the turn, after resources fill, draw n and/or fill the bar to its cap */
   dualStrike?: { draw?: (t: Tuning) => number; fillRes?: boolean }
   /** extra cards a Charge that isn't broken draws */
@@ -123,6 +126,8 @@ export type StyleDef = {
   lifesteal?: (state: GameState, side: Side) => number
   /** dmg taken off every hit that gets past this side's Block */
   hitCut?: (state: GameState, side: Side) => number
+  /** Cost: every hit this side's Block stops after the first still deals this % of its dmg */
+  blockLeakPct?: (state: GameState, side: Side) => number
   /** extra cards a Charge that isn't broken draws, decided per turn */
   extraChargeDraw?: (state: GameState, side: Side) => number
   /** Energy Surge switches on at this much less than a full bar (Wraith Form) */

@@ -35,11 +35,6 @@ const addMaxHp = (p: PlayerState, n: number) => {
   p.maxHp = Math.max(1, p.maxHp + n)
   p.hp = Math.max(1, Math.min(p.maxHp, p.hp + n))
 }
-const cost = (p: PlayerState, pct: number, flat: number) => {
-  const c = (p.costMod ??= { pct: 0, flat: 0 })
-  c.pct += pct
-  c.flat += flat
-}
 const status = (p: PlayerState, kind: 'shield' | 'parry', n: number) => {
   if (n > 0) p.statuses.push({ kind, turns: 9999, n })
 }
@@ -83,6 +78,26 @@ const freshFreeze = (state: GameState, side: Side, bit: number) => {
 }
 /** Endurance stacks (Tank Lifeline v2) */
 const endurance = (p: PlayerState) => p.perkData?.endurance ?? 0
+function gainEndurance(state: GameState, side: Side, why: string, src = 'flinch', by = 1) {
+  const p = state.players[side]
+  const at = `endAt_${src}`
+  if (p.perkData?.[at] === state.turn) return // once a turn per source
+  const max = num(state, side, 'TK:1', 'ascEnduranceMax')
+  const n = Math.min(max, endurance(p) + by)
+  p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, [at]: state.turn }
+  say(state, side, `Endurance (${why}): ${n}/${max}`)
+}
+/** Unrelenting: dmg still to drain, one entry per coming turn (perkData only holds numbers: drain0, drain1, …) */
+const drainQueue = (p: PlayerState) => {
+  const out: number[] = []
+  for (let i = 0; i < (p.perkData?.drain ?? 0); i++) out.push(p.perkData?.[`drain${i}`] ?? 0)
+  return out
+}
+const setDrain = (p: PlayerState, due: number[]) => {
+  const d: Record<string, number> = { drain: due.length }
+  due.forEach((n, i) => (d[`drain${i}`] = n))
+  p.perkData = { ...p.perkData, ...d }
+}
 /** Fatal Rhythm nodes: remember this turn's Critical count (Style beforeHits runs first, so crit is filled) */
 const critSeen: NonNullable<StyleDef['beforeHits']> = (state, side, _b, _m, crit) => {
   const p = state.players[side]
@@ -203,23 +218,15 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         const p = state.players[side]
         // Q 2026-10-25: an Ignite burn this turn counts as 1 hit (vs Pyromancer)
         const hits = r.hitsTaken + (igniteStacks(p) > 0 ? 1 : 0)
-        if (hits < 2 || p.hp <= 0) return
-        const max = num(state, side, 'TK:1', 'ascEnduranceMax')
-        const n = Math.min(max, endurance(p) + (p.perks?.includes('asc:TK:1:A3') ? 2 : 1))
-        p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn }
-        say(state, side, `Unflinching: Endurance ${n}/${max}`)
+        if (hits >= 2 && p.hp > 0) gainEndurance(state, side, 'took 2+ hits')
       },
-      hitCut: (state, side) => endurance(state.players[side]),
-      endTurn: (state, side) => {
-        const p = state.players[side]
-        if (endurance(p) && state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
-          p.perkData = { ...p.perkData, endurance: 0 }
-          say(state, side, 'Unflinching: Endurance fades')
-        }
+      endTurn: (state, side, action) => {
+        if (action === 'charge' && state.players[side].hp > 0) gainEndurance(state, side, 'Charge')
       },
     },
   }),
   'TK:1:A2': (amt) => ({
+    tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnyieldingMax')),
     hooks: {
       beforeHits: (state, side, bonus) => {
         const n = endurance(state.players[side]) * amt(state, side)
@@ -229,82 +236,184 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
+  // Unrelenting (Q 2026-10-25, like Death's Dance): hit dmg taken this turn comes back and drains over the next turns
   'TK:1:A3': () => ({
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnrelenting')),
     hooks: {
+      blockLeakPct: (state, side) => num(state, side, 'TK:1', 'ascUnrelentingLeak'),
+      actionStart: (state, side) => {
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, preHitHp: p.hp }
+      },
+      afterHits: (state, side) => {
+        const p = state.players[side]
+        const lost = (p.perkData?.preHitHp ?? p.hp) - p.hp
+        if (lost <= 0) return
+        p.hp += lost
+        const turns = Math.max(1, num(state, side, 'TK:1', 'ascUnrelentingTurns'))
+        const due = [...(p.perkData?.drain !== undefined ? drainQueue(p) : [])]
+        for (let i = 0; i < turns; i++) due[i] = (due[i] ?? 0) + Math.floor(lost / turns) + (i < lost % turns ? 1 : 0)
+        setDrain(p, due)
+        say(state, side, `Unrelenting: ${lost} hit dmg will drain over ${turns} turns`)
+      },
       endTurn: (state, side) => {
         const p = state.players[side]
-        const n = endurance(p)
-        if (!n || p.hp <= 0 || pctHp(p) >= RED_PCT) return
-        p.perkData = { ...p.perkData, endurance: 0 }
-        const got = styleHeal(state, side, n * num(state, side, 'TK:1', 'ascUnrelentingHeal'))
-        say(state, side, `Unrelenting: ${n} Endurance → heals ${got}`)
+        const due = drainQueue(p)
+        if (!due.length) return
+        const [now, ...rest] = due
+        setDrain(p, rest)
+        if (now > 0) {
+          hurt(state, side, now)
+          say(state, side, `Unrelenting: drains ${now}`)
+        }
       },
     },
   }),
-  // Lifeline · Untiring
-  'TK:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'TK:1', 'hpPct', v(k)) }),
-  'TK:1:B2': (amt) => ({
+  // Lifeline · Untiring (Q 2026-10-25 14:58): Endurance from HP lost / Blocks / every turn
+  'TK:1:B1': (_, k) => ({
+    tune: (t, v) => add(t, 'TK:1', 'hpPct', v(k)),
+    hooks: {
+      // HP seen at the start of the turn, so heals in between aren't counted as loss
+      actionStart: (state, side) => {
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, rallyHp: p.hp }
+      },
+      onHpLoss: (state, side) => {
+        const p = state.players[side]
+        if (p.hp <= 0) return
+        const step = Math.max(1, Math.floor((p.maxHp * num(state, side, 'TK:1', 'ascEarlyRallyLoss')) / 100))
+        const lost = (p.perkData?.rallyLost ?? 0) + Math.max(0, (p.perkData?.rallyHp ?? p.maxHp) - p.hp)
+        p.perkData = { ...p.perkData, rallyHp: p.hp, rallyLost: lost % step }
+        if (lost >= step) gainEndurance(state, side, 'HP lost', 'rally')
+      },
+    },
+  }),
+  'TK:1:B2': () => ({
     hooks: {
       afterHits: (state, side, r) => {
-        if (!r.hitsBlocked) return
-        const got = styleHeal(state, side, Math.min(num(state, side, 'TK:1', 'ascUntiringCap'), r.hitsBlocked * amt(state, side)))
-        if (got) say(state, side, `Untiring: heals ${got}`)
+        if (r.hitsBlocked && state.players[side].hp > 0) gainEndurance(state, side, 'Block', 'block')
       },
     },
   }),
   'TK:1:B3': () => ({
-    setup: (p, v) => addMaxHp(p, -v('ascSecondWindCost')),
+    setup: (p, v) => {
+      p.perkData = { ...p.perkData, healPct: 100 - v('ascSecondWindHealCut') }
+    },
     hooks: {
       endTurn: (state, side) => {
         const p = state.players[side]
+        if (p.hp > 0) gainEndurance(state, side, 'Second Wind', 'wind')
         if (!p.styleData?.spent || !once(p, 'secondWind')) return
         p.styleData = { ...p.styleData, spent: 0, below: 0 }
         say(state, side, 'Second Wind: Lifeline can switch on once more')
       },
     },
   }),
-  // Lifeline · Unstoppable
-  'TK:1:C1': (amt) => ({ hooks: { chargeBreakSafe: (state, side) => amt(state, side) } }),
+  // Lifeline · Unbroken (Q 2026-10-25 15:06: Unstoppable + Unbroken merged)
+  'TK:1:C1': (amt) => ({
+    hooks: {
+      chargeBreakSafe: (state, side) => amt(state, side),
+      onChargeBreak: (state, side) => {
+        if (state.players[side].hp > 0) gainEndurance(state, side, 'Charge break', 'break', num(state, side, 'TK:1', 'ascUnstoppableEnd'))
+      },
+    },
+  }),
   'TK:1:C2': (amt) => ({
-    hooks: {
-      blockBonus: (state, side) => (state.players[side].perkData?.chargedTurn === state.turn - 1 ? amt(state, side) : 0),
-      endTurn: (state, side, action) => {
-        if (action === 'charge') state.players[side].perkData = { ...state.players[side].perkData, chargedTurn: state.turn }
-      },
-    },
-  }),
-  'TK:1:C3': (amt) => ({
-    setup: (p, v) => cost(p, v('ascUndeniableCost'), 0),
-    hooks: {
-      beforeHits: (state, side, _b, _m, _c, _chain, pierce) => {
-        if (!pierce?.length || amt(state, side) <= 0) return
-        for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
-        say(state, side, 'Undeniable: slot 1 ignores Block')
-      },
-    },
-  }),
-  // Lifeline · Unbroken
-  'TK:1:D1': (amt) => ({
     hooks: {
       onHpLoss: (state, side) => {
         const p = state.players[side]
         if (p.hp <= 0 || pctHp(p) >= RED_PCT || !once(p, 'bastion')) return
-        status(p, 'shield', amt(state, side))
-        say(state, side, `Last Bastion: Shield ${amt(state, side)}`)
+        const n = amt(state, side) + Math.floor(((p.maxHp - p.hp) * num(state, side, 'TK:1', 'ascLastBastionPct')) / 100)
+        status(p, 'shield', n)
+        say(state, side, `Last Bastion: Shield ${n}`)
       },
+      hitCut: (state, side) => (pctHp(state.players[side]) < RED_PCT ? num(state, side, 'TK:1', 'ascDefiance') : 0),
     },
   }),
-  'TK:1:D2': (amt) => ({ hooks: { hitCut: (state, side) => (pctHp(state.players[side]) < RED_PCT ? amt(state, side) : 0) } }),
-  'TK:1:D3': (amt) => ({
-    setup: (p, v) => addMaxHp(p, -v('ascUnbrokenCost')),
+  // Grasp of the Undying (Q 2026-10-25 15:21): a knockout leaves you on 1 HP and Undying for N turns (can't drop below 1);
+  // Undying cards deal +X% Max HP each; when it ends, heal the bonus dmg that landed
+  'TK:1:C3': () => ({
+    setup: (p, v) => {
+      const c = (p.costMod ??= { pct: 0, flat: 0 })
+      c.hpPct = v('ascUndyingCost')
+    },
     hooks: {
       onHpLoss: (state, side) => {
         const p = state.players[side]
-        if (p.hp > 0 || (p.perkData?.unbroken ?? 0) >= amt(state, side)) return
+        if ((p.perkData?.undyingUntil ?? 0) >= state.turn) {
+          p.hp = Math.max(1, p.hp)
+          return
+        }
+        if (p.hp > 0 || (p.perkData?.unbroken ?? 0) >= num(state, side, 'TK:1', 'ascUnbroken')) return
         p.hp = 1
-        p.perkData = { ...p.perkData, unbroken: (p.perkData?.unbroken ?? 0) + 1 }
-        say(state, side, 'Unbroken: stays on 1 HP')
+        const until = state.turn + Math.max(1, num(state, side, 'TK:1', 'ascUndyingTurns')) - 1
+        p.perkData = { ...p.perkData, unbroken: (p.perkData?.unbroken ?? 0) + 1, undyingUntil: until, undyingDmg: 0 }
+        say(state, side, `Grasp of the Undying: stays on 1 HP, Undying until T${until}`)
+      },
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        if ((p.perkData?.undyingUntil ?? 0) < state.turn || !bonus.length) return
+        const n = Math.floor((p.maxHp * num(state, side, 'TK:1', 'ascUndyingPct')) / 100)
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        p.perkData = { ...p.perkData, undyingBonus: n }
+        say(state, side, `Undying: every card +${n} dmg`)
+      },
+      afterChain: (state, side, r) => {
+        const p = state.players[side]
+        if ((p.perkData?.undyingUntil ?? 0) < state.turn) return 0
+        p.perkData = { ...p.perkData, undyingDmg: (p.perkData?.undyingDmg ?? 0) + r.cleanHits * (p.perkData?.undyingBonus ?? 0) }
+        return 0
+      },
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        if (p.perkData?.undyingUntil !== state.turn) return
+        const got = styleHeal(state, side, p.perkData?.undyingDmg ?? 0)
+        say(state, side, `Undying ends: heals ${got}`)
+      },
+    },
+  }),
+  // Lifeline · Undeniable (offence: Strike streaks, pierce, spend Endurance)
+  'TK:1:D1': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        const streak = p.perkData?.strikeAt === state.turn - 1 ? (p.perkData?.streak ?? 0) + 1 : 1
+        p.perkData = { ...p.perkData, streak, strikeAt: state.turn }
+        if (bonus.length >= num(state, side, 'TK:1', 'ascMomentumCards')) gainEndurance(state, side, `${bonus.length}-card chain`, 'momentum', num(state, side, 'TK:1', 'ascMomentumEnd'))
+        const n = Math.min(num(state, side, 'TK:1', 'ascMomentumCap'), (streak - 1) * amt(state, side))
+        if (!n) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        say(state, side, `Momentum: Strike ${streak} in a row, every card +${n} dmg`)
+      },
+    },
+  }),
+  'TK:1:D2': (amt) => ({
+    hooks: {
+      // Q 15:21: with Endurance slot 1 ignores Block; without, gain 1 Endurance but slot 1 deals half
+      beforeHits: (state, side, _b, mult, _c, _chain, pierce) => {
+        if (!pierce?.length || amt(state, side) <= 0) return
+        if (endurance(state.players[side]) > 0) {
+          for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
+          say(state, side, 'Undeniable: slot 1 ignores Block')
+          return
+        }
+        gainEndurance(state, side, 'Undeniable', 'undeniable')
+        mult[0] *= (100 - num(state, side, 'TK:1', 'ascUndeniableHalf')) / 100
+        say(state, side, 'Undeniable: no Endurance, slot 1 deals half')
+      },
+    },
+  }),
+  'TK:1:D3': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        const n = endurance(p)
+        if (!n || !bonus.length) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n * amt(state, side)
+        p.perkData = { ...p.perkData, endurance: 0 }
+        const v = num(state, side, 'TK:1', 'ascUnleashedVuln')
+        if (v > 0) p.statuses.push({ kind: 'vulnerable', turns: 1, n: v })
+        say(state, side, `Unleashed: spends ${n} Endurance, every card +${n * amt(state, side)} dmg`)
       },
     },
   }),
@@ -321,7 +430,14 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     tune: (t, v) => {
       add(t, 'TK:2', 'maxHpCap', v(k))
       add(t, 'TK:2', 'perHitTaken', v('ascAncientHit'))
-      add(t, 'TK:2', 'hpPerDmg', 1_000_000) // Cost: no Titan Bloom dmg
+    },
+    hooks: {
+      endTurn: (state, side, action) => {
+        const p = state.players[side]
+        if (action !== 'charge' || p.hp <= 0) return
+        const got = styleHeal(state, side, num(state, side, 'TK:2', 'ascAncientHeal') + Math.floor(((p.maxHp - p.hp) * num(state, side, 'TK:2', 'ascAncientPct')) / 100))
+        if (got) say(state, side, `Ancient: Charge heals ${got}`)
+      },
     },
   }),
   // Titan Bloom · Bramble
@@ -1111,6 +1227,26 @@ for (const [style, tree] of Object.entries(TREES))
     const make = NODE_FX[`${style}:${n.id}`]
     if (make) PIECES[`asc:${style}:${n.id}`] = { group: style, ...make((state, side) => num(state, side, style, key), key) }
   }
+// Endurance itself (Tank Lifeline): one piece however many nodes give it, so the cut / regen count once
+PIECES['asc:TK:1:END'] = {
+  group: 'TK:1',
+  hooks: {
+    hitCut: (state, side) => endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut'),
+    endTurn: (state, side) => {
+      const p = state.players[side]
+      const n = endurance(p)
+      if (!n) return
+      if (state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
+        p.perkData = { ...p.perkData, endurance: 0 }
+        say(state, side, 'Endurance fades')
+        return
+      }
+      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
+      if (got) say(state, side, `Endurance: ${n} regen ${got}`)
+    },
+  },
+}
+const GIVES_ENDURANCE = ['A1', 'B1', 'B2', 'B3', 'C1', 'D1', 'D2']
 for (const [k, piece] of Object.entries(PIECES)) if (piece.hooks) PERK_HOOKS[k] = { name: k, ...piece.hooks }
 
 const LETTERS = 'ABCDEFGH'
@@ -1140,6 +1276,7 @@ export function perkKeys(champ: string, style: string | undefined, l: Loadout | 
   if (l.minor && PIECES[`minor:${l.minor}`]) out.push(`minor:${l.minor}`)
   // id order (A1 < A2 < A3 < B1 …): a capstone's tune lands after its branch's nodes
   if (style && l.asc && validAsc(l.asc, l.points ?? treePoints(style, 5), style)) for (const id of [...l.asc].sort()) if (PIECES[`asc:${style}:${id}`]) out.push(`asc:${style}:${id}`)
+  if (style === 'TK:1' && out.some((k) => GIVES_ENDURANCE.some((id) => k === `asc:TK:1:${id}`))) out.push('asc:TK:1:END')
   return out
 }
 
