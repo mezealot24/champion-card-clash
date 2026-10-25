@@ -1,5 +1,5 @@
 // Loadout content (design/customization-options-2026-10-18.md): Sigil I · Oath (per Champion, Boon + Cost),
-// Sigil II · Minor (shared, small, no cost) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down; Mage: 4 branches × 3).
+// Sigil II · Minor (shared, small, no cost) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down; Mage and Tank: 4 branches × 3).
 // Names and numbers started as the Game Designer mockup's placeholders; nodes the engine can't do cheaply were swapped
 // for ones it can. Every number is a tuning field (Admin): Oaths in the Champion's class group, nodes in their Style's
 // group, Minors in game_config (minor_* keys). Text says {key} for its own group's numbers, like Style text.
@@ -63,6 +63,14 @@ const node = (id: string, name: string, text: string, key: string, label: string
   fields: [f(key, `Asc ${id} ${name}: ${label}`, def, min, max)],
 })
 
+/** A node with more than one number (a cap, a timer); its first field is {key}. */
+const multi = (id: string, name: string, text: string, fields: [string, string, number, number?, number?][]): PieceData => ({
+  id,
+  name,
+  text,
+  fields: fields.map(([key, label, def, min, max]) => f(key, `Asc ${id} ${name}: ${label}`, def, min ?? 0, max)),
+})
+
 /** Capstone (Mage v2): a node with a Cost line; its first field is {key}, the rest are named in text/cost. */
 const capstone = (id: string, name: string, text: string, cost: string, fields: [string, string, number, number?, number?][]): PieceData => ({
   id,
@@ -73,34 +81,83 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
 })
 
 /**
- * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage: A1..D3); take them top-down in a branch, the last node = capstone.
- * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage v2: named asc keys).
+ * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage, Tank: A1..D3); take them top-down in a branch, the last node = capstone.
+ * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank v2: named asc keys).
  */
 export const TREES: Record<string, TreeData> = {
+  /**
+   * Tank v2 (Q 2026-10-25, design/tank-ascendancy-v2-2026-10-25.md): same shape as Mage v2, from PoE Juggernaut
+   * (Lifeline) and Guardian (Titan Bloom). Everything that stacks has a cap (Hoarfrost lesson).
+   */
   'TK:1': {
-    branches: ['Rally', 'Iron Will'],
+    branches: ['Endurance', 'Untiring', 'Unstoppable', 'Unbroken'],
+    depth: 3,
+    bonusPoints: 1,
     nodes: [
-      node('A1', 'Early Rally', 'Lifeline HP line +{ascA1}%.', 'ascA1', 'HP line % +', 5),
-      node('A2', 'Deep Breaths', 'Lifeline heals +{ascA2}% of missing HP per hit.', 'ascA2', 'heal % +', 1),
-      node('A3', 'Steady Guard', 'P+K+P combo heal +{ascA3}%.', 'ascA3', 'combo heal % +', 5),
-      node('A4', 'Last Bastion', 'The first time your HP drops into the red, gain Shield {ascA4}.', 'ascA4', 'Shield', 30),
-      node('B1', 'Thick Skin', '+{ascB1} Max HP and start HP.', 'ascB1', 'Max HP +', 15),
-      node('B2', 'Hold the Line', 'While your HP is red, your Block stops {ascB2} more hit.', 'ascB2', 'Block stops +', 1),
-      node('B3', 'Grit', 'Your S cards cost {ascB3} less HP.', 'ascB3', 'S cost −', 3),
-      node('B4', 'Unbroken', 'Once per match, a hit that would knock you out leaves you at 1 HP.', 'ascB4', 'times per match', 1),
+      multi('A1', 'Unflinching', 'Each turn 2+ hits reach you, gain 1 Endurance (max {ascEnduranceMax}). Each Endurance: hits that reach you deal 1 less dmg. Endurance fades after {ascEnduranceTurns} turns without a new one.', [
+        ['ascEnduranceMax', 'max Endurance', 3, 1],
+        ['ascEnduranceTurns', 'turns before it fades', 3, 1],
+      ]),
+      node('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance.', 'ascUnyielding', 'dmg per Endurance', 1),
+      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}, and you gain 2 at a time. While your HP is in the red, at the end of the turn all your Endurance turns into a heal: {ascUnrelentingHeal} per stack.', 'The Endurance you heal with is gone, dmg cut and all.', [
+        ['ascUnrelenting', 'max Endurance +', 2],
+        ['ascUnrelentingHeal', 'heal per Endurance', 3],
+      ]),
+      node('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%.', 'ascEarlyRally', 'HP line % +', 5),
+      multi('B2', 'Untiring', 'Each hit your Block stops heals {ascUntiring}, up to {ascUntiringCap} a turn.', [
+        ['ascUntiring', 'heal per stopped hit', 2],
+        ['ascUntiringCap', 'heal cap per turn', 6],
+      ]),
+      capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off.', '−{ascSecondWindCost} Max HP.', [['ascSecondWindCost', 'Cost: Max HP −', 20]]),
+      node('C1', 'Unstoppable', 'A charge break can\'t throw away your first {ascUnstoppable} Field cards.', 'ascUnstoppable', 'safe slots', 2, 0, 5),
+      node('C2', 'Unbreakable', 'The turn after you Charge, your Block stops {ascUnbreakable} more hit.', 'ascUnbreakable', 'Block stops +', 1),
+      capstone('C3', 'Undeniable', 'Chain slot 1 ignores Block.', 'Your S cards cost {ascUndeniableCost}% more HP.', [
+        ['ascUndeniableSlots', 'slots that ignore Block', 1, 0, 5],
+        ['ascUndeniableCost', 'Cost: S cost % +', 50],
+      ]),
+      node('D1', 'Last Bastion', 'The first time your HP drops into the red, gain Shield {ascLastBastion}.', 'ascLastBastion', 'Shield', 30),
+      node('D2', 'Defiance', 'While your HP is in the red, hits that reach you deal {ascDefiance} less dmg.', 'ascDefiance', 'dmg cut per hit', 2),
+      capstone('D3', 'Unbroken', 'Once per match, a hit that would knock you out leaves you on 1 HP.', '−{ascUnbrokenCost} Max HP.', [
+        ['ascUnbroken', 'times per match', 1],
+        ['ascUnbrokenCost', 'Cost: Max HP −', 30],
+      ]),
     ],
   },
   'TK:2': {
-    branches: ['Bloom', 'Bramble'],
+    branches: ['Bloom', 'Bramble', 'Timber', 'Time of Need'],
+    depth: 3,
+    bonusPoints: 1,
     nodes: [
-      node('A1', 'Taproot', 'Titan Bloom: +{ascA1} Max HP per facing pair.', 'ascA1', 'per facing +', 1),
-      node('A2', 'Seedling', 'Start the match with {ascA2} Max HP already grown.', 'ascA2', 'Max HP grown at start', 20),
-      node('A3', 'Heartwood', 'Titan Bloom needs {ascA3} less Max HP grown for each +1 dmg.', 'ascA3', 'HP per dmg −', 5),
-      node('A4', 'Deep Growth', 'Titan Bloom: +{ascA4} Max HP per hit taken.', 'ascA4', 'per hit taken +', 1),
-      node('B1', 'Bark Guard', 'Titan Bloom: +{ascB1} Max HP per hit Blocked.', 'ascB1', 'per hit Blocked +', 1),
-      node('B2', 'Sap', 'Heal {ascB2} each turn your Block stops a hit.', 'ascB2', 'heal', 3),
-      node('B3', 'Wide Canopy', 'Titan Bloom Max HP cap +{ascB3}.', 'ascB3', 'cap +', 50),
-      node('B4', 'World Tree', 'Heal {ascB4} at the end of every turn you Block.', 'ascB4', 'heal', 4),
+      node('A1', 'Taproot', 'Titan Bloom: +{ascTaproot} Max HP per facing pair.', 'ascTaproot', 'per facing +', 1),
+      node('A2', 'Seedling', 'Start the match with {ascSeedling} Max HP already grown.', 'ascSeedling', 'Max HP grown at start', 20),
+      capstone('A3', 'Ancient', 'Titan Bloom cap +{ascAncient} and +{ascAncientHit} Max HP per hit taken.', 'Titan Bloom gives no dmg.', [
+        ['ascAncient', 'cap +', 100],
+        ['ascAncientHit', 'per hit taken +', 2],
+      ]),
+      node('B1', 'Bark Guard', 'Titan Bloom: +{ascBarkGuard} Max HP per hit Blocked.', 'ascBarkGuard', 'per hit Blocked +', 1),
+      node('B2', 'Thorns', 'Each hit your Block stops deals {ascThorns} dmg back.', 'ascThorns', 'dmg back per hit', 2),
+      capstone('B3', 'Briar Wall', 'After a Block, your next Strike: every card +{ascBriarWall} dmg per hit that Block stopped (up to {ascBriarWallCap} hits).', 'Titan Bloom grows nothing from hits Blocked.', [
+        ['ascBriarWall', 'dmg per stopped hit', 2],
+        ['ascBriarWallCap', 'hits counted (cap)', 3],
+      ]),
+      node('C1', 'Heartwood', 'Titan Bloom needs {ascHeartwood} less Max HP grown for each +1 dmg.', 'ascHeartwood', 'HP per dmg −', 5),
+      multi('C2', 'Ironbark Fist', 'Chain slot 1 deals +1 dmg per {ascIronbark} Max HP grown, up to +{ascIronbarkCap}.', [
+        ['ascIronbark', 'Max HP grown per +1', 10, 1],
+        ['ascIronbarkCap', 'dmg cap', 8],
+      ]),
+      capstone('C3', 'Timber!', 'When you Strike with {ascTimberCards}+ cards, fell the tree: every card +1 dmg per {ascTimber} Max HP grown, up to +{ascTimberCap}.', 'Your grown Max HP goes back to 0 (Max HP drops, Titan Bloom dmg resets).', [
+        ['ascTimberCards', 'chain cards needed', 4, 1, 5],
+        ['ascTimber', 'Max HP grown per +1', 10, 1],
+        ['ascTimberCap', 'dmg cap', 10],
+      ]),
+      node('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} Max HP per debuff stack (end of turn).', 'ascLivingBark', 'per debuff stack +', 1),
+      node('D2', 'Rooted', 'While you have 3+ debuff stacks, hits that reach you deal {ascRooted} less dmg.', 'ascRooted', 'dmg cut per hit', 2),
+      capstone('D3', 'Time of Need', 'Every {ascTimeOfNeed} turns, at the end of the turn, remove every debuff on you and heal {ascTimeOfNeedHeal} + {ascTimeOfNeedPct}% of your missing HP.', 'Titan Bloom cap −{ascTimeOfNeedCost}.', [
+        ['ascTimeOfNeed', 'every N turns', 3, 1],
+        ['ascTimeOfNeedHeal', 'heal', 4],
+        ['ascTimeOfNeedPct', 'heal % of missing HP', 5, 0, 100],
+        ['ascTimeOfNeedCost', 'Cost: cap −', 100],
+      ]),
     ],
   },
   'BR:1': {

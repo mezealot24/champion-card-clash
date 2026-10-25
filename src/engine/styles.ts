@@ -165,14 +165,17 @@ function infuseChain(state: GameState, side: Side, r: ChainReport, element: stri
 /** Titan Bloom: +1 dmg per hpPerDmg (20) Max HP grown */
 export const overgrowthDmg = (p: PlayerState, t: Tuning) => Math.floor((p.styleData?.grown ?? 0) / t['TK:2'].hpPerDmg)
 
+const DEBUFF_KINDS = ['ignite', 'chill', 'frozen', 'silence', 'skillSilence', 'noBlock', 'noCharge', 'noStrike', 'vulnerable', 'deathMark']
+/** Is this status a debuff (harmful, put on by the enemy)? Block − counts; Block + doesn't. */
+export const isDebuff = (s: PlayerState['statuses'][number]) => DEBUFF_KINDS.includes(s.kind) || (s.kind === 'blockPlus' && (s.n ?? 0) < 0)
+
 /** Debuff stacks on a side: Ignite / Chill count each stack, every other harmful status counts 1 (Frozen covers its noStrike). */
 export function debuffStacks(p: PlayerState): number {
   let n = 0
   for (const s of p.statuses) {
+    if (!isDebuff(s)) continue
     if (s.kind === 'ignite' || s.kind === 'chill') n += s.n ?? 0
-    else if (s.kind === 'blockPlus') n += (s.n ?? 0) < 0 ? 1 : 0
-    else if (['frozen', 'silence', 'skillSilence', 'noBlock', 'noCharge', 'vulnerable', 'deathMark'].includes(s.kind)) n++
-    else if (s.kind === 'noStrike' && !p.statuses.some((x) => x.kind === 'frozen')) n++
+    else if (s.kind !== 'noStrike' || !p.statuses.some((x) => x.kind === 'frozen')) n++
   }
   return n
 }
