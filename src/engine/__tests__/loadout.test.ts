@@ -215,12 +215,17 @@ describe('randomLoadout', () => {
       expect(s.log.some((l) => l.includes('Unrelenting: 10 hit dmg'))).toBe(true)
       expect(s.players.p1.hp).toBeLessThanOrEqual(hp)
     })
-    it('Untiring heals per stopped hit, up to its cap', () => {
-      let s = tk('TK:1', ['B1', 'B2'])
-      s.players.p1.hp = 200
-      s.players.p2.hand = [hit(10), hit(10), hit(10), hit(10), hit(10)]
+    it('Untiring: Block, HP lost and Second Wind give Endurance; Second Wind halves heals', () => {
+      let s = tk('TK:1', ['B1', 'B2', 'B3'])
+      expect(s.players.p1.perkData?.healPct).toBe(50)
+      s.players.p2.hand = [hit(10), hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.log.some((l) => l.includes('Untiring: heals 6'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Endurance (Block)'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Endurance (Second Wind)'))).toBe(true)
+      expect(s.players.p1.perkData?.endurance).toBe(2)
+      s.players.p2.hand = [hit(50)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.log.some((l) => l.includes('Endurance (HP lost)'))).toBe(true)
     })
     it('Undeniable: S cost +50% and slot 1 ignores Block', () => {
       let s = tk('TK:1', ['C1', 'C2', 'C3'])

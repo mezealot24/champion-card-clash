@@ -114,12 +114,16 @@ export const TREES: Record<string, TreeData> = {
         ['ascUnrelentingLeak', '% dmg of blocked hits after the first', 50, 0],
         ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
       ]),
-      node('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%.', 'ascEarlyRally', 'HP line % +', 5),
-      multi('B2', 'Untiring', 'Each hit your Block stops heals {ascUntiring}, up to {ascUntiringCap} a turn.', [
-        ['ascUntiring', 'heal per stopped hit', 4],
-        ['ascUntiringCap', 'heal cap per turn', 6],
+      // Q 2026-10-25 14:58: Untiring = Endurance from HP lost / Blocks / Second Wind (uses Unflinching's Endurance numbers)
+      multi('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn).', [
+        ['ascEarlyRally', 'HP line % +', 5],
+        ['ascEarlyRallyLoss', '% Max HP lost per Endurance', 15, 1],
       ]),
-      capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off.', '−{ascSecondWindCost} Max HP.', [['ascSecondWindCost', 'Cost: Max HP −', 20]]),
+      node('B2', 'Untiring', 'A turn your Block stops a hit, gain 1 Endurance.', 'ascUntiring', 'unused', 0),
+      capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off. Gain 1 Endurance at the end of every turn.', '−{ascSecondWindCost} Max HP, and every heal and regen you get is {ascSecondWindHealCut}% smaller.', [
+        ['ascSecondWindCost', 'Cost: Max HP −', 20],
+        ['ascSecondWindHealCut', 'Cost: heal cut %', 50, 0, 100],
+      ]),
       node('C1', 'Unstoppable', 'A charge break can\'t throw away your first {ascUnstoppable} Field cards.', 'ascUnstoppable', 'safe slots', 2, 0, 5),
       node('C2', 'Unbreakable', 'The turn after you Charge, your Block stops {ascUnbreakable} more hit.', 'ascUnbreakable', 'Block stops +', 1),
       capstone('C3', 'Undeniable', 'Chain slot 1 ignores Block.', 'Your S cards cost {ascUndeniableCost}% more HP.', [

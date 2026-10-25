@@ -48,8 +48,9 @@ export const igniteBurn = (p: PlayerState, t: Tuning) => {
   const f = t['MG:1']
   return n * f.igniteFlat + Math.floor((p.maxHp * n * f.ignitePctMaxHp) / 100)
 }
+/** also a loadout heal cut (perkData.healPct, e.g. Second Wind's Cost) */
 export const healAfterIgnite = (p: PlayerState, n: number, t: Tuning) =>
-  Math.floor((n * (100 - Math.min(t['MG:1'].healCutMax, t['MG:1'].healCutPerStack * igniteStacks(p)))) / 100)
+  Math.floor((n * (100 - Math.min(t['MG:1'].healCutMax, t['MG:1'].healCutPerStack * igniteStacks(p))) * (p.perkData?.healPct ?? 100)) / 10000)
 
 /** Add n Ignite stacks to a side (capped) and reset its timer. Returns the stacks it has now. */
 export function addIgnite(state: GameState, side: Side, n: number): number {

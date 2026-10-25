@@ -83,13 +83,14 @@ const freshFreeze = (state: GameState, side: Side, bit: number) => {
 }
 /** Endurance stacks (Tank Lifeline v2) */
 const endurance = (p: PlayerState) => p.perkData?.endurance ?? 0
-function gainEndurance(state: GameState, side: Side, why: string) {
+function gainEndurance(state: GameState, side: Side, why: string, src = 'flinch') {
   const p = state.players[side]
-  if (p.perkData?.enduranceAt === state.turn && p.perkData?.enduranceWhy) return // once a turn
+  const at = `endAt_${src}`
+  if (p.perkData?.[at] === state.turn) return // once a turn per source
   const max = num(state, side, 'TK:1', 'ascEnduranceMax')
   const n = Math.min(max, endurance(p) + 1)
-  p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, enduranceWhy: 1 }
-  say(state, side, `Unflinching (${why}): Endurance ${n}/${max}`)
+  p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, [at]: state.turn }
+  say(state, side, `Endurance (${why}): ${n}/${max}`)
 }
 /** Unrelenting: dmg still to drain, one entry per coming turn (perkData only holds numbers: drain0, drain1, …) */
 const drainQueue = (p: PlayerState) => {
@@ -224,19 +225,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         const hits = r.hitsTaken + (igniteStacks(p) > 0 ? 1 : 0)
         if (hits >= 2 && p.hp > 0) gainEndurance(state, side, 'took 2+ hits')
       },
-      hitCut: (state, side) => endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut'),
       endTurn: (state, side, action) => {
-        const p = state.players[side]
-        if (action === 'charge' && p.hp > 0) gainEndurance(state, side, 'Charge')
-        const n = endurance(p)
-        if (!n) return
-        if (state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
-          p.perkData = { ...p.perkData, endurance: 0 }
-          say(state, side, 'Unflinching: Endurance fades')
-          return
-        }
-        const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
-        if (got) say(state, side, `Unflinching: ${n} Endurance regen ${got}`)
+        if (action === 'charge' && state.players[side].hp > 0) gainEndurance(state, side, 'Charge')
       },
     },
   }),
@@ -284,22 +274,41 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  // Lifeline · Untiring
-  'TK:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'TK:1', 'hpPct', v(k)) }),
-  'TK:1:B2': (amt) => ({
+  // Lifeline · Untiring (Q 2026-10-25 14:58): Endurance from HP lost / Blocks / every turn
+  'TK:1:B1': (_, k) => ({
+    tune: (t, v) => add(t, 'TK:1', 'hpPct', v(k)),
+    hooks: {
+      // HP seen at the start of the turn, so heals in between aren't counted as loss
+      actionStart: (state, side) => {
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, rallyHp: p.hp }
+      },
+      onHpLoss: (state, side) => {
+        const p = state.players[side]
+        if (p.hp <= 0) return
+        const step = Math.max(1, Math.floor((p.maxHp * num(state, side, 'TK:1', 'ascEarlyRallyLoss')) / 100))
+        const lost = (p.perkData?.rallyLost ?? 0) + Math.max(0, (p.perkData?.rallyHp ?? p.maxHp) - p.hp)
+        p.perkData = { ...p.perkData, rallyHp: p.hp, rallyLost: lost % step }
+        if (lost >= step) gainEndurance(state, side, 'HP lost', 'rally')
+      },
+    },
+  }),
+  'TK:1:B2': () => ({
     hooks: {
       afterHits: (state, side, r) => {
-        if (!r.hitsBlocked) return
-        const got = styleHeal(state, side, Math.min(num(state, side, 'TK:1', 'ascUntiringCap'), r.hitsBlocked * amt(state, side)))
-        if (got) say(state, side, `Untiring: heals ${got}`)
+        if (r.hitsBlocked && state.players[side].hp > 0) gainEndurance(state, side, 'Block', 'block')
       },
     },
   }),
   'TK:1:B3': () => ({
-    setup: (p, v) => addMaxHp(p, -v('ascSecondWindCost')),
+    setup: (p, v) => {
+      addMaxHp(p, -v('ascSecondWindCost'))
+      p.perkData = { ...p.perkData, healPct: 100 - v('ascSecondWindHealCut') }
+    },
     hooks: {
       endTurn: (state, side) => {
         const p = state.players[side]
+        if (p.hp > 0) gainEndurance(state, side, 'Second Wind', 'wind')
         if (!p.styleData?.spent || !once(p, 'secondWind')) return
         p.styleData = { ...p.styleData, spent: 0, below: 0 }
         say(state, side, 'Second Wind: Lifeline can switch on once more')
@@ -1160,6 +1169,26 @@ for (const [style, tree] of Object.entries(TREES))
     const make = NODE_FX[`${style}:${n.id}`]
     if (make) PIECES[`asc:${style}:${n.id}`] = { group: style, ...make((state, side) => num(state, side, style, key), key) }
   }
+// Endurance itself (Tank Lifeline): one piece however many nodes give it, so the cut / regen count once
+PIECES['asc:TK:1:END'] = {
+  group: 'TK:1',
+  hooks: {
+    hitCut: (state, side) => endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut'),
+    endTurn: (state, side) => {
+      const p = state.players[side]
+      const n = endurance(p)
+      if (!n) return
+      if (state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
+        p.perkData = { ...p.perkData, endurance: 0 }
+        say(state, side, 'Endurance fades')
+        return
+      }
+      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
+      if (got) say(state, side, `Endurance: ${n} regen ${got}`)
+    },
+  },
+}
+const GIVES_ENDURANCE = ['A1', 'B1', 'B2', 'B3']
 for (const [k, piece] of Object.entries(PIECES)) if (piece.hooks) PERK_HOOKS[k] = { name: k, ...piece.hooks }
 
 const LETTERS = 'ABCDEFGH'
@@ -1189,6 +1218,7 @@ export function perkKeys(champ: string, style: string | undefined, l: Loadout | 
   if (l.minor && PIECES[`minor:${l.minor}`]) out.push(`minor:${l.minor}`)
   // id order (A1 < A2 < A3 < B1 …): a capstone's tune lands after its branch's nodes
   if (style && l.asc && validAsc(l.asc, l.points ?? treePoints(style, 5), style)) for (const id of [...l.asc].sort()) if (PIECES[`asc:${style}:${id}`]) out.push(`asc:${style}:${id}`)
+  if (style === 'TK:1' && out.some((k) => GIVES_ENDURANCE.some((id) => k === `asc:TK:1:${id}`))) out.push('asc:TK:1:END')
   return out
 }
 
