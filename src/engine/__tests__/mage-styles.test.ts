@@ -147,14 +147,47 @@ describe('Cryomancer', () => {
     const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
     expect(n.players.p1.hp).toBe(100 - 35) // 50 × 70%
   })
-  it('4 Chill stacks freeze: Chill clears, Shatter takes 15% Max HP, no Strike next turn', () => {
+  it('4 Chill stacks freeze: Chill clears, no Strike next turn, Flash Freeze draws, no Shatter yet', () => {
     const s = game('MG:2') // Frost Armor soaks both hits: 2 more Chill
     s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 2 })
     s.players.p2.hand = [hit(10), hit(10)]
+    const field = s.players.p1.hand.length
     const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
     expect(chill(n)).toBeUndefined()
-    expect(n.players.p2.hp).toBe(85)
+    expect(n.players.p2.hp).toBe(100)
     expect(frozen(n)).toBe(true)
+    expect(n.players.p1.hand.length).toBe(field + 1 + 2) // Charge 1 + Flash Freeze 2
+  })
+  it('Shatter: the first clean hit on a Frozen enemy takes 15% Max HP, once; Block dodges it', () => {
+    const frozenFoe = () => {
+      const s = fresh()
+      s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 3 })
+      s.players.p1.hand = [skill(1)] // ⟡ Infuse: 4th Chill → Frozen
+      return resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    }
+    let s = frozenFoe()
+    const hp = s.players.p2.hp
+    s.players.p1.hand = [hit(1), hit(1)]
+    s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(hp - s.players.p2.hp).toBe(2 + 15)
+    const blocked = frozenFoe()
+    blocked.players.p1.hand = [hit(1), hit(1)]
+    expect(resolveTurn(blocked, { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(blocked.players.p2.hp)
+  })
+  it('Thaw: a side that just thawed can\'t be Frozen again yet', () => {
+    const s = fresh()
+    s.players.p2.statuses.push({ kind: 'thaw', turns: 2 }, { kind: 'chill', turns: 3, n: 3 })
+    s.players.p1.hand = [skill(1)]
+    const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(frozen(n)).toBe(false)
+  })
+  it('Frost Armor regrows Shield on Block, up to its cap', () => {
+    let s = fresh()
+    s.players.p1.statuses = []
+    for (let i = 0; i < 8; i++) s = resolveTurn(s, { p1: 'block', p2: 'charge' })
+    const shields = s.players.p1.statuses.filter((x) => x.kind === 'shield')
+    expect(shields.reduce((t, x) => t + (x.n ?? 0), 0)).toBe(40)
+    expect(shields.length).toBe(1)
   })
   it('Absolute Zero: S + S + S all clean freezes and stops Block, so only Charge is left', () => {
     const s = fresh()

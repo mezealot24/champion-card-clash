@@ -21,7 +21,7 @@ export const chillStacks = (p: PlayerState) => p.statuses.find((s) => s.kind ===
 /** % the chilled side's hits lose */
 export const chillCut = (p: PlayerState, t: Tuning) => chillStacks(p) * t['MG:2'].chillDmgCut
 
-/** Add n Chill stacks to a side and reset its timer. Reaching chillMax freezes it and Shatter takes shatterPct of its Max HP. Returns the stacks it has now (0 after a freeze). */
+/** Add n Chill stacks to a side and reset its timer. Reaching chillMax freezes it (Shatter comes later, on a hit). Returns the stacks it has now (0 after a freeze). */
 export function addChill(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   // the numbers of whoever applies it (the other side)
@@ -30,15 +30,21 @@ export function addChill(state: GameState, side: Side, n: number): number {
   if (!cur && n <= 0) return 0
   const stacks = Math.min(t.chillMax, (cur?.n ?? 0) + n)
   p.statuses = p.statuses.filter((s) => s.kind !== 'chill')
-  if (stacks >= t.chillMax && !t.chillNoFreeze) {
-    const lost = Math.floor((p.maxHp * t.shatterPct) / 100)
-    p.hp = Math.max(0, p.hp - lost)
-    for (const h of hooksOf(p)) h.onHpLoss?.(state, side)
-    freeze(state, side, `${t.chillMax} Chill, Shatter takes ${lost} HP`)
-    return 0
-  }
+  if (stacks >= t.chillMax && !t.chillNoFreeze && freeze(state, side, `${t.chillMax} Chill`)) return 0
   p.statuses.push({ kind: 'chill', turns: t.chillTurns, n: stacks })
   return stacks
+}
+
+/** Shield points a side has left */
+export const shieldOf = (p: PlayerState) => p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
+/** Grow one lasting Shield by n, keeping the side's total Shield at most cap. Returns what it gained. */
+export function growShield(p: PlayerState, n: number, cap: number): number {
+  const add = Math.min(n, cap - shieldOf(p))
+  if (add <= 0) return 0
+  const lasting = p.statuses.find((s) => s.kind === 'shield' && s.turns > 9000)
+  if (lasting) lasting.n = (lasting.n ?? 0) + add
+  else p.statuses.push({ kind: 'shield', turns: 9999, n: add })
+  return add
 }
 
 export const igniteStacks = (p: PlayerState) => p.statuses.find((s) => s.kind === 'ignite')?.n ?? 0
@@ -48,8 +54,9 @@ export const igniteBurn = (p: PlayerState, t: Tuning) => {
   const f = t['MG:1']
   return n * f.igniteFlat + Math.floor((p.maxHp * n * f.ignitePctMaxHp) / 100)
 }
+/** also a loadout heal cut (perkData.healPct, e.g. Second Wind's Cost) */
 export const healAfterIgnite = (p: PlayerState, n: number, t: Tuning) =>
-  Math.floor((n * (100 - Math.min(t['MG:1'].healCutMax, t['MG:1'].healCutPerStack * igniteStacks(p)))) / 100)
+  Math.floor((n * (100 - Math.min(t['MG:1'].healCutMax, t['MG:1'].healCutPerStack * igniteStacks(p))) * (p.perkData?.healPct ?? 100)) / 10000)
 
 /** Add n Ignite stacks to a side (capped) and reset its timer. Returns the stacks it has now. */
 export function addIgnite(state: GameState, side: Side, n: number): number {
@@ -104,6 +111,8 @@ export type StyleDef = {
   strikeStart?: (state: GameState, side: Side, chain: CardInst[]) => void
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
+  /** this side was hit while Charging (Charge break), after the Field card is lost */
+  onChargeBreak?: (state: GameState, side: Side) => void
   /** Dual Strike (both sides Strike this turn): at the end of the turn, after resources fill, draw n and/or fill the bar to its cap */
   dualStrike?: { draw?: (t: Tuning) => number; fillRes?: boolean }
   /** extra cards a Charge that isn't broken draws */
@@ -123,14 +132,14 @@ export type StyleDef = {
   lifesteal?: (state: GameState, side: Side) => number
   /** dmg taken off every hit that gets past this side's Block */
   hitCut?: (state: GameState, side: Side) => number
+  /** Cost: every hit this side's Block stops after the first still deals this % of its dmg */
+  blockLeakPct?: (state: GameState, side: Side) => number
+  /** cards drawn at the end of the turn, after Dual Strike draws (Cryomancer Flash Freeze) */
+  endDraw?: (state: GameState, side: Side) => number
   /** extra cards a Charge that isn't broken draws, decided per turn */
   extraChargeDraw?: (state: GameState, side: Side) => number
-  /** Energy Surge switches on at this much less than a full bar (Wraith Form) */
-  surgeLess?: (state: GameState, side: Side) => number
-  /** Acceleration (dualStrike) draws but doesn't fill the bar (Afterburner's Cost) */
-  noDualFill?: boolean
-  /** Acceleration also fires when this side Strikes into a Charge (Mach Speed) */
-  dualOnCharge?: boolean
+  /** Mach Speed: when this side Strikes into a Charge, a small Acceleration: draw this many, no Energy */
+  dualOnCharge?: (state: GameState, side: Side) => number
   /** this side's Cut effects Cut n more cards (still within CUT_CAP a turn) */
   cutMore?: (state: GameState, side: Side) => number
 }
@@ -405,7 +414,10 @@ Object.assign(STYLES, {
    * Next turn you can only Block; at its end heal 10 + 5 per Mana, spending all Mana. The turn after, the Shield
    * left melts: half of it comes back as HP. (Turn order and the Mana spend are Claude defaults.)
    * Chill: each stack makes that side's hits deal 10% less (3 turns, refreshed). At 4 stacks it is Frozen:
-   * Chill clears, Shatter takes 15% of its Max HP and it can't Strike next turn (Absolute Zero freezes without Shatter).
+   * Chill clears and it can't Strike next turn, then Thaw keeps it from being Frozen again for a while (combos.ts freeze).
+   * Shatter (Q 2026-10-25, Ice Lance pattern): your first clean hit on a Frozen enemy takes shatterPct of its Max HP,
+   * so the Frozen side guesses Block (stops the hits) or Charge. Flash Freeze draws you cards for that Strike.
+   * Frost Armor regrows (Q 2026-10-25, StS Frost orb): every turn you Block, Shield +frostArmorRegen up to frostArmorCap.
    * Arcane Sub-Zero (card) leaves a subZero status: the next Strike's clean hits each give 1 Chill.
    */
   'MG:2': {
@@ -418,9 +430,26 @@ Object.assign(STYLES, {
       const p = state.players[side]
       // subZero is read here, before statuses tick (it was put on last turn)
       if (action === 'strike' && p.statuses.some((s) => s.kind === 'subZero')) p.styleData = { ...p.styleData, subZero: 1 }
+      // the enemy is Frozen this turn (can't Strike): a clean hit now Shatters
+      const foe = state.players[other(side)].statuses
+      p.styleData = { ...p.styleData, foeFrozen: foe.some((s) => s.kind === 'frozen') && foe.some((s) => s.kind === 'noStrike') ? 1 : 0 }
     },
     afterChain: (state, side, r) => {
       const p = state.players[side]
+      // Shatter before Infuse, so a Freeze from this very chain waits for the next Strike
+      const ice = state.players[other(side)].statuses.find((s) => s.kind === 'frozen')
+      if (p.styleData?.foeFrozen && r.cleanHits && ice && !((ice.n ?? 0) & 4)) {
+        ice.n = (ice.n ?? 0) | 4 // once per Freeze
+        const foe = state.players[other(side)]
+        const before = foe.hp
+        const lost = Math.floor((foe.maxHp * tuningOf(state, side)['MG:2'].shatterPct) / 100)
+        foe.hp = Math.max(0, foe.hp - lost)
+        if (foe.hp < before) {
+          for (const h of hooksOf(foe)) h.onHpLoss?.(state, other(side))
+          ;(state.events ??= []).push({ k: 'hp', side: other(side), delta: foe.hp - before })
+        }
+        say(state, side, `💥 Shatter: clean hit on a Frozen enemy → ${lost} HP`)
+      }
       if (p.styleData?.subZero && r.cleanHits) {
         const n = addChill(state, other(side), r.cleanHits)
         say(state, side, `Arcane Sub-Zero: ${r.cleanHits} clean hits → enemy gets ❄ Chill${n ? ` (${n} stacks)` : ''}`)
@@ -452,9 +481,20 @@ Object.assign(STYLES, {
       p.statuses.push({ kind: 'noStrike', turns: 1 }, { kind: 'noCharge', turns: 1 }, { kind: 'frozenTomb', turns: 1 })
       say(state, side, `🧊 Frozen Tomb${saved ? ' (survives at 1 HP)' : ''}: Frost Armor Shield ${f.frostArmorShield} is back, Block only next turn`)
     },
-    endTurn: (state, side) => {
+    endDraw: (state, side) => {
+      const p = state.players[side]
+      const n = p.styleData?.freezeDraw ?? 0
+      if (n) p.styleData = { ...p.styleData, freezeDraw: 0 }
+      return n
+    },
+    endTurn: (state, side, action) => {
       const p = state.players[side]
       if (p.styleData?.subZero) p.styleData = { ...p.styleData, subZero: 0 }
+      const t = tuningOf(state, side)['MG:2']
+      if (action === 'block' && p.hp > 0) {
+        const got = growShield(p, t.frostArmorRegen, t.frostArmorCap)
+        if (got) say(state, side, `Frost Armor regrows: Shield +${got}`)
+      }
       const at = p.styleData?.tombAt
       if (at === undefined || p.hp <= 0) return
       const f = tuningOf(state, side)['MG:2']

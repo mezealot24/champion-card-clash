@@ -73,9 +73,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   for (const side of SIDES) {
     const p = state.players[side]
     const def = resourceOf(p.championId, tuningOf(state, side))
-    // Wraith Form (Assassin Ascendancy): the bar counts as full a little early
-    const less = Math.max(0, ...hooksOf(p).map((h) => h.surgeLess?.(state, side) ?? 0))
-    if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) <= 0 || (p.res ?? 0) < def.cap - less) continue
+    if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) continue
     const mode = actions[side] === 'block' ? 'A' : actions[side] === 'charge' ? 'B' : 'C'
     if (!SURGE_MODES.includes(mode)) continue
     surge[side] = p.res ?? 0
@@ -150,6 +148,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
         // empty Field: nothing to lose, the Charge still draws 1 (Q 2026-10-17)
         drawCards(state, side, 1)
       }
+      for (const h of hooksOf(p)) h.onChargeBreak?.(state, side)
     } else {
       const extra = hooksOf(p).reduce((t, h) => t + (h.chargeDraw ?? 0) + (h.extraChargeDraw?.(state, side) ?? 0), 0)
       drawCards(state, side, state.rules.chargeDraw + extra)
@@ -179,20 +178,31 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     p.otherDmg = undefined
   }
   // Dual Strike Styles (Sonic Bliz Acceleration): after resources fill, so a full bar stays full
-  // Mach Speed (Ascendancy): also when this side Strikes into a Charge
   for (const side of SIDES) {
     if (actions[side] !== 'strike') continue
     const hooks = hooksOf(state.players[side])
     const enemy = actions[other(side)]
-    if (enemy !== 'strike' && !(enemy === 'charge' && hooks.some((h) => h.dualOnCharge))) continue
+    // Mach Speed (Ascendancy): Strike into a Charge draws a little, no Energy
+    if (enemy === 'charge') {
+      const draw = hooks.reduce((t, h) => t + (h.dualOnCharge?.(state, side) ?? 0), 0)
+      if (draw > 0) log(state, `${side} Mach Speed: draws ${drawCards(state, side, draw)}`)
+      continue
+    }
+    if (enemy !== 'strike') continue
     const ds = getStyle(state.players[side].style)?.dualStrike
     if (!ds) continue
-    const fill = ds.fillRes && !hooks.some((h) => h.noDualFill)
+    const fill = ds.fillRes
     const cap = resourceOf(state.players[side].championId, tuningOf(state, side))?.cap ?? 0
     if (fill && state.rules.resources) addRes(state, side, cap)
     const draw = ds.draw?.(tuningOf(state, side)) ?? 0
     const n = draw ? drawCards(state, side, draw) : 0
-    log(state, `${side} Acceleration (${enemy === 'strike' ? 'Dual Strike' : 'Mach Speed'}): ${fill ? 'Energy full, ' : ''}draws ${n}`)
+    log(state, `${side} Acceleration (Dual Strike): ${fill ? 'Energy full, ' : ''}draws ${n}`)
+  }
+  // end-of-turn draws from Styles/pieces (Cryomancer Flash Freeze)
+  for (const side of SIDES) {
+    if (state.players[side].hp <= 0) continue
+    const want = hooksOf(state.players[side]).reduce((t, h) => t + (h.endDraw?.(state, side) ?? 0), 0)
+    if (want > 0) log(state, `${side} ❄ Flash Freeze: draws ${drawCards(state, side, want)}`)
   }
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.endTurn?.(state, side, actions[side], actions[other(side)])
   // Ignite burns at the end of every turn it's on (Pyromancer)
@@ -315,7 +325,17 @@ function resolveStrikes(
   const ts = (side: Side) => tuningOf(state, side)
   const throughPct = (side: Side, i: number) =>
     Math.min(100, Math.max(guardBreak[side] ? ts(side).BR.guardCrushBlockedPct : 0, crit[side].has(i) ? ts(side)['AS:2'].blockedCritPct : 0))
-  const dealtOf = (side: Side, i: number) => (!isBlocked(side, i) ? dmgOf(side, i) : Math.floor((dmgOf(side, i) * throughPct(side, i)) / 100))
+  // loadout Costs that make a side's Block leak: every blocked hit after its first still deals N% (Unrelenting)
+  const blockLeak = { p1: 0, p2: 0 }
+  for (const side of SIDES) blockLeak[side] = hooksOf(state.players[side]).reduce((t, h) => Math.max(t, h.blockLeakPct?.(state, side) ?? 0), 0)
+  const leakPct = (side: Side, i: number) => {
+    if (!blockLeak[other(side)]) return 0
+    let earlier = 0
+    for (let j = 0; j < i; j++) if (isBlocked(side, j)) earlier++
+    return earlier >= 1 ? blockLeak[other(side)] : 0
+  }
+  const dealtOf = (side: Side, i: number) =>
+    !isBlocked(side, i) ? dmgOf(side, i) : Math.floor((dmgOf(side, i) * Math.min(100, Math.max(throughPct(side, i), leakPct(side, i)))) / 100)
 
   // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
   const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }

@@ -125,7 +125,8 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
   p.unpaid = []
   if (!def || p.silenced || !state.rules.resources) return // Silenced: effects are off anyway, nothing to pay for
   for (const card of chain) {
-    const cost = costOf(p.championId, card, tuningOf(state, side), p.costMod)
+    // Grasp of the Undying's Cost: S cards cost hpPct% of current HP instead
+    const cost = p.costMod?.hpPct && card.def.type === 'S' && def.payWithHp ? Math.max(1, Math.floor((p.hp * p.costMod.hpPct) / 100)) : costOf(p.championId, card, tuningOf(state, side), p.costMod)
     // Bitter Cold: Skill effects are off, nothing to pay for
     if (cost <= 0 || (p.skillSilenced && card.def.type === 'S')) continue
     if (def.payWithHp ? p.hp > cost : (p.res ?? 0) >= cost) {
