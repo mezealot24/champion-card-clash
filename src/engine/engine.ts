@@ -73,9 +73,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   for (const side of SIDES) {
     const p = state.players[side]
     const def = resourceOf(p.championId, tuningOf(state, side))
-    // Wraith Form (Assassin Ascendancy): the bar counts as full a little early
-    const less = Math.max(0, ...hooksOf(p).map((h) => h.surgeLess?.(state, side) ?? 0))
-    if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) <= 0 || (p.res ?? 0) < def.cap - less) continue
+    if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) continue
     const mode = actions[side] === 'block' ? 'A' : actions[side] === 'charge' ? 'B' : 'C'
     if (!SURGE_MODES.includes(mode)) continue
     surge[side] = p.res ?? 0
@@ -179,12 +177,17 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     p.otherDmg = undefined
   }
   // Dual Strike Styles (Sonic Bliz Acceleration): after resources fill, so a full bar stays full
-  // Mach Speed (Ascendancy): also when this side Strikes into a Charge
   for (const side of SIDES) {
     if (actions[side] !== 'strike') continue
     const hooks = hooksOf(state.players[side])
     const enemy = actions[other(side)]
-    if (enemy !== 'strike' && !(enemy === 'charge' && hooks.some((h) => h.dualOnCharge))) continue
+    // Mach Speed (Ascendancy): Strike into a Charge draws a little, no Energy
+    if (enemy === 'charge') {
+      const draw = hooks.reduce((t, h) => t + (h.dualOnCharge?.(state, side) ?? 0), 0)
+      if (draw > 0) log(state, `${side} Mach Speed: draws ${drawCards(state, side, draw)}`)
+      continue
+    }
+    if (enemy !== 'strike') continue
     const ds = getStyle(state.players[side].style)?.dualStrike
     if (!ds) continue
     const fill = ds.fillRes && !hooks.some((h) => h.noDualFill)
@@ -192,7 +195,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (fill && state.rules.resources) addRes(state, side, cap)
     const draw = ds.draw?.(tuningOf(state, side)) ?? 0
     const n = draw ? drawCards(state, side, draw) : 0
-    log(state, `${side} Acceleration (${enemy === 'strike' ? 'Dual Strike' : 'Mach Speed'}): ${fill ? 'Energy full, ' : ''}draws ${n}`)
+    log(state, `${side} Acceleration (Dual Strike): ${fill ? 'Energy full, ' : ''}draws ${n}`)
   }
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.endTurn?.(state, side, actions[side], actions[other(side)])
   // Ignite burns at the end of every turn it's on (Pyromancer)
@@ -336,7 +339,8 @@ function resolveStrikes(
       const enemy = other(side)
       let dealt = dealtOf(side, i)
       // Energy Surge: Wraith Step caps hits past Block at 1, Shroud halves them
-      if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, 1)
+      // Wraith Form (Assassin Ascendancy): Wraith Step lets nothing through
+      if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, hooksOf(state.players[enemy]).some((h) => h.wraithZero) ? 0 : 1)
       if (env.shroud[enemy]) dealt = Math.floor(dealt / 2)
       if (hitCut[enemy] && !isBlocked(side, i)) dealt = Math.max(0, dealt - hitCut[enemy])
       const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined

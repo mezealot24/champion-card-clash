@@ -257,21 +257,21 @@ export const TREES: Record<string, TreeData> = {
     nodes: [
       node('A1', 'Redline', 'Overdrive +{ascRedline} dmg per Energy.', 'ascRedline', 'dmg per Energy +', 1),
       node('A2', 'Hair Trigger', 'Overdrive needs {ascHairTrigger} fewer chain card.', 'ascHairTrigger', 'min chain −', 1),
-      capstone('A3', 'Afterburner', 'After an Overdrive Strike, get {ascAfterburner} Energy back at the end of the turn.', 'Acceleration no longer fills your Energy (it still draws).', [
+      capstone('A3', 'Afterburner', 'After an Overdrive Strike, get up to {ascAfterburner} Energy back at the end of the turn (never a full bar).', 'Acceleration no longer fills your Energy (it still draws).', [
         ['ascAfterburner', 'Energy back', 2],
       ]),
       node('B1', 'Quick Hands', 'Acceleration draws {ascQuickHands} more.', 'ascQuickHands', 'draw +', 1),
       node('B2', 'Slipstream', 'When Strike meets Strike, hits that reach you deal {ascSlipstream} less dmg.', 'ascSlipstream', 'dmg cut per hit', 2),
-      capstone('B3', 'Mach Speed', "Acceleration also fires when you Strike into the enemy's Charge.", 'Start the match with {ascMachCost} fewer card on your Field.', [
+      capstone('B3', 'Mach Speed', "When you Strike into the enemy's Charge, draw {ascMachDraw} at the end of the turn (no Energy).", 'Start the match with {ascMachCost} fewer card on your Field.', [
         ['ascMachCost', 'Cost: cards at start −', 1, 0, 5],
+        ['ascMachDraw', 'draw on Strike into Charge', 1, 0, 5],
       ]),
       node('C1', 'Escape Artist', 'When the enemy Strikes and your Block stops every hit, gain {ascEscapeArtist} Energy.', 'ascEscapeArtist', 'Energy', 1),
       multi('C2', 'Ghost Veil', 'Each turn no hit reaches you, gain 1 Veil (max {ascVeilMax}). Each Veil: hits that reach you deal {ascVeil} less dmg. A turn hits reach you, all Veil is gone after it.', [
         ['ascVeil', 'dmg cut per Veil', 1],
         ['ascVeilMax', 'max Veil', 3, 1],
       ]),
-      capstone('C3', 'Wraith Form', 'Energy Surge switches on at {ascWraithForm} less Energy than a full bar.', '−{ascWraithFormCost} Max HP.', [
-        ['ascWraithForm', 'Energy less', 1, 0, 2],
+      capstone('C3', 'Wraith Form', 'Energy Surge Wraith Step: hits that get past your Block deal 0 instead of 1.', '−{ascWraithFormCost} Max HP.', [
         ['ascWraithFormCost', 'Cost: Max HP −', 20],
       ]),
       node('D1', 'Snare', 'When you Charge and the enemy Blocks, Cut their {ascSnare} newest Field card.', 'ascSnare', 'cards Cut', 1, 0, 2),
@@ -289,13 +289,13 @@ export const TREES: Record<string, TreeData> = {
     nodes: [
       node('A1', 'Blood Scent', 'Low HP line +{ascBloodScent}%.', 'ascBloodScent', 'HP line % +', 5),
       node('A2', 'Merciless', 'Critical vs low HP ×{ascMerciless} more.', 'ascMerciless', 'multiplier +', 1),
-      capstone('A3', 'Executioner', 'A Critical that leaves the enemy at {ascExecutioner}% Max HP or less finishes them.', 'Criticals vs HP above the low line ×{ascExecutionerCost} less.', [
-        ['ascExecutioner', 'finish at % Max HP', 10, 0, 50],
-        ['ascExecutionerCost', 'Cost: Critical multiplier −', 1],
+      capstone('A3', 'Executioner', 'A Critical that leaves the enemy at {ascExecutioner}% Max HP or less finishes them.', '−{ascExecutionerCost} Max HP.', [
+        ['ascExecutioner', 'finish at % Max HP', 20, 0, 50],
+        ['ascExecutionerCost', 'Cost: Max HP −', 15],
       ]),
       node('B1', 'Primed', 'The Critical counter starts at {ascPrimed}.', 'ascPrimed', 'counter at start', 2),
       node('B2', 'Off-Beat', 'Each hit your Block stops adds 1 to the Critical counter, up to {ascOffBeat} a turn.', 'ascOffBeat', 'counter + per turn (cap)', 2),
-      capstone('B3', 'Crescendo', 'Critical every {ascCrescendo} fewer attack.', 'Criticals ×{ascCrescendoCost} less (vs low HP too).', [
+      capstone('B3', 'Crescendo', 'Critical every {ascCrescendo} fewer attack.', 'Criticals ×{ascCrescendoCost} less (not vs low HP).', [
         ['ascCrescendo', 'every N −', 1],
         ['ascCrescendoCost', 'Cost: Critical multiplier −', 1],
       ]),
@@ -307,13 +307,13 @@ export const TREES: Record<string, TreeData> = {
         ['ascVirulent', 'dmg +', 1],
         ['ascVirulentAt', 'Venom needed', 3, 1],
       ]),
-      capstone('C3', 'Noxious', 'Venom no longer drops by itself and burns +{ascNoxious} HP per stack.', 'Blocked Criticals deal 0.', [
-        ['ascNoxious', 'burn per stack +', 1],
+      capstone('C3', 'Noxious', 'Venom no longer drops by itself.', 'Blocked Criticals deal 0, and Venom max −{ascNoxiousCost}.', [
+        ['ascNoxiousCost', 'Cost: Venom max −', 2],
       ]),
       node('D1', 'Feint', 'Blocked Criticals deal +{ascFeint}% dmg.', 'ascFeint', 'blocked dmg % +', 25),
       node('D2', 'Ghost Dance', "After a Strike with a Critical, gain Parry {ascGhostDance} for the next turn (doesn't stack).", 'ascGhostDance', 'Parry', 1),
-      capstone('D3', 'Unseen Strike', 'Criticals ignore Block.', 'Critical every {ascUnseenCost} more attack.', [
-        ['ascUnseenCost', 'Cost: every N +', 1],
+      capstone('D3', 'Unseen Strike', 'Criticals ignore Block.', '−{ascUnseenCost} Max HP.', [
+        ['ascUnseenCost', 'Cost: Max HP −', 15],
       ]),
     ],
   },

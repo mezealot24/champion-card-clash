@@ -26,14 +26,14 @@ describe('Assassin v2 Ascendancy', () => {
   })
 
   describe('Sonic Bliz', () => {
-    it('Afterburner: Energy back after an Overdrive; Acceleration no longer fills', () => {
+    it('Afterburner: Energy back after an Overdrive, never a full bar; Acceleration no longer fills', () => {
       let s = as('AS:1', ['A1', 'A2', 'A3'])
       expect(t(s, 'AS:1').minChain).toBe(2)
       s.players.p1.res = 3
       s.players.p1.hand = [hit(1), hit(1)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(said(s, 'Afterburner')).toBe(true)
-      expect(s.players.p1.res).toBe(3) // 0 after Overdrive, +1 a turn, +2 Afterburner
+      expect(s.players.p1.res).toBe(2) // 0 after Overdrive, +1 a turn, Afterburner stops below a full bar (Surge)
       s.players.p1.res = 0
       s.players.p1.hand = [hit(1, 'S')]
       s.players.p2.hand = [hit(1)]
@@ -41,13 +41,14 @@ describe('Assassin v2 Ascendancy', () => {
       expect(s.players.p1.res).toBeLessThan(3)
     })
 
-    it('Mach Speed: Acceleration on Strike into Charge, one fewer card at start', () => {
+    it('Mach Speed: Strike into Charge draws 1, no Energy; one fewer card at start', () => {
       let s = as('AS:1', ['B1', 'B2', 'B3'])
       expect(s.players.p1.hand).toHaveLength(2)
       s.players.p1.res = 0
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(said(s, 'Mach Speed')).toBe(true)
-      expect(s.players.p1.res).toBe(3)
+      expect(said(s, 'Mach Speed: draws 1')).toBe(true)
+      expect(s.players.p1.hand).toHaveLength(1)
+      expect(s.players.p1.res).toBe(1)
     })
 
     it('Slipstream: hits deal 2 less only when Strike meets Strike', () => {
@@ -77,12 +78,15 @@ describe('Assassin v2 Ascendancy', () => {
       expect(s.players.p1.perkData?.veil).toBe(0)
     })
 
-    it('Wraith Form: Surge at 2 Energy, −20 Max HP', () => {
+    it('Wraith Form: Wraith Step lets 0 through, −20 Max HP', () => {
       let s = as('AS:1', ['C1', 'C2', 'C3'])
       expect(s.players.p1.maxHp).toBe(140)
-      s.players.p1.res = 2
-      s = resolveTurn(s, { p1: 'block', p2: 'charge' })
+      s.players.p1.res = 3
+      const hp = s.players.p1.hp
+      s.players.p2.hand = [hit(10), hit(10), hit(10), hit(10)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
       expect(said(s, 'Energy Surge')).toBe(true)
+      expect(s.players.p1.hp).toBe(hp)
     })
 
     it('Snare and Tripwire Cut the newest card on Charge vs Block', () => {
@@ -108,22 +112,22 @@ describe('Assassin v2 Ascendancy', () => {
   })
 
   describe('Fatal Rhythm', () => {
-    it('Executioner: a Critical that leaves the enemy at 10% or less finishes them; ×2 above the line', () => {
+    it('Executioner: a Critical that leaves the enemy at 20% or less finishes them; −15 Max HP', () => {
       let s = as('AS:2', ['A1', 'A2', 'A3'])
-      expect(t(s, 'AS:2').critMult).toBe(2)
+      expect(s.players.p1.maxHp).toBe(145)
       s.players.p1.styleData = { attacks: 3 }
-      s.players.p2.hp = 30
-      s.players.p1.hand = [hit(4)]
+      s.players.p2.hp = 40
+      s.players.p1.hand = [hit(7)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(s.players.p2.hp).toBe(0)
       expect(said(s, 'Executioner')).toBe(true)
     })
 
-    it('Crescendo: every 3rd, ×2 / ×3; Off-Beat counts stopped hits up to 2', () => {
+    it('Crescendo: every 3rd, ×2 (×4 vs low HP stays); Off-Beat counts stopped hits up to 2', () => {
       let s = as('AS:2', ['B1', 'B2', 'B3'])
       expect(t(s, 'AS:2').every).toBe(3)
       expect(t(s, 'AS:2').critMult).toBe(2)
-      expect(t(s, 'AS:2').redCritMult).toBe(3)
+      expect(t(s, 'AS:2').redCritMult).toBe(4)
       expect(s.players.p1.styleData?.attacks).toBe(2)
       s.players.p2.hand = [hit(1), hit(1), hit(1)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
@@ -154,19 +158,20 @@ describe('Assassin v2 Ascendancy', () => {
       expect(said(s, 'Virulent')).toBe(true)
     })
 
-    it('Noxious: Venom stays and burns double; blocked Criticals deal 0 even with Feint', () => {
+    it('Noxious: Venom stays; blocked Criticals deal 0 even with Feint, Venom max 4', () => {
       let s = as('AS:2', ['C1', 'C2', 'C3', 'D1'])
       expect(t(s, 'AS:2').blockedCritPct).toBe(0)
+      expect(t(s, 'AS:2').ascVenomMax).toBe(4)
       s.players.p2.statuses.push({ kind: 'venom', turns: 9999, n: 3 })
       s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-      expect(100 - s.players.p2.hp).toBe(6)
+      expect(100 - s.players.p2.hp).toBe(3)
       expect(s.players.p2.statuses.find((x) => x.kind === 'venom')?.n).toBe(3)
     })
 
-    it('Ghost Dance gives Parry after a Critical; Unseen Strike: Criticals ignore Block, every 5th', () => {
+    it('Ghost Dance gives Parry after a Critical; Unseen Strike: Criticals ignore Block, −15 Max HP', () => {
       let s = as('AS:2', ['D1', 'D2', 'D3'])
-      expect(t(s, 'AS:2').every).toBe(5)
-      s.players.p1.styleData = { attacks: 4 }
+      expect(s.players.p1.maxHp).toBe(145)
+      s.players.p1.styleData = { attacks: 3 }
       s.players.p1.hand = [hit(5)]
       s = resolveTurn(s, { p1: 'strike', p2: 'block' })
       expect(100 - s.players.p2.hp).toBe(15)
