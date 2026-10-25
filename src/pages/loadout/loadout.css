@@ -30,6 +30,8 @@
 .lo-tier { flex: none; font-style: normal; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 900;
   border: 2px solid var(--s-line); color: var(--s-muted); }
 .lo-node span { font-size: 12.5px; line-height: 1.35; color: var(--s-muted); overflow-wrap: anywhere; }
+.lo-node .lo-cost { display: flex; gap: 6px; }
+.lo-node .lo-cost i { flex: none; font-style: normal; font-size: 9px; font-weight: 900; letter-spacing: .8px; text-transform: uppercase; padding: 1px 5px; border-radius: 6px; height: fit-content; margin-top: 1px; background: color-mix(in srgb, var(--pen) 22%, transparent); color: var(--pen); }
 .lo-node.avail { border-color: color-mix(in srgb, var(--tint) 70%, var(--s-line)); }
 .lo-node.avail .lo-tier { border-color: var(--tint); color: var(--tint); }
 .lo-node.taken { border-color: var(--tint); background: color-mix(in srgb, var(--tint) 22%, var(--s-panel-2)); }

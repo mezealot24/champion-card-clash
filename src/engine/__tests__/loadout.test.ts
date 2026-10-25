@@ -1,6 +1,6 @@
 // Loadout: Sigil I · Oath, Sigil II · Minor, Ascendancy nodes (engine/loadout.ts).
 import { describe, expect, it } from 'vitest'
-import { createGame, legalActions, MINORS, OATHS, pickAiAction, resolveTurn, TREES, validAsc } from '../index'
+import { createGame, legalActions, MINORS, OATHS, pickAiAction, randomLoadout, resolveTurn, TREES, treePoints, treeShape, validAsc } from '../index'
 import type { Action, CardDef, CardInst, GameState, Loadout } from '../index'
 import { tuningOf } from '../tuning'
 
@@ -31,7 +31,8 @@ describe('loadout', () => {
       for (const o of oaths) for (const m of MINORS) run(game(champ, { oath: o.id, minor: m.id }, `${champ}:1`, champ))
     for (const style of Object.keys(TREES)) {
       const champ = style.slice(0, 2)
-      for (const b of ['A', 'B']) run(game(champ, { asc: [1, 2, 3, 4].map((n) => `${b}${n}`) }, style, champ))
+      const { letters, depth } = treeShape(style)
+      for (const b of letters) run(game(champ, { asc: Array.from({ length: depth }, (_, i) => `${b}${i + 1}`), points: treePoints(style, 5) }, style, champ))
     }
   })
 
@@ -39,6 +40,14 @@ describe('loadout', () => {
     expect(validAsc(['A1', 'A2', 'B1'], 5)).toBe(true)
     expect(validAsc(['A2'], 5)).toBe(false)
     expect(validAsc(['A1', 'A2', 'A3', 'A4', 'B1', 'B2'], 5)).toBe(false)
+    // Mage v2: 4 branches (A-D) × 3 nodes, 5 + 1 points
+    expect(treePoints('MG:1', 5)).toBe(6)
+    expect(treePoints('TK:1', 5)).toBe(5)
+    expect(validAsc(['A1', 'A2', 'A3', 'D1', 'D2', 'D3'], 6, 'MG:2')).toBe(true)
+    expect(validAsc(['A1', 'A2', 'A3', 'A4'], 6, 'MG:2')).toBe(false)
+    expect(validAsc(['C1', 'D1'], 6, 'TK:1')).toBe(false)
+    const r = randomLoadout('MG', 'MG:1', 5, () => 0.99)
+    expect(r.asc?.length).toBe(6)
     // an illegal tree is ignored, not half-applied
     expect(game('TK', { asc: ['A2'] }, 'TK:1').players.p1.perks).toBeUndefined()
   })
@@ -109,10 +118,30 @@ describe('randomLoadout', () => {
         const l = randomLoadout(champ, style, 5)
         expect(OATHS[champ].some((o) => o.id === l.oath)).toBe(true)
         expect(MINORS.some((m) => m.id === l.minor)).toBe(true)
-        expect(l.asc).toHaveLength(5)
-        expect(validAsc(l.asc!, 5)).toBe(true)
+        expect(l.asc).toHaveLength(treePoints(style, 5))
+        expect(validAsc(l.asc!, treePoints(style, 5), style)).toBe(true)
       }
     }
     expect(randomLoadout('TK', undefined, 5).asc).toEqual([])
   })
+
+  describe('Mage v2 Ascendancy', () => {
+    const mg = (style: string, asc: string[]) => game('MG', { asc, points: 6 }, style, 'MG')
+    it('Shatterpoint changes only the Cryomancer\'s own numbers, Cost included', () => {
+      const s = mg('MG:2', ['A1', 'A2', 'A3'])
+      expect(tuningOf(s, 'p1')['MG:2'].chillMax).toBe(3)
+      expect(tuningOf(s, 'p1')['MG:2'].frostArmorShield).toBe(20)
+      expect(tuningOf(s, 'p2')['MG:2'].chillMax).toBe(4)
+    })
+    it('Eternal Winter: Chill stacks past the freeze line and never freezes', () => {
+      const s = mg('MG:2', ['B1', 'B2', 'B3'])
+      expect(tuningOf(s, 'p1')['MG:2'].chillNoFreeze).toBe(1)
+      expect(tuningOf(s, 'p1')['MG:2'].chillMax).toBe(6)
+    })
+    it('Eruption takes away Molten Shield Ignite; Rebirth costs Max HP', () => {
+      expect(tuningOf(mg('MG:1', ['C1', 'C2', 'C3']), 'p1')['MG:1'].moltenIgnite).toBe(0)
+      expect(mg('MG:1', ['D1', 'D2', 'D3']).players.p1.maxHp).toBe(110)
+    })
+  })
 })
+

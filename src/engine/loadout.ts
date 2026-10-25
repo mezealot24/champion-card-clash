@@ -4,7 +4,7 @@
 // into the turn like a Style (StyleDef hooks, registered in PERK_HOOKS). Pieces never touch the other player's numbers.
 import { MINORS, OATHS, TREES } from './loadoutData'
 import { resourceOf } from './resources'
-import { addChill, hooksOf, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
+import { addIgnite, chillStacks, hooksOf, igniteStacks, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
 import { fieldsOf, tuningOf, type Tuning, type TuningGroup } from './tuning'
 import type { GameState, PlayerState, Side } from './types'
 import { other } from './types'
@@ -67,6 +67,18 @@ const add = (t: Tuning, group: string, key: string, n: number) => {
   if (f?.min !== undefined) v = Math.max(f.min, v)
   if (f?.max !== undefined) v = Math.min(f.max, v)
   g[key] = v
+}
+/** Shield points this side has left */
+const shieldOf = (p: PlayerState) => p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
+/**
+ * Was the enemy Frozen this turn (a new frozen status)? Each node marks it with its own bit (status.n), so every
+ * node that reacts to a Freeze sees it once.
+ */
+const freshFreeze = (state: GameState, side: Side, bit: number) => {
+  const s = state.players[other(side)].statuses.find((x) => x.kind === 'frozen')
+  if (!s || ((s.n ?? 0) & bit)) return false
+  s.n = (s.n ?? 0) | bit
+  return true
 }
 /** Fury is on for this Strike (Bruiser Style 1) */
 const furyOn = (state: GameState, side: Side) => pctHp(state.players[side]) < num(state, side, 'BR:1', 'hpPct')
@@ -317,39 +329,249 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
 
-  'MG:1:A1': (_, k) => ({ tune: (t, v) => add(t, 'MG:1', 'igniteMax', v(k)) }),
-  'MG:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'MG:1', 'igniteFlat', v(k)) }),
-  'MG:1:A3': (_, k) => ({ tune: (t, v) => add(t, 'MG:1', 'healCutMax', v(k)) }),
-  'MG:1:A4': (_, k) => ({ tune: (t, v) => add(t, 'MG', 'infusePerS', v(k)) }),
-  'MG:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'MG:1', 'moltenShieldPerMana', v(k)) }),
-  'MG:1:B2': (_, k) => ({ tune: (t, v) => add(t, 'MG:1', 'moltenMaxMana', v(k)) }),
-  'MG:1:B3': (_, k) => ({ setup: (p, v) => addMaxHp(p, v(k)) }),
-  'MG:1:B4': (amt) => ({
+  // ---- Mage v2 (design/mage-ascendancy-v2-2026-10-21.md): 4 branches × (2 nodes + capstone with a Cost) ----
+  // Pyromancer · Inferno (burst)
+  'MG:1:A1': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const n = igniteStacks(state.players[other(side)]) * amt(state, side)
+        if (!n) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        say(state, side, `Flashpoint: every chain card +${n} dmg`)
+      },
+    },
+  }),
+  'MG:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'MG:1', 'igniteMax', v(k)) }),
+  'MG:1:A3': (amt) => ({
+    tune: (t, v) => add(t, 'MG:1', 'igniteFlat', -v('ascCombustionCost')),
+    hooks: {
+      afterChain: (state, side) => {
+        const combo = state.events?.some((e) => e.k === 'combo' && e.side === side && e.name === 'S + S + S')
+        const foe = state.players[other(side)]
+        const n = igniteStacks(foe)
+        if (!combo || !n) return 0
+        foe.statuses = foe.statuses.filter((s) => s.kind !== 'ignite')
+        hurt(state, other(side), n * amt(state, side))
+        say(state, side, `🔥 Combustion: ${n} Ignite consumed → enemy loses ${n * amt(state, side)} HP`)
+        return 0
+      },
+    },
+  }),
+  // Pyromancer · Wildfire (attrition)
+  'MG:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'MG:1', 'igniteTurns', v(k)) }),
+  'MG:1:B2': (amt) => ({
+    hooks: {
+      afterChain: (state, side, r) => {
+        const stopped = r.chainLength - r.cleanHits
+        if (stopped <= 0 || amt(state, side) <= 0) return 0
+        const n = addIgnite(state, other(side), stopped * amt(state, side))
+        say(state, side, `Fan the Flames: ${stopped} stopped hits → enemy gets 🔥 Ignite (${n} stacks)`)
+        return 0
+      },
+    },
+  }),
+  'MG:1:B3': (_, k) => ({
+    tune: (t, v) => add(t, 'MG:1', 'igniteFlat', v(k)),
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const n = num(state, side, 'MG:1', 'ascEverburnCost')
+        if (n) for (let i = 0; i < bonus.length; i++) bonus[i] -= n
+      },
+      endTurn: (state, side) => {
+        const burn = state.players[other(side)].statuses.find((s) => s.kind === 'ignite')
+        if (burn) burn.turns = Math.max(burn.turns, num(state, side, 'MG:1', 'igniteTurns'))
+      },
+    },
+  }),
+  // Pyromancer · Molten Core (counter)
+  'MG:1:C1': (amt) => ({
+    hooks: {
+      afterHits: (state, side, r) => {
+        if (!state.players[side].styleData?.molten || !r.hitsBlocked || amt(state, side) <= 0) return
+        hurt(state, other(side), r.hitsBlocked * amt(state, side))
+        say(state, side, `Backdraft: ${r.hitsBlocked} stopped hits → ${r.hitsBlocked * amt(state, side)} dmg back`)
+      },
+    },
+  }),
+  'MG:1:C2': (amt) => ({
+    hooks: {
+      afterHits: (state, side, r) => {
+        const p = state.players[side]
+        if (!p.styleData?.molten || !r.attacked || r.hitsTaken > 0 || !state.rules.resources) return
+        p.res = Math.min(num(state, side, 'MG', 'cap'), (p.res ?? 0) + amt(state, side))
+        say(state, side, `Banked Heat: no dmg taken → +${amt(state, side)} Mana`)
+      },
+    },
+  }),
+  'MG:1:C3': (amt) => ({
+    tune: (t) => add(t, 'MG:1', 'moltenIgnite', -999),
+    hooks: {
+      afterHits: (state, side) => {
+        const p = state.players[side]
+        if (p.styleData?.molten && p.styleData.moltenSpent) p.perkData = { ...p.perkData, eruption: p.styleData.moltenSpent }
+      },
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        const mana = p.perkData?.eruption ?? 0
+        if (!mana) return
+        const n = mana * amt(state, side)
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        p.perkData = { ...p.perkData, eruption: 0 }
+        say(state, side, `🌋 Eruption: ${mana} Mana banked → every chain card +${n} dmg`)
+      },
+    },
+  }),
+  // Pyromancer · Phoenix (comeback)
+  'MG:1:D1': (amt) => ({
+    hooks: {
+      afterChain: (state, side, r) => {
+        if (!r.paidSkills || pctHp(state.players[side]) >= RED_PCT || amt(state, side) <= 0) return 0
+        const n = addIgnite(state, other(side), r.paidSkills * amt(state, side))
+        say(state, side, `Ember Heart: low HP → enemy gets more 🔥 Ignite (${n} stacks)`)
+        return 0
+      },
+    },
+  }),
+  'MG:1:D2': (amt) => ({
+    hooks: {
+      endTurn: (state, side) => {
+        const n = igniteStacks(state.players[other(side)]) * amt(state, side)
+        if (!n) return
+        const got = styleHeal(state, side, n)
+        if (got) say(state, side, `Cauterize: heals ${got}`)
+      },
+    },
+  }),
+  'MG:1:D3': (amt) => ({
+    setup: (p, v) => addMaxHp(p, -v('ascRebirthCost')),
     hooks: {
       onHpLoss: (state, side) => {
         const p = state.players[side]
-        if (p.hp <= 0 || pctHp(p) >= RED_PCT || !once(p, 'phoenix')) return
-        const n = amt(state, side)
-        const got = styleHeal(state, side, n)
-        status(p, 'shield', n)
-        say(state, side, `Phoenix Ash: heals ${got}, Shield ${n}`)
+        if (p.hp > 0 || !once(p, 'rebirth')) return
+        p.hp = 1
+        const got = styleHeal(state, side, Math.floor((p.maxHp * amt(state, side)) / 100))
+        const n = addIgnite(state, other(side), num(state, side, 'MG:1', 'igniteMax'))
+        say(state, side, `🔥 Rebirth: rises on 1 HP, heals ${got}, enemy gets 🔥 Ignite (${n} stacks)`)
       },
     },
   }),
 
-  'MG:2:A1': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'chillDmgCut', v(k)) }),
-  'MG:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'shatterPct', v(k)) }),
-  'MG:2:A3': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'chillTurns', v(k)) }),
-  'MG:2:A4': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'chillMax', -v(k)) }),
-  'MG:2:B1': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'frostArmorShield', v(k)) }),
-  'MG:2:B2': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'tombHeal', v(k)) }),
-  'MG:2:B3': (_, k) => ({ setup: (p, v) => addMaxHp(p, v(k)) }),
-  'MG:2:B4': (amt) => ({
+  // Cryomancer · Shatter (burst)
+  'MG:2:A1': (amt) => ({
     hooks: {
-      afterHits: (state, side, r) => {
-        if (!r.shieldHits) return
-        const n = addChill(state, other(side), r.shieldHits * amt(state, side))
-        say(state, side, `Glacier Heart: enemy gets more ❄ Chill${n ? ` (${n} stacks)` : ''}`)
+      beforeHits: (state, side, _b, mult) => {
+        const pct = chillStacks(state.players[other(side)]) * amt(state, side)
+        if (!pct) return
+        for (let i = 0; i < mult.length; i++) mult[i] *= 1 + pct / 100
+        say(state, side, `Brittle: every chain card +${pct}% dmg`)
+      },
+    },
+  }),
+  'MG:2:A2': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        if (!state.players[other(side)].statuses.some((s) => s.kind === 'frozen') || amt(state, side) <= 0) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += amt(state, side)
+        say(state, side, `Cold Snap: enemy Frozen → every chain card +${amt(state, side)} dmg`)
+      },
+    },
+  }),
+  'MG:2:A3': (_, k) => ({
+    tune: (t, v) => {
+      add(t, 'MG:2', 'chillMax', -v(k))
+      add(t, 'MG:2', 'shatterPct', v('ascShatterpointPct'))
+      add(t, 'MG:2', 'frostArmorShield', -v('ascShatterpointCost'))
+    },
+  }),
+  // Cryomancer · Permafrost (control)
+  'MG:2:B1': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'chillDmgCut', v(k)) }),
+  'MG:2:B2': (amt) => ({
+    hooks: {
+      afterChain: (state, side) => {
+        const foe = state.players[other(side)]
+        if (chillStacks(foe) < amt(state, side) || foe.statuses.some((s) => s.kind === 'skillSilence')) return 0
+        foe.statuses.push({ kind: 'skillSilence', turns: 1 })
+        say(state, side, 'Bitter Wind: enemy Skill card effects are off next turn')
+        return 0
+      },
+    },
+  }),
+  'MG:2:B3': (_, k) => ({
+    tune: (t, v) => {
+      add(t, 'MG:2', 'chillNoFreeze', 1)
+      add(t, 'MG:2', 'chillMax', v(k) - t['MG:2'].chillMax)
+    },
+    hooks: {
+      endTurn: (state, side) => {
+        const chill = state.players[other(side)].statuses.find((s) => s.kind === 'chill')
+        if (chill) chill.turns = Math.max(chill.turns, num(state, side, 'MG:2', 'chillTurns'))
+      },
+    },
+  }),
+  // Cryomancer · Glacier (Shield as ammo)
+  'MG:2:C1': (amt) => ({
+    hooks: {
+      endTurn: (state, side, action) => {
+        const p = state.players[side]
+        if (action !== 'block' || p.hp <= 0 || amt(state, side) <= 0) return
+        status(p, 'shield', amt(state, side))
+        say(state, side, `Hoarfrost: Shield +${amt(state, side)}`)
+      },
+    },
+  }),
+  'MG:2:C2': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        if (!bonus.length || shieldOf(state.players[side]) <= 0) return
+        bonus[0] += amt(state, side)
+        say(state, side, `Ice Lance: slot 1 +${amt(state, side)} dmg`)
+      },
+    },
+  }),
+  'MG:2:C3': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        const total = shieldOf(p)
+        const n = Math.floor(total / Math.max(1, amt(state, side)))
+        if (!bonus.length || !n) return
+        p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        say(state, side, `🏔 Avalanche: ${total} Shield breaks → every chain card +${n} dmg`)
+      },
+    },
+  }),
+  // Cryomancer · Rime Hex (lockdown)
+  'MG:2:D1': (amt) => ({
+    hooks: {
+      endTurn: (state, side) => {
+        if (!freshFreeze(state, side, 1)) return
+        const foe = state.players[other(side)]
+        const lost = foe.hand.splice(0, Math.max(0, amt(state, side)))
+        if (!lost.length) return
+        foe.deck.push(...lost)
+        say(state, side, `Cold Hands: enemy's ${lost.length} oldest Field card${lost.length === 1 ? '' : 's'} → deck bottom`)
+      },
+    },
+  }),
+  'MG:2:D2': (amt) => ({
+    hooks: {
+      afterChain: (state, side) => {
+        const foe = state.players[other(side)]
+        if (chillStacks(foe) < amt(state, side) || foe.statuses.some((s) => s.kind === 'noCharge')) return 0
+        foe.statuses.push({ kind: 'noCharge', turns: 1 })
+        say(state, side, 'Frost Lock: enemy can\'t Charge next turn')
+        return 0
+      },
+    },
+  }),
+  'MG:2:D3': (amt) => ({
+    tune: (t, v) => add(t, 'MG:2', 'chillMax', v('ascGlacialPrisonCost')),
+    hooks: {
+      endTurn: (state, side) => {
+        if (!freshFreeze(state, side, 2) || amt(state, side) <= 0) return
+        for (const s of state.players[other(side)].statuses) if (s.kind === 'noStrike' || s.kind === 'frozen') s.turns += amt(state, side)
+        say(state, side, `Glacial Prison: enemy stays Frozen ${amt(state, side)} more turn`)
       },
     },
   }),
@@ -363,16 +585,29 @@ for (const [champ, list] of Object.entries(OATHS)) for (const o of list) PIECES[
 for (const m of MINORS) PIECES[`minor:${m.id}`] = { group: 'MINOR', ...MINOR_FX[m.id] }
 for (const [style, tree] of Object.entries(TREES))
   for (const n of tree.nodes) {
-    const key = `asc${n.id}`
+    const key = n.fields[0]?.key ?? `asc${n.id}`
     const make = NODE_FX[`${style}:${n.id}`]
     if (make) PIECES[`asc:${style}:${n.id}`] = { group: style, ...make((state, side) => num(state, side, style, key), key) }
   }
 for (const [k, piece] of Object.entries(PIECES)) if (piece.hooks) PERK_HOOKS[k] = { name: k, ...piece.hooks }
 
-/** Can these node ids be taken together? Top-down per branch, at most `points` of them. */
-export function validAsc(ids: string[], points: number): boolean {
+const LETTERS = 'ABCDEFGH'
+/** Branch letters and nodes per branch of a Style's tree (no tree: the classic 2 × 4). */
+export const treeShape = (style?: string) => {
+  const t = style ? TREES[style] : undefined
+  return { letters: LETTERS.slice(0, t?.branches.length ?? 2), depth: t?.depth ?? 4 }
+}
+/** Points a Style's tree gets: game_config asc_points + the tree's own bonus. */
+export const treePoints = (style: string | undefined, base: number) => base + ((style && TREES[style]?.bonusPoints) || 0)
+
+/** Can these node ids be taken together in this Style's tree? Top-down per branch, at most `points` of them. */
+export function validAsc(ids: string[], points: number, style?: string): boolean {
   if (ids.length > points || new Set(ids).size !== ids.length) return false
-  return ids.every((id) => /^[AB][1-4]$/.test(id) && (id[1] === '1' || ids.includes(`${id[0]}${Number(id[1]) - 1}`)))
+  const { letters, depth } = treeShape(style)
+  return ids.every((id) => {
+    const n = Number(id.slice(1))
+    return id.length === 2 && letters.includes(id[0]) && n >= 1 && n <= depth && (n === 1 || ids.includes(`${id[0]}${n - 1}`))
+  })
 }
 
 /** The perk keys a loadout gives this Champion + Style (unknown or illegal picks are left out). */
@@ -381,7 +616,7 @@ export function perkKeys(champ: string, style: string | undefined, l: Loadout | 
   const out: string[] = []
   if (l.oath && PIECES[`oath:${champ}:${l.oath}`]) out.push(`oath:${champ}:${l.oath}`)
   if (l.minor && PIECES[`minor:${l.minor}`]) out.push(`minor:${l.minor}`)
-  if (style && l.asc && validAsc(l.asc, l.points ?? 5)) for (const id of l.asc) if (PIECES[`asc:${style}:${id}`]) out.push(`asc:${style}:${id}`)
+  if (style && l.asc && validAsc(l.asc, l.points ?? treePoints(style, 5), style)) for (const id of l.asc) if (PIECES[`asc:${style}:${id}`]) out.push(`asc:${style}:${id}`)
   return out
 }
 
@@ -407,13 +642,14 @@ export function applyLoadout(p: PlayerState, l: Loadout | undefined, gameTuning:
 export function randomLoadout(champ: string, style: string | undefined, points: number, rand: () => number = Math.random): Loadout {
   const pick = <T,>(xs: T[]): T | undefined => xs[Math.floor(rand() * xs.length)]
   const asc: string[] = []
+  const pts = treePoints(style, points)
   if (style && TREES[style]) {
-    for (let i = 0; i < points; i++) {
-      const next = (['A', 'B'] as const).map((b) => `${b}${asc.filter((x) => x[0] === b).length + 1}`).filter((id) => validAsc([...asc, id], points))
+    for (let i = 0; i < pts; i++) {
+      const next = [...treeShape(style).letters].map((b) => `${b}${asc.filter((x) => x[0] === b).length + 1}`).filter((id) => validAsc([...asc, id], pts, style))
       const id = pick(next)
       if (!id) break
       asc.push(id)
     }
   }
-  return { oath: pick(OATHS[champ] ?? [])?.id, minor: pick(MINORS)?.id, asc, points }
+  return { oath: pick(OATHS[champ] ?? [])?.id, minor: pick(MINORS)?.id, asc, points: pts }
 }

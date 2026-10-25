@@ -1,5 +1,5 @@
 // Loadout content (design/customization-options-2026-10-18.md): Sigil I · Oath (per Champion, Boon + Cost),
-// Sigil II · Minor (shared, small, no cost) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down).
+// Sigil II · Minor (shared, small, no cost) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down; Mage: 4 branches × 3).
 // Names and numbers started as the Game Designer mockup's placeholders; nodes the engine can't do cheaply were swapped
 // for ones it can. Every number is a tuning field (Admin): Oaths in the Champion's class group, nodes in their Style's
 // group, Minors in game_config (minor_* keys). Text says {key} for its own group's numbers, like Style text.
@@ -50,7 +50,11 @@ export const MINORS: PieceData[] = [
   { id: 'm4', name: 'Last Stand', text: 'While your HP is below {lastStandHpPct}%, chain slot 1 deals +{lastStandDmg} dmg.', fields: [f('lastStandHpPct', 'Minor Last Stand: HP line %', 30, 1, 100), f('lastStandDmg', 'Minor Last Stand: slot 1 dmg +', 5)] },
 ]
 
-export type TreeData = { branches: [string, string]; nodes: PieceData[] }
+/**
+ * branches: one name per branch, ids A.., B.., C.., D.. in order. depth: nodes per branch (default 4), the last is the capstone.
+ * bonusPoints: points this tree gets on top of game_config asc_points (Mage v2: +1, Q 2026-10-25).
+ */
+export type TreeData = { branches: string[]; nodes: PieceData[]; depth?: number; bonusPoints?: number }
 
 const node = (id: string, name: string, text: string, key: string, label: string, def: number, min = 0, max?: number): PieceData => ({
   id,
@@ -59,9 +63,18 @@ const node = (id: string, name: string, text: string, key: string, label: string
   fields: [f(key, `Asc ${id} ${name}: ${label}`, def, min, max)],
 })
 
+/** Capstone (Mage v2): a node with a Cost line; its first field is {key}, the rest are named in text/cost. */
+const capstone = (id: string, name: string, text: string, cost: string, fields: [string, string, number, number?, number?][]): PieceData => ({
+  id,
+  name,
+  text,
+  cost,
+  fields: fields.map(([key, label, def, min, max]) => f(key, `Asc ${id} ${name}: ${label}`, def, min ?? 0, max)),
+})
+
 /**
- * Ascendancy tree per Style. Node ids A1..A4 / B1..B4; take them top-down in a branch, node 4 = capstone.
- * Numbers live in the Style's group (champion_styles.params) as asc<ID>.
+ * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage: A1..D3); take them top-down in a branch, the last node = capstone.
+ * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage v2: named asc keys).
  */
 export const TREES: Record<string, TreeData> = {
   'TK:1': {
@@ -142,30 +155,69 @@ export const TREES: Record<string, TreeData> = {
       node('B4', 'Shadow Mark', 'After a Strike with a Critical, your next chain deals +{ascB4} dmg per card.', 'ascB4', 'dmg +', 5),
     ],
   },
+  /**
+   * Mage v2 (Q 2026-10-21/25, design/mage-ascendancy-v2-2026-10-21.md): 4 branches, each a different way to play.
+   * Node 1-2 + an optional capstone that changes a rule and has a Cost. 6 points (asc_points + 1).
+   * Keys are named (not asc<ID>) so numbers tuned for the old v1 nodes don't carry over.
+   */
   'MG:1': {
-    branches: ['Wildfire', 'Molten Core'],
+    branches: ['Inferno', 'Wildfire', 'Molten Core', 'Phoenix'],
+    depth: 3,
+    bonusPoints: 1,
     nodes: [
-      node('A1', 'Kindling', 'Ignite max stacks +{ascA1}.', 'ascA1', 'max stacks +', 1),
-      node('A2', 'Searing', 'Ignite +{ascA2} HP per stack.', 'ascA2', 'HP per stack +', 1),
-      node('A3', 'Smother', 'Heal cut max +{ascA3}%.', 'ascA3', 'heal cut % +', 10),
-      node('A4', 'Firestorm', 'Each paid Skill Infuses {ascA4} more Ignite.', 'ascA4', 'Infuse +', 1),
-      node('B1', 'Magma Skin', 'Molten Shield +{ascB1} per Mana.', 'ascB1', 'Shield per Mana +', 2),
-      node('B2', 'Deep Well', 'Molten Shield uses up to {ascB2} more Mana.', 'ascB2', 'max Mana +', 1),
-      node('B3', 'Ember Ward', '+{ascB3} Max HP and start HP.', 'ascB3', 'Max HP +', 10),
-      node('B4', 'Phoenix Ash', 'The first time your HP drops into the red (30%), heal {ascB4} and gain Shield {ascB4}.', 'ascB4', 'heal and Shield', 15),
+      node('A1', 'Flashpoint', 'Your cards deal +{ascFlashpoint} dmg for each Ignite stack on the enemy.', 'ascFlashpoint', 'dmg per enemy Ignite', 1),
+      node('A2', 'Stockpile', 'Ignite max stacks +{ascStockpile}.', 'ascStockpile', 'max stacks +', 2),
+      capstone('A3', 'Combustion', 'Your S + S + S combo consumes all enemy Ignite: they lose {ascCombustion} HP per stack.', 'Ignite burns {ascCombustionCost} less HP per stack.', [
+        ['ascCombustion', 'HP per stack', 8],
+        ['ascCombustionCost', 'Cost: burn per stack −', 1],
+      ]),
+      node('B1', 'Slow Burn', 'Ignite lasts {ascSlowBurn} more turns.', 'ascSlowBurn', 'turns +', 2),
+      node('B2', 'Fan the Flames', 'Each of your hits the enemy stops gives them {ascFanFlames} Ignite.', 'ascFanFlames', 'Ignite per stopped hit', 1),
+      capstone('B3', 'Everburn', 'Ignite never runs out and burns +{ascEverburn} HP per stack.', 'All your cards deal −{ascEverburnCost} dmg.', [
+        ['ascEverburn', 'burn per stack +', 1],
+        ['ascEverburnCost', 'Cost: card dmg −', 2],
+      ]),
+      node('C1', 'Backdraft', 'Each hit your Molten Shield Block stops deals {ascBackdraft} dmg back.', 'ascBackdraft', 'dmg back per hit', 3),
+      node('C2', 'Banked Heat', 'When your Molten Shield Block is attacked and you take no dmg, gain {ascBankedHeat} Mana.', 'ascBankedHeat', 'Mana', 1),
+      capstone('C3', 'Eruption', 'After a Molten Shield Block, your next Strike: every card +{ascEruption} dmg per Mana that Block spent.', 'Molten Shield no longer Ignites the hits it stops.', [
+        ['ascEruption', 'dmg per Mana', 2],
+      ]),
+      node('D1', 'Ember Heart', 'While your HP is in the red (30%), each paid Skill card gives the enemy {ascEmberHeart} more Ignite.', 'ascEmberHeart', 'Ignite +', 1),
+      node('D2', 'Cauterize', 'At the end of every turn, heal {ascCauterize} for each Ignite stack on the enemy.', 'ascCauterize', 'heal per stack', 1),
+      capstone('D3', 'Rebirth', 'Once per match, a hit that would knock you out leaves you on 1 HP: heal {ascRebirth}% Max HP and the enemy gets max Ignite.', '−{ascRebirthCost} Max HP.', [
+        ['ascRebirth', 'heal % Max HP', 30, 0, 100],
+        ['ascRebirthCost', 'Cost: Max HP −', 20],
+      ]),
     ],
   },
   'MG:2': {
-    branches: ['Deep Cold', 'Glacier'],
+    branches: ['Shatter', 'Permafrost', 'Glacier', 'Rime Hex'],
+    depth: 3,
+    bonusPoints: 1,
     nodes: [
-      node('A1', 'Frostbite', 'Each Chill cuts +{ascA1}% more dmg.', 'ascA1', 'dmg cut % +', 5),
-      node('A2', 'Brittle', 'Shatter +{ascA2}% Max HP.', 'ascA2', 'Shatter % +', 3),
-      node('A3', 'Long Winter', 'Chill lasts {ascA3} more turn.', 'ascA3', 'turns +', 1),
-      node('A4', 'Absolute Zero', 'Freeze at {ascA4} fewer Chill stack.', 'ascA4', 'stacks to freeze −', 1),
-      node('B1', 'Rime', 'Frost Armor Shield +{ascB1}.', 'ascB1', 'Shield +', 10),
-      node('B2', 'Cold Rest', 'Frozen Tomb heals +{ascB2}.', 'ascB2', 'heal +', 5),
-      node('B3', 'Permafrost', '+{ascB3} Max HP and start HP.', 'ascB3', 'Max HP +', 10),
-      node('B4', 'Glacier Heart', 'Each hit your Shield soaks gives {ascB4} more Chill.', 'ascB4', 'Chill +', 1),
+      node('A1', 'Brittle', 'Your cards deal +{ascBrittle}% dmg for each Chill stack on the enemy.', 'ascBrittle', 'dmg % per enemy Chill', 10),
+      node('A2', 'Cold Snap', 'While the enemy is Frozen, your cards deal +{ascColdSnap} dmg.', 'ascColdSnap', 'dmg +', 4),
+      capstone('A3', 'Shatterpoint', 'Freeze at {ascShatterpoint} fewer Chill, and Shatter takes +{ascShatterpointPct}% Max HP.', 'Frost Armor (and Frozen Tomb) Shield −{ascShatterpointCost}.', [
+        ['ascShatterpoint', 'stacks to freeze −', 1],
+        ['ascShatterpointPct', 'Shatter % +', 5],
+        ['ascShatterpointCost', 'Cost: Shield −', 20],
+      ]),
+      node('B1', 'Numbing Cold', 'Each Chill cuts +{ascNumbingCold}% more dmg.', 'ascNumbingCold', 'dmg cut % +', 5),
+      node('B2', 'Bitter Wind', 'When the enemy has {ascBitterWind}+ Chill after your chain, their Skill card effects are off next turn.', 'ascBitterWind', 'Chill needed', 3, 1),
+      capstone('B3', 'Eternal Winter', 'Chill never freezes and never runs out: it stacks up to {ascEternalWinter}.', 'No Freeze and no Shatter from Chill (Absolute Zero still freezes).', [
+        ['ascEternalWinter', 'max Chill', 6, 1],
+      ]),
+      node('C1', 'Hoarfrost', 'At the end of every turn you Block, gain Shield {ascHoarfrost}.', 'ascHoarfrost', 'Shield', 8),
+      node('C2', 'Ice Lance', 'While you have Shield, chain slot 1 deals +{ascIceLance} dmg.', 'ascIceLance', 'slot 1 dmg +', 6),
+      capstone('C3', 'Avalanche', 'When you Strike, all your Shield breaks into the chain: every card +1 dmg per {ascAvalanche} Shield.', 'Your Shield is gone for that turn\'s hits.', [
+        ['ascAvalanche', 'Shield per +1 dmg', 10, 1],
+      ]),
+      node('D1', 'Cold Hands', 'When you Freeze the enemy, their {ascColdHands} oldest Field cards go to the bottom of their deck.', 'ascColdHands', 'cards', 1),
+      node('D2', 'Frost Lock', 'When the enemy has {ascFrostLock}+ Chill after your chain, they can\'t Charge next turn.', 'ascFrostLock', 'Chill needed', 3, 1),
+      capstone('D3', 'Glacial Prison', 'Frozen lasts {ascGlacialPrison} more turn: the enemy can\'t Strike for longer.', 'Freeze needs {ascGlacialPrisonCost} more Chill.', [
+        ['ascGlacialPrison', 'turns +', 1],
+        ['ascGlacialPrisonCost', 'Cost: stacks to freeze +', 1],
+      ]),
     ],
   },
 }

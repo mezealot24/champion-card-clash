@@ -1,7 +1,7 @@
 // Loadout screen: Sigil I · Oath (Boon + Cost), Sigil II · Minor, and the Ascendancy tree of the picked Style.
 // Mockup: Game Designer thread (claude.ai/artifact/QWLfQ4bSXFxz6BMXUwQAB6). All open in Beta, saved per Champion.
 import { useState } from 'react'
-import { MINORS, OATHS, TREES, validAsc, type PieceData } from '../../engine'
+import { MINORS, OATHS, TREES, treePoints, treeShape, validAsc, type PieceData } from '../../engine'
 import { champColor } from '../fighters'
 import { Portrait } from '../select/Portrait'
 import { loadLoadout, saveLoadout, type SavedLoadout } from './loadout'
@@ -18,7 +18,9 @@ export function LoadoutBuilder(props: {
   fill: (text: string, group: string) => string
   onClose: () => void
 }) {
-  const { champ, style, points, fill } = props
+  const { champ, style, fill } = props
+  const points = treePoints(style, props.points)
+  const { letters, depth } = treeShape(style)
   const [l, setL] = useState<SavedLoadout>(() => loadLoadout(champ))
   const oaths = OATHS[champ] ?? []
   const tree = style ? TREES[style] : undefined
@@ -31,9 +33,9 @@ export function LoadoutBuilder(props: {
     // untaking a node also drops the ones below it in that branch
     if (taken.includes(id)) return setAsc(taken.filter((x) => !(x[0] === b && Number(x[1]) >= n)))
     const next = [...taken, id]
-    if (validAsc(next, points)) setAsc(next)
+    if (validAsc(next, points, style)) setAsc(next)
   }
-  const nodeState = (id: string) => (taken.includes(id) ? 'taken' : validAsc([...taken, id], points) ? 'avail' : 'locked')
+  const nodeState = (id: string) => (taken.includes(id) ? 'taken' : validAsc([...taken, id], points, style) ? 'avail' : 'locked')
 
   const pick = (p: PieceData, group: string, on: boolean, onPick: () => void) => (
     <button key={p.id} type="button" className={`lo-opt${on ? ' on' : ''}`} aria-pressed={on} onClick={onPick}>
@@ -81,10 +83,10 @@ export function LoadoutBuilder(props: {
           <p className="lo-note">Pick a Style on the Champion screen to grow its tree.</p>
         ) : (
           <>
-            <p className="lo-note">Take nodes from the top of a branch down. Node 4 is the capstone. Respec is free.</p>
+            <p className="lo-note">Take nodes from the top of a branch down. The last node (★) is the capstone: optional, with a Cost. Respec is free.</p>
             <div className="lo-tree">
               {tree.branches.map((name, bi) => {
-                const b = bi === 0 ? 'A' : 'B'
+                const b = letters[bi]
                 return (
                   <div className="lo-branch" key={b}>
                     <h3>{name}</h3>
@@ -92,21 +94,28 @@ export function LoadoutBuilder(props: {
                       .filter((n) => n.id[0] === b)
                       .map((n) => {
                         const st = nodeState(n.id)
+                        const cap = Number(n.id[1]) === depth
                         return (
                           <button
                             key={n.id}
                             type="button"
-                            className={`lo-node ${st}${n.id[1] === '4' ? ' cap' : ''}`}
+                            className={`lo-node ${st}${cap ? ' cap' : ''}`}
                             aria-pressed={st === 'taken'}
                             aria-disabled={st === 'locked'}
                             onClick={() => toggleNode(n.id)}
                           >
                             <b>
-                              <em className="lo-tier">{n.id[1] === '4' ? '★' : n.id[1]}</em>
+                              <em className="lo-tier">{cap ? '★' : n.id[1]}</em>
                               {n.name}
-                              <i>{n.id[1] === '4' ? 'Capstone' : `T${n.id[1]}`}</i>
+                              <i>{cap ? 'Capstone' : `T${n.id[1]}`}</i>
                             </b>
                             <span>{fill(n.text, style!)}</span>
+                            {n.cost && (
+                              <span className="lo-cost">
+                                <i>Cost</i>
+                                {fill(n.cost, style!)}
+                              </span>
+                            )}
                           </button>
                         )
                       })}

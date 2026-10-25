@@ -1,6 +1,6 @@
 // Player loadout saved on this device, per Champion (no player accounts yet): Oath, Minor, and Ascendancy nodes per Style.
-// Everything is open in Beta (Q 2026-10-20); points per Style = game_config asc_points (default 5).
-import { MINORS, OATHS, validAsc, type Loadout } from '../../engine'
+// Everything is open in Beta (Q 2026-10-20); points per Style = game_config asc_points (default 5) + the tree's bonusPoints.
+import { MINORS, OATHS, treePoints, validAsc, type Loadout } from '../../engine'
 
 export type SavedLoadout = { oath?: string; minor?: string; asc?: Record<string, string[]> }
 
@@ -38,7 +38,8 @@ export function loadoutFor(champ: string, style: string | undefined, points: num
   const oath = OATHS[champ]?.some((o) => o.id === saved.oath) ? saved.oath : undefined
   const minor = MINORS.some((m) => m.id === saved.minor) ? saved.minor : undefined
   const nodes = style ? (saved.asc?.[style] ?? []) : []
-  const asc = validAsc(nodes, points) ? nodes : []
+  const pts = treePoints(style, points)
+  const asc = validAsc(nodes, pts, style) ? nodes : []
   if (!oath && !minor && !asc.length) return undefined
-  return { oath, minor, asc, points }
+  return { oath, minor, asc, points: pts }
 }
