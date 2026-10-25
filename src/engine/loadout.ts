@@ -107,6 +107,13 @@ function cutNewest(state: GameState, side: Side, n: number, who: string) {
     say(state, side, `${who}: Cut → enemy sends ${lost.def.id} to the deck bottom`)
   }
 }
+/** Juggernaut Momentum is at max, so its Lifesteal is on (Bruiser Style 2) */
+const momentumLifesteal = (state: GameState, side: Side) => (state.players[side].comboData?.conqueror ?? 0) >= num(state, side, 'BR:2', 'conquerorMax')
+/** Quake (Juggernaut capstone) is guarding this turn */
+const quakeOn = (state: GameState, side: Side) => {
+  const from = state.players[side].perkData?.quakeFrom
+  return !!from && state.turn - from < num(state, side, 'BR:2', 'ascQuakeTurns')
+}
 /** Fury is on for this Strike (Bruiser Style 1) */
 const furyOn = (state: GameState, side: Side) => pctHp(state.players[side]) < num(state, side, 'BR:1', 'hpPct')
 
@@ -393,46 +400,266 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
 
+  // ---- Bruiser v2 (design/bruiser-ascendancy-v2-2026-10-25.md): 4 branches × (2 nodes + capstone with a Cost) ----
+  // Fury · Carnage (PoE Berserker: more dmg, more dmg taken)
   'BR:1:A1': (_, k) => ({ tune: (t, v) => add(t, 'BR:1', 'hpPct', v(k)) }),
   'BR:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'BR:1', 'bonusDmg', v(k)) }),
-  'BR:1:A3': (_, k) => ({ tune: (t, v) => add(t, 'BR:1', 'slots', v(k)) }),
-  'BR:1:A4': (amt) => ({
+  'BR:1:A3': (amt) => ({
+    tune: (t) => add(t, 'BR:1', 'slots', 5),
+    // Cost: a negative cut adds dmg to every hit that gets past Block
+    hooks: { hitCut: (state, side) => (furyOn(state, side) ? -amt(state, side) : 0) },
+  }),
+  // Fury · Blood Rite (PoE Berserker Rage)
+  'BR:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'BR', 'perCleanHit', v(k)) }),
+  'BR:1:B2': (amt) => ({
     hooks: {
       beforeHits: (state, side, bonus) => {
-        if (!furyOn(state, side) || pctHp(state.players[side]) >= amt(state, side)) return
-        const f = tuningOf(state, side)['BR:1']
-        for (let i = 0; i < Math.min(f.slots, bonus.length); i++) bonus[i] += f.bonusDmg
-        say(state, side, 'Blood Frenzy: Fury counts twice')
+        const n = Math.min(num(state, side, 'BR:1', 'ascWarCryCap'), Math.floor((state.players[side].res ?? 0) / Math.max(1, amt(state, side))))
+        if (!bonus.length || n <= 0) return
+        bonus[0] += n
+        say(state, side, `War Cry: slot 1 +${n} dmg`)
       },
     },
   }),
-  'BR:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'BR', 'perCleanHit', v(k)) }),
-  'BR:1:B2': (amt) => ({ hooks: { lifesteal: (state, side) => (furyOn(state, side) ? amt(state, side) : 0) } }),
-  'BR:1:B3': (_, k) => ({ setup: (p, v) => addMaxHp(p, v(k)) }),
-  'BR:1:B4': (amt) => ({
+  'BR:1:B3': (_, k) => ({
+    tune: (t, v) => {
+      add(t, 'BR', 'cap', v(k))
+      add(t, 'BR', 'quietLoss', -1_000_000)
+    },
+    hooks: {
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        const n = Math.min(p.hp - 1, Math.floor((p.res ?? 0) / Math.max(1, num(state, side, 'BR:1', 'ascBloodRiteCost'))))
+        if (p.hp <= 0 || n <= 0) return
+        p.hp -= n
+        ;(state.events ??= []).push({ k: 'hp', side, delta: -n })
+        say(state, side, `Blood Rite: ${p.res} Rage burns ${n} HP`)
+      },
+    },
+  }),
+  // Fury · Payback (LoL Sett: left-right punches, stored grit let out in one punch; uses the Rage you already have)
+  'BR:1:C1': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus, _m, _c, chain) => {
+        let ps = 0
+        let hits = 0
+        chain?.forEach((card, i) => {
+          if (card.def.type !== 'P' || ++ps % 2) return
+          bonus[i] += amt(state, side)
+          hits++
+        })
+        if (hits) say(state, side, `One-Two: ${hits} right hook${hits === 1 ? '' : 's'} +${amt(state, side)} dmg`)
+      },
+    },
+  }),
+  'BR:1:C2': (amt) => ({
+    hooks: {
+      afterHits: (state, side, r) => {
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, hitTurn: r.hitsTaken ? state.turn : 0 }
+      },
+      // after this turn's Rage is in, so Rage from being hit counts
+      endTurn: (state, side, action) => {
+        const p = state.players[side]
+        // Wound Up lasts until the end of the next turn
+        p.statuses = p.statuses.filter((s) => s.kind !== 'woundUp')
+        if (action !== 'charge' || p.hp <= 0) return
+        if (p.perkData?.hitTurn === state.turn) {
+          addRes(state, side, num(state, side, 'BR:1', 'ascFlinchRage'))
+          say(state, side, `Wind Up interrupted: Rage ${p.res}`)
+        } else if ((p.res ?? 0) > 0) {
+          p.statuses.push({ kind: 'woundUp', turns: 9999 })
+          say(state, side, '🥊 Wound Up: next Strike is a Payback')
+        }
+      },
+      // S cards were paid before this, so Payback gets the Rage left
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        if (!bonus.length || !p.statuses.some((s) => s.kind === 'woundUp')) return
+        p.statuses = p.statuses.filter((s) => s.kind !== 'woundUp')
+        const spent = p.res ?? 0
+        p.res = 0
+        const n = spent * amt(state, side)
+        bonus[0] += n
+        p.perkData = { ...p.perkData, paybackTurn: state.turn, paybackRage: spent }
+        say(state, side, `🥊 Payback: ${spent} Rage → slot 1 +${n} dmg`)
+      },
+    },
+  }),
+  'BR:1:C3': (amt) => ({
+    tune: (t, v) => add(t, 'BR:1', 'bonusDmg', -v('ascKnockoutCost')),
     hooks: {
       beforeHits: (state, side, _b, _m, _c, _chain, pierce) => {
-        if (!pierce || !furyOn(state, side)) return
-        for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
-        say(state, side, 'Unstoppable: Fury slot 1 ignores Block')
+        const p = state.players[side]
+        if (p.perkData?.paybackTurn !== state.turn || !pierce?.length) return
+        pierce[0] = 1
+        const n = Math.floor(((p.perkData?.paybackRage ?? 0) * amt(state, side)) / 100)
+        if (n > 0) p.statuses.push({ kind: 'shield', turns: 1, n })
+        say(state, side, `Knockout: Payback ignores Block${n > 0 ? `, Shield ${n}` : ''}`)
+      },
+    },
+  }),
+  // Fury · Comeback (Precision ideas: lifesteal, more dmg when behind, heal on a big hit)
+  'BR:1:D1': (amt) => ({ hooks: { lifesteal: (state, side) => (furyOn(state, side) ? amt(state, side) : 0) } }),
+  'BR:1:D2': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        if (state.players[other(side)].hp <= state.players[side].hp) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += amt(state, side)
+        say(state, side, `Underdog: every chain card +${amt(state, side)} dmg`)
+      },
+    },
+  }),
+  'BR:1:D3': (amt) => ({
+    tune: (t, v) => add(t, 'BR:1', 'hpPct', -v('ascRallyCost')),
+    hooks: {
+      strikeStart: (state, side) => {
+        state.players[side].perkData = { ...state.players[side].perkData, foeHpAt: state.players[other(side)].hp }
+      },
+      afterChain: (state, side) => {
+        const p = state.players[side]
+        const foe = state.players[other(side)]
+        const lost = (p.perkData?.foeHpAt ?? foe.hp) - foe.hp
+        if (lost * 100 < amt(state, side) * foe.maxHp) return 0
+        const heal = num(state, side, 'BR:1', 'ascRallyHeal') + Math.floor(((p.maxHp - p.hp) * num(state, side, 'BR:1', 'ascRallyPct')) / 100)
+        const got = styleHeal(state, side, heal)
+        if (got) say(state, side, `Rally: ${lost} dmg dealt, heals ${got}`)
+        return 0
       },
     },
   }),
 
-  'BR:2:A1': (_, k) => ({ setup: (p, v) => (p.comboData = { ...p.comboData, conqueror: v(k) }) }),
-  'BR:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'BR:2', 'conquerorMax', v(k)) }),
-  'BR:2:A3': (_, k) => ({ tune: (t, v) => add(t, 'BR:2', 'omnivampPct', v(k)) }),
-  'BR:2:A4': (_, k) => ({ tune: (t, v) => add(t, 'BR:2', 'tenacityTurns', v(k)) }),
-  'BR:2:B1': (_, k) => ({ tune: (t, v) => add(t, 'BR:2', 'blockLoss', -v(k)) }),
-  'BR:2:B2': (_, k) => ({ setup: (p, v) => addMaxHp(p, v(k)) }),
-  'BR:2:B3': (_, k) => ({ tune: (t, v) => add(t, 'BR:2', 'chargeBreakTakenPct', -v(k)) }),
-  'BR:2:B4': (amt) => ({
+  // Juggernaut · Arena (PoE Gladiator: Block and retaliate)
+  'BR:2:A1': (_, k) => ({ tune: (t, v) => add(t, 'BR:2', 'blockLoss', -v(k)) }),
+  'BR:2:A2': (amt) => ({
     hooks: {
-      beforeHits: (state, side, _b, _m, _c, _chain, pierce) => {
+      afterHits: (state, side, r) => {
+        if (r.attacked && r.hitsBlocked && !r.hitsTaken) state.players[side].perkData = { ...state.players[side].perkData, riposte: 1 }
+      },
+      beforeHits: (state, side, bonus) => {
         const p = state.players[side]
-        if (!pierce || (p.comboData?.conqueror ?? 0) < tuningOf(state, side)['BR:2'].conquerorMax) return
-        for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
-        say(state, side, 'Steamroller: slot 1 ignores Block')
+        if (!p.perkData?.riposte || !bonus.length) return
+        bonus[0] += amt(state, side)
+        p.perkData = { ...p.perkData, riposte: 0 }
+        say(state, side, `Riposte: slot 1 +${amt(state, side)} dmg`)
+      },
+    },
+  }),
+  'BR:2:A3': (amt) => ({
+    tune: (t, v) => add(t, 'BR:2', 'omnivampPct', -v('ascRetaliationCost')),
+    hooks: {
+      afterHits: (state, side, r) => {
+        const p = state.players[side]
+        const max = tuningOf(state, side)['BR:2'].conquerorMax
+        const was = p.comboData?.conqueror ?? 0
+        const n = Math.min(max, was + Math.min(amt(state, side), r.hitsBlocked))
+        if (n === was) return
+        p.comboData = { ...p.comboData, conqueror: n }
+        say(state, side, `Retaliation: Momentum ${n}/${max}`)
+      },
+    },
+  }),
+  // Juggernaut · Verdict (PoE Slayer: finish them)
+  'BR:2:B1': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        if (pctHp(state.players[other(side)]) > RED_PCT) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += amt(state, side)
+        say(state, side, `Cleave: every chain card +${amt(state, side)} dmg`)
+      },
+    },
+  }),
+  'BR:2:B2': (amt) => ({
+    hooks: {
+      strikeStart: (state, side) => {
+        state.players[side].perkData = { ...state.players[side].perkData, foeRedAt: pctHp(state.players[other(side)]) <= RED_PCT ? 1 : 0 }
+      },
+      afterChain: (state, side) => {
+        const p = state.players[side]
+        const foe = state.players[other(side)]
+        if (p.perkData?.foeRedAt || foe.hp <= 0 || pctHp(foe) > RED_PCT || !once(p, 'bloodhound')) return 0
+        const max = tuningOf(state, side)['BR:2'].conquerorMax
+        const n = Math.min(max, (p.comboData?.conqueror ?? 0) + amt(state, side))
+        p.comboData = { ...p.comboData, conqueror: n }
+        say(state, side, `Bloodhound: enemy in the red, Momentum ${n}/${max}`)
+        return 0
+      },
+    },
+  }),
+  'BR:2:B3': (amt) => ({
+    tune: (t, v) => add(t, 'BR:2', 'conquerorMax', v('ascVerdictCost')),
+    hooks: {
+      afterChain: (state, side) => {
+        const p = state.players[side]
+        const foe = state.players[other(side)]
+        if ((p.comboData?.conqueror ?? 0) < tuningOf(state, side)['BR:2'].conquerorMax) return 0
+        if (foe.hp <= 0 || foe.hp * 100 > amt(state, side) * foe.maxHp) return 0
+        const before = foe.hp
+        foe.hp = 0
+        ;(state.events ??= []).push({ k: 'hp', side: other(side), delta: -before })
+        for (const h of hooksOf(foe)) h.onHpLoss?.(state, other(side))
+        say(state, side, `⚖ Final Verdict: enemy at ${before} HP is finished`)
+        return 0
+      },
+    },
+  }),
+  // Juggernaut · Hunger (PoE Slayer: Leech)
+  'BR:2:C1': (_, k) => ({ tune: (t, v) => add(t, 'BR:2', 'omnivampPct', v(k)) }),
+  'BR:2:C2': (amt) => ({ hooks: { hitCut: (state, side) => (momentumLifesteal(state, side) ? amt(state, side) : 0) } }),
+  'BR:2:C3': (amt) => ({
+    setup: (p, v) => addMaxHp(p, -v('ascInsatiableCost')),
+    hooks: {
+      // only below max: at max the Style's own Lifesteal is on
+      lifesteal: (state, side) => {
+        const n = state.players[side].comboData?.conqueror ?? 0
+        const f = tuningOf(state, side)['BR:2']
+        return n >= amt(state, side) && n < f.conquerorMax ? f.omnivampPct : 0
+      },
+    },
+  }),
+  // Juggernaut · Bulwark (Resolve ideas: plating, a regular heal that grows Max HP, a shockwave at full power)
+  'BR:2:D1': (amt) => ({
+    hooks: {
+      afterHits: (state, side, r) => {
+        if (r.hitsTaken) state.players[side].perkData = { ...state.players[side].perkData, platingTurn: state.turn + 1 }
+      },
+      hitCut: (state, side) => (state.players[side].perkData?.platingTurn === state.turn ? amt(state, side) : 0),
+    },
+  }),
+  'BR:2:D2': (amt) => ({
+    hooks: {
+      afterChain: (state, side) => {
+        const p = state.players[side]
+        if (p.hp <= 0 || state.turn - (p.perkData?.gripAt ?? 0) < amt(state, side)) return 0
+        const grown = p.perkData?.gripHp ?? 0
+        const add = Math.max(0, Math.min(num(state, side, 'BR:2', 'ascIronGripHp'), num(state, side, 'BR:2', 'ascIronGripCap') - grown))
+        p.maxHp += add
+        p.perkData = { ...p.perkData, gripAt: state.turn, gripHp: grown + add }
+        const got = styleHeal(state, side, num(state, side, 'BR:2', 'ascIronGripHeal'))
+        say(state, side, `Iron Grip: heals ${got}${add ? `, Max HP +${add}` : ''}`)
+        return 0
+      },
+    },
+  }),
+  'BR:2:D3': (amt) => ({
+    tune: (t) => add(t, 'BR:2', 'tenacityTurns', -1_000_000),
+    hooks: {
+      // after the Style's strikeStart, which marks the turn Momentum hit max
+      strikeStart: (state, side) => {
+        const p = state.players[side]
+        if (p.styleData?.tenacityFrom === state.turn) {
+          p.perkData = { ...p.perkData, quakeFrom: state.turn }
+          say(state, side, `Quake: hits deal ${amt(state, side)} less for ${num(state, side, 'BR:2', 'ascQuakeTurns')} turns`)
+        }
+      },
+      hitCut: (state, side) => (quakeOn(state, side) ? amt(state, side) : 0),
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        const from = p.perkData?.quakeFrom
+        if (!from || state.turn - from !== num(state, side, 'BR:2', 'ascQuakeTurns') - 1 || p.hp <= 0) return
+        const n = num(state, side, 'BR:2', 'ascQuakeDmg')
+        hurt(state, other(side), n)
+        say(state, side, `Quake: the enemy loses ${n} HP`)
       },
     },
   }),

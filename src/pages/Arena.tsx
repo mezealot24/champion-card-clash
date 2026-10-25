@@ -737,6 +737,7 @@ function statusChip(s: Status, frozen: boolean): Chip {
     : s.kind === 'deathMark' ? ['💀 Mark of Assassin', 'debuff', 'Every Strike against you bursts for extra damage, even through Block.']
     : s.kind === 'ignite' ? [`🔥 Ignite ${n}`, 'debuff', `Burning (${n} stack${n === 1 ? '' : 's'}): you lose HP every turn and your healing is cut.`]
     : s.kind === 'venom' ? [`🐍 Venom ${n}`, 'debuff', `Poisoned (${n} stack${n === 1 ? '' : 's'}): you lose 1 HP per stack at the end of every turn.`]
+    : s.kind === 'woundUp' ? ['🥊 Wound Up', 'buff', 'Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left as extra damage.']
     : s.kind === 'chill' ? [`❄ Chill ${n}`, 'debuff', `Chilled (${n} stack${n === 1 ? '' : 's'}): your damage is cut for each stack.`]
     : [s.kind, 'debuff', s.kind]
   return { label, tone, tip: tip + turnsLeft(s) }

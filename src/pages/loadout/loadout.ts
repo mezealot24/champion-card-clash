@@ -1,9 +1,10 @@
 // Player loadout saved on this device, per Champion (no player accounts yet): Oath and Ascendancy nodes per Style.
-// A Minor saved before 2026-10-25 is dropped (Sigil II is off).
+// A Minor saved before 2026-10-25 is dropped (Sigil II is off). A tree saved for an older rev of its Style (TreeData.rev,
+// e.g. Bruiser v2) starts empty.
 // Everything is open in Beta (Q 2026-10-20); points per Style = game_config asc_points (default 5) + the tree's bonusPoints.
-import { OATHS, treePoints, validAsc, type Loadout } from '../../engine'
+import { OATHS, TREES, treePoints, validAsc, type Loadout } from '../../engine'
 
-export type SavedLoadout = { oath?: string; minor?: string; asc?: Record<string, string[]> }
+export type SavedLoadout = { oath?: string; minor?: string; asc?: Record<string, string[]>; ascRev?: Record<string, number> }
 
 export const DEFAULT_ASC_POINTS = 5
 
@@ -19,13 +20,22 @@ export function loadLoadout(champ: string): SavedLoadout {
   if (mem.has(champ)) return mem.get(champ)!
   try {
     const raw = JSON.parse(localStorage.getItem(key(champ)) ?? '{}') as SavedLoadout
-    return raw && typeof raw === 'object' ? raw : {}
+    return raw && typeof raw === 'object' ? dropOldTrees(raw) : {}
   } catch {
     return {}
   }
 }
 
-export function saveLoadout(champ: string, l: SavedLoadout) {
+/** Trees saved for an older rev of their Style are dropped (their node ids now mean other nodes). */
+export function dropOldTrees(l: SavedLoadout): SavedLoadout {
+  if (!l.asc) return l
+  const asc = Object.fromEntries(Object.entries(l.asc).filter(([style]) => (TREES[style]?.rev ?? 0) === (l.ascRev?.[style] ?? 0)))
+  return { ...l, asc }
+}
+
+export function saveLoadout(champ: string, saved: SavedLoadout) {
+  const ascRev = Object.fromEntries(Object.keys(saved.asc ?? {}).flatMap((style) => (TREES[style]?.rev ? [[style, TREES[style].rev!]] : [])))
+  const l = { ...saved, ascRev }
   mem.set(champ, l)
   try {
     localStorage.setItem(key(champ), JSON.stringify(l))

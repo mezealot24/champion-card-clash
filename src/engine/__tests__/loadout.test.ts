@@ -43,11 +43,12 @@ describe('loadout', () => {
     // Mage v2: 4 branches (A-D) × 3 nodes, 5 + 1 points
     expect(treePoints('MG:1', 5)).toBe(6)
     expect(treePoints('TK:1', 5)).toBe(6)
-    expect(treePoints('BR:1', 5)).toBe(5)
+    expect(treePoints('BR:1', 5)).toBe(6)
     expect(validAsc(['A1', 'A2', 'A3', 'D1', 'D2', 'D3'], 6, 'MG:2')).toBe(true)
     expect(validAsc(['A1', 'A2', 'A3', 'A4'], 6, 'MG:2')).toBe(false)
     expect(validAsc(['C1', 'D1'], 6, 'TK:1')).toBe(true)
-    expect(validAsc(['C1', 'D1'], 6, 'BR:1')).toBe(false)
+    expect(validAsc(['C1', 'D1'], 6, 'BR:1')).toBe(true)
+    expect(validAsc(['A1', 'A2', 'A3', 'A4'], 6, 'BR:2')).toBe(false)
     const r = randomLoadout('MG', 'MG:1', 5, () => 0.99)
     expect(r.asc?.length).toBe(6)
     // an illegal tree is ignored, not half-applied
