@@ -1,4 +1,4 @@
-// Loadout screen: one Sigil (the Champion's Oath: Boon + Cost) and the Ascendancy tree of the picked Style.
+// Loadout screen: one Sigil (the Champion's Oath, no Cost) and the Ascendancy tree of the picked Style.
 // Q 2026-10-25: Sigil II · Minor is off (the engine still knows the Minors, nothing offers them).
 // Mockup: Game Designer thread (claude.ai/artifact/QWLfQ4bSXFxz6BMXUwQAB6). All open in Beta, saved per Champion.
 import { useState } from 'react'
@@ -133,7 +133,7 @@ export function LoadoutBuilder(props: {
 
       <section className="box">
         <h2>
-          Sigil · Oath <span>{props.champName} only · Boon + Cost</span>
+          Sigil · Oath <span>{props.champName} only · pick one</span>
         </h2>
         <div className="lo-opts">
           {oaths.map((o) => pick(o, champ, l.oath === o.id, () => setL({ ...l, oath: l.oath === o.id ? undefined : o.id })))}
