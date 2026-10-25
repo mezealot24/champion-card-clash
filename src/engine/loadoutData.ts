@@ -1,5 +1,5 @@
 // Loadout content (design/customization-options-2026-10-18.md): Sigil · Oath (per Champion, no Cost since Q 2026-10-25),
-// Sigil II · Minor (shared, small; off in the UI since 2026-10-25) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down; Mage and Tank: 4 branches × 3).
+// Sigil II · Minor (shared, small; off in the UI since 2026-10-25) and the Ascendancy tree of each Style (2 branches × 4 nodes, top-down; Mage, Tank, Assassin: 4 branches × 3).
 // Names and numbers started as the Game Designer mockup's placeholders; nodes the engine can't do cheaply were swapped
 // for ones it can. Every number is a tuning field (Admin): Oaths in the Champion's class group, nodes in their Style's
 // group, Minors in game_config (minor_* keys). Text says {key} for its own group's numbers, like Style text.
@@ -84,8 +84,8 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
 })
 
 /**
- * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage, Tank: A1..D3); take them top-down in a branch, the last node = capstone.
- * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank v2: named asc keys).
+ * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage, Tank, Assassin: A1..D3); take them top-down in a branch, the last node = capstone.
+ * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank / Assassin v2: named asc keys).
  */
 export const TREES: Record<string, TreeData> = {
   /**
@@ -189,30 +189,75 @@ export const TREES: Record<string, TreeData> = {
       node('B4', 'Steamroller', 'At max stacks, chain slot 1 ignores Block.', 'ascB4', 'slots that ignore Block', 1, 0, 5),
     ],
   },
+  /**
+   * Assassin v2 (Q 2026-10-25, design/assassin-ascendancy-v2-2026-10-25.md): same shape as Mage / Tank v2, from PoE
+   * Shadow (Assassin, Trickster, Saboteur). Everything that stacks has a cap (Hoarfrost lesson).
+   */
   'AS:1': {
-    branches: ['Overdrive', 'Acceleration'],
+    branches: ['Overdrive', 'Acceleration', 'Shadowstep', 'Sabotage'],
+    depth: 3,
+    bonusPoints: 1,
     nodes: [
-      node('A1', 'Hair Trigger', 'Overdrive needs {ascA1} fewer chain card.', 'ascA1', 'min chain −', 1),
-      node('A2', 'Redline', 'Overdrive +{ascA2} dmg per Energy.', 'ascA2', 'dmg per Energy +', 1),
-      node('A3', 'Killer Instinct', 'Mark of Assassin burst +{ascA3}%.', 'ascA3', 'burst % +', 10),
-      node('A4', 'Afterimage', 'After an Overdrive Strike, gain Parry {ascA4} for the next turn.', 'ascA4', 'Parry', 2),
-      node('B1', 'Quick Hands', 'Acceleration draws {ascB1} more.', 'ascB1', 'draw +', 1),
-      node('B2', 'Quick Start', 'Start with {ascB2} more card on the Field.', 'ascB2', 'cards at start +', 1),
-      node('B3', 'Overflow', 'Energy cap +{ascB3}.', 'ascB3', 'Energy cap +', 1),
-      node('B4', 'Blur', 'After Strike meets Strike, your next Block stops {ascB4} more hits.', 'ascB4', 'Block stops +', 2),
+      node('A1', 'Redline', 'Overdrive +{ascRedline} dmg per Energy.', 'ascRedline', 'dmg per Energy +', 1),
+      node('A2', 'Hair Trigger', 'Overdrive needs {ascHairTrigger} fewer chain card.', 'ascHairTrigger', 'min chain −', 1),
+      capstone('A3', 'Afterburner', 'After an Overdrive Strike, get {ascAfterburner} Energy back at the end of the turn.', 'Acceleration no longer fills your Energy (it still draws).', [
+        ['ascAfterburner', 'Energy back', 2],
+      ]),
+      node('B1', 'Quick Hands', 'Acceleration draws {ascQuickHands} more.', 'ascQuickHands', 'draw +', 1),
+      node('B2', 'Slipstream', 'When Strike meets Strike, hits that reach you deal {ascSlipstream} less dmg.', 'ascSlipstream', 'dmg cut per hit', 2),
+      capstone('B3', 'Mach Speed', "Acceleration also fires when you Strike into the enemy's Charge.", 'Start the match with {ascMachCost} fewer card on your Field.', [
+        ['ascMachCost', 'Cost: cards at start −', 1, 0, 5],
+      ]),
+      node('C1', 'Escape Artist', 'When the enemy Strikes and your Block stops every hit, gain {ascEscapeArtist} Energy.', 'ascEscapeArtist', 'Energy', 1),
+      multi('C2', 'Ghost Veil', 'Each turn no hit reaches you, gain 1 Veil (max {ascVeilMax}). Each Veil: hits that reach you deal {ascVeil} less dmg. A turn hits reach you, all Veil is gone after it.', [
+        ['ascVeil', 'dmg cut per Veil', 1],
+        ['ascVeilMax', 'max Veil', 3, 1],
+      ]),
+      capstone('C3', 'Wraith Form', 'Energy Surge switches on at {ascWraithForm} less Energy than a full bar.', '−{ascWraithFormCost} Max HP.', [
+        ['ascWraithForm', 'Energy less', 1, 0, 2],
+        ['ascWraithFormCost', 'Cost: Max HP −', 20],
+      ]),
+      node('D1', 'Snare', 'When you Charge and the enemy Blocks, Cut their {ascSnare} newest Field card.', 'ascSnare', 'cards Cut', 1, 0, 2),
+      node('D2', 'Tripwire', 'When you Block and the enemy Charges, Cut their {ascTripwire} newest Field card after they draw.', 'ascTripwire', 'cards Cut', 1, 0, 2),
+      capstone('D3', 'Demolition', 'Your Cut cards Cut {ascDemolition} more card (still max 2 Cuts a turn).', 'Your Cut cards deal {ascDemolitionCost} less dmg.', [
+        ['ascDemolition', 'Cut +', 1, 0, 2],
+        ['ascDemolitionCost', 'Cost: Cut card dmg −', 2],
+      ]),
     ],
   },
   'AS:2': {
-    branches: ['Execution', 'Shadow'],
+    branches: ['Execution', 'Crescendo', 'Venom', 'Shadow'],
+    depth: 3,
+    bonusPoints: 1,
     nodes: [
-      node('A1', 'Primed', 'The Critical counter starts at {ascA1}.', 'ascA1', 'counter at start', 1),
-      node('A2', 'Blood Scent', 'Low HP line +{ascA2}%.', 'ascA2', 'HP line % +', 5),
-      node('A3', 'Merciless', 'Critical vs low HP ×{ascA3} more.', 'ascA3', 'multiplier +', 1),
-      node('A4', 'Final Verdict', 'Blocked Criticals deal +{ascA4}% dmg.', 'ascA4', 'blocked dmg % +', 50),
-      node('B1', 'Feint', 'Blocked Criticals deal +{ascB1}% dmg.', 'ascB1', 'blocked dmg % +', 25),
-      node('B2', 'Siphon', 'Each Critical heals {ascB2}.', 'ascB2', 'heal', 5),
-      node('B3', 'Nimble', '+{ascB3} Max HP and start HP.', 'ascB3', 'Max HP +', 10),
-      node('B4', 'Shadow Mark', 'After a Strike with a Critical, your next chain deals +{ascB4} dmg per card.', 'ascB4', 'dmg +', 5),
+      node('A1', 'Blood Scent', 'Low HP line +{ascBloodScent}%.', 'ascBloodScent', 'HP line % +', 5),
+      node('A2', 'Merciless', 'Critical vs low HP ×{ascMerciless} more.', 'ascMerciless', 'multiplier +', 1),
+      capstone('A3', 'Executioner', 'A Critical that leaves the enemy at {ascExecutioner}% Max HP or less finishes them.', 'Criticals vs HP above the low line ×{ascExecutionerCost} less.', [
+        ['ascExecutioner', 'finish at % Max HP', 10, 0, 50],
+        ['ascExecutionerCost', 'Cost: Critical multiplier −', 1],
+      ]),
+      node('B1', 'Primed', 'The Critical counter starts at {ascPrimed}.', 'ascPrimed', 'counter at start', 2),
+      node('B2', 'Off-Beat', 'Each hit your Block stops adds 1 to the Critical counter, up to {ascOffBeat} a turn.', 'ascOffBeat', 'counter + per turn (cap)', 2),
+      capstone('B3', 'Crescendo', 'Critical every {ascCrescendo} fewer attack.', 'Criticals ×{ascCrescendoCost} less (vs low HP too).', [
+        ['ascCrescendo', 'every N −', 1],
+        ['ascCrescendoCost', 'Cost: Critical multiplier −', 1],
+      ]),
+      multi('C1', 'Toxic Strike', 'Each Critical (clean or Blocked) gives the enemy {ascToxic} Venom (max {ascVenomMax}). At the end of every turn they lose 1 HP per Venom, then Venom drops by 1.', [
+        ['ascToxic', 'Venom per Critical', 2],
+        ['ascVenomMax', 'max Venom', 6, 1],
+      ]),
+      multi('C2', 'Virulent', 'While the enemy has {ascVirulentAt}+ Venom, every chain card +{ascVirulent} dmg.', [
+        ['ascVirulent', 'dmg +', 1],
+        ['ascVirulentAt', 'Venom needed', 3, 1],
+      ]),
+      capstone('C3', 'Noxious', 'Venom no longer drops by itself and burns +{ascNoxious} HP per stack.', 'Blocked Criticals deal 0.', [
+        ['ascNoxious', 'burn per stack +', 1],
+      ]),
+      node('D1', 'Feint', 'Blocked Criticals deal +{ascFeint}% dmg.', 'ascFeint', 'blocked dmg % +', 25),
+      node('D2', 'Ghost Dance', "After a Strike with a Critical, gain Parry {ascGhostDance} for the next turn (doesn't stack).", 'ascGhostDance', 'Parry', 1),
+      capstone('D3', 'Unseen Strike', 'Criticals ignore Block.', 'Critical every {ascUnseenCost} more attack.', [
+        ['ascUnseenCost', 'Cost: every N +', 1],
+      ]),
     ],
   },
   /**

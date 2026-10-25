@@ -73,7 +73,9 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   for (const side of SIDES) {
     const p = state.players[side]
     const def = resourceOf(p.championId, tuningOf(state, side))
-    if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) continue
+    // Wraith Form (Assassin Ascendancy): the bar counts as full a little early
+    const less = Math.max(0, ...hooksOf(p).map((h) => h.surgeLess?.(state, side) ?? 0))
+    if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) <= 0 || (p.res ?? 0) < def.cap - less) continue
     const mode = actions[side] === 'block' ? 'A' : actions[side] === 'charge' ? 'B' : 'C'
     if (!SURGE_MODES.includes(mode)) continue
     surge[side] = p.res ?? 0
@@ -85,7 +87,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, shieldHits, vulnPct, chillPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 }, hitsIn }
 
   // Styles that act on the action picked (Molten Shield), before statuses are read
-  for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.actionStart?.(state, side, actions[side])
+  for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.actionStart?.(state, side, actions[side], actions[other(side)])
 
   // Silence: a side Silenced at the start of the turn has no card effects all turn
   for (const side of SIDES) state.players[side].silenced = hasStatus(state, side, 'silence')
@@ -177,16 +179,20 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     p.otherDmg = undefined
   }
   // Dual Strike Styles (Sonic Bliz Acceleration): after resources fill, so a full bar stays full
-  if (actions.p1 === 'strike' && actions.p2 === 'strike') {
-    for (const side of SIDES) {
-      const ds = getStyle(state.players[side].style)?.dualStrike
-      if (!ds) continue
-      const cap = resourceOf(state.players[side].championId, tuningOf(state, side))?.cap ?? 0
-      if (ds.fillRes && state.rules.resources) addRes(state, side, cap)
-      const draw = ds.draw?.(tuningOf(state, side)) ?? 0
-      const n = draw ? drawCards(state, side, draw) : 0
-      log(state, `${side} Acceleration (Dual Strike): ${ds.fillRes ? 'Energy full, ' : ''}draws ${n}`)
-    }
+  // Mach Speed (Ascendancy): also when this side Strikes into a Charge
+  for (const side of SIDES) {
+    if (actions[side] !== 'strike') continue
+    const hooks = hooksOf(state.players[side])
+    const enemy = actions[other(side)]
+    if (enemy !== 'strike' && !(enemy === 'charge' && hooks.some((h) => h.dualOnCharge))) continue
+    const ds = getStyle(state.players[side].style)?.dualStrike
+    if (!ds) continue
+    const fill = ds.fillRes && !hooks.some((h) => h.noDualFill)
+    const cap = resourceOf(state.players[side].championId, tuningOf(state, side))?.cap ?? 0
+    if (fill && state.rules.resources) addRes(state, side, cap)
+    const draw = ds.draw?.(tuningOf(state, side)) ?? 0
+    const n = draw ? drawCards(state, side, draw) : 0
+    log(state, `${side} Acceleration (${enemy === 'strike' ? 'Dual Strike' : 'Mach Speed'}): ${fill ? 'Energy full, ' : ''}draws ${n}`)
   }
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.endTurn?.(state, side, actions[side], actions[other(side)])
   // Ignite burns at the end of every turn it's on (Pyromancer)

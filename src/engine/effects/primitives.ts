@@ -3,7 +3,8 @@
 import { addRes, resourceOf } from '../resources'
 import { tuningOf } from '../tuning'
 import { drawCards, handMaxOf, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
-import { addChill, addIgnite, chillStacks, getStyle, igniteBurn, igniteStacks } from '../styles'
+import { addChill, addIgnite, chillStacks, getStyle, hooksOf, igniteBurn, igniteStacks } from '../styles'
+import { CUT_CAP } from '../types'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond, HitIn } from './types'
 
@@ -192,8 +193,7 @@ export const steal: Act = (ctx) => {
 
 /** Which opponent Field card a Cut takes: oldest (slot 1), newest (last slot), or the one in this card's slot. */
 export type CutWhich = 'oldest' | 'newest' | 'facing'
-/** A side loses at most this many Field cards to Cut effects per turn (Claude default 2026-10-16). Charge break doesn't count. */
-export const CUT_CAP = 2
+export { CUT_CAP } from '../types'
 
 /**
  * Cut (Assassin, Q 2026-10-16): the opponent discards n cards from their Field, as the Field is now.
@@ -203,7 +203,8 @@ export const cut =
   (which: CutWhich, n: number): Act =>
   (ctx) => {
     const foe = ctx.state.players[ctx.enemy]
-    for (let k = 0; k < n; k++) {
+    const more = hooksOf(ctx.state.players[ctx.self]).reduce((t, h) => t + (h.cutMore?.(ctx.state, ctx.self) ?? 0), 0) // Demolition
+    for (let k = 0; k < n + more; k++) {
       if ((foe.cutTaken ?? 0) >= CUT_CAP) {
         log(ctx.state, `${ctx.card.def.id}: already Cut ${CUT_CAP} cards this turn`)
         return

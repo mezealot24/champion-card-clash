@@ -109,7 +109,7 @@ export type StyleDef = {
   /** extra cards a Charge that isn't broken draws */
   chargeDraw?: number
   /** right after actions are revealed, before statuses are read or tick (e.g. Molten Shield on Block) */
-  actionStart?: (state: GameState, side: Side, action: Action) => void
+  actionStart?: (state: GameState, side: Side, action: Action, enemyAction?: Action) => void
   /** last thing in the turn, before the winner check (action = what this side played) */
   endTurn?: (state: GameState, side: Side, action: Action, enemyAction?: Action) => void
   /** right after this side lost HP from anything (hits, effects, burns); may change p.hp (e.g. Frozen Tomb keeps 1 HP) */
@@ -125,6 +125,14 @@ export type StyleDef = {
   hitCut?: (state: GameState, side: Side) => number
   /** extra cards a Charge that isn't broken draws, decided per turn */
   extraChargeDraw?: (state: GameState, side: Side) => number
+  /** Energy Surge switches on at this much less than a full bar (Wraith Form) */
+  surgeLess?: (state: GameState, side: Side) => number
+  /** Acceleration (dualStrike) draws but doesn't fill the bar (Afterburner's Cost) */
+  noDualFill?: boolean
+  /** Acceleration also fires when this side Strikes into a Charge (Mach Speed) */
+  dualOnCharge?: boolean
+  /** this side's Cut effects Cut n more cards (still within CUT_CAP a turn) */
+  cutMore?: (state: GameState, side: Side) => number
 }
 
 /** A Style or loadout piece that acts in the game: same hooks. Loadout pieces register here (engine/loadout.ts). */
@@ -165,16 +173,16 @@ function infuseChain(state: GameState, side: Side, r: ChainReport, element: stri
 /** Titan Bloom: +1 dmg per hpPerDmg (20) Max HP grown */
 export const overgrowthDmg = (p: PlayerState, t: Tuning) => Math.floor((p.styleData?.grown ?? 0) / t['TK:2'].hpPerDmg)
 
-const DEBUFF_KINDS = ['ignite', 'chill', 'frozen', 'silence', 'skillSilence', 'noBlock', 'noCharge', 'noStrike', 'vulnerable', 'deathMark']
+const DEBUFF_KINDS = ['ignite', 'chill', 'frozen', 'silence', 'skillSilence', 'noBlock', 'noCharge', 'noStrike', 'vulnerable', 'deathMark', 'venom']
 /** Is this status a debuff (harmful, put on by the enemy)? Block − counts; Block + doesn't. */
 export const isDebuff = (s: PlayerState['statuses'][number]) => DEBUFF_KINDS.includes(s.kind) || (s.kind === 'blockPlus' && (s.n ?? 0) < 0)
 
-/** Debuff stacks on a side: Ignite / Chill count each stack, every other harmful status counts 1 (Frozen covers its noStrike). */
+/** Debuff stacks on a side: Ignite / Chill / Venom count each stack, every other harmful status counts 1 (Frozen covers its noStrike). */
 export function debuffStacks(p: PlayerState): number {
   let n = 0
   for (const s of p.statuses) {
     if (!isDebuff(s)) continue
-    if (s.kind === 'ignite' || s.kind === 'chill') n += s.n ?? 0
+    if (s.kind === 'ignite' || s.kind === 'chill' || s.kind === 'venom') n += s.n ?? 0
     else if (s.kind !== 'noStrike' || !p.statuses.some((x) => x.kind === 'frozen')) n++
   }
   return n

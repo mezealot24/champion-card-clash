@@ -3,11 +3,11 @@
 // A piece changes this player's own numbers (deltas on their tuning copy), sets them up at the start, and/or hooks
 // into the turn like a Style (StyleDef hooks, registered in PERK_HOOKS). Pieces never touch the other player's numbers.
 import { MINORS, OATHS, TREES } from './loadoutData'
-import { resourceOf } from './resources'
+import { addRes, resourceOf } from './resources'
 import { addIgnite, chillStacks, debuffStacks, hooksOf, igniteStacks, isDebuff, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
 import { fieldsOf, tuningOf, type Tuning, type TuningGroup } from './tuning'
 import type { GameState, PlayerState, Side } from './types'
-import { other } from './types'
+import { CUT_CAP, other } from './types'
 
 /** What a player brings: Oath id, Minor id, Ascendancy node ids of the Style they play ("A1".."B4"), points they may spend. */
 export type Loadout = { oath?: string; minor?: string; asc?: string[]; points?: number }
@@ -18,6 +18,8 @@ export const RED_PCT = 30
 type Piece = {
   /** change this player's numbers (t is their own copy) */
   tune?: (t: Tuning, v: (key: string) => number, champ: string) => void
+  /** like tune, after every piece's tune (a Cost that must win over other nodes) */
+  lastTune?: (t: Tuning, v: (key: string) => number, champ: string) => void
   /** once at the start: HP, Field size, costs, starting statuses */
   setup?: (p: PlayerState, v: (key: string) => number) => void
   /** acts during the game like a Style */
@@ -81,6 +83,30 @@ const freshFreeze = (state: GameState, side: Side, bit: number) => {
 }
 /** Endurance stacks (Tank Lifeline v2) */
 const endurance = (p: PlayerState) => p.perkData?.endurance ?? 0
+/** Fatal Rhythm nodes: remember this turn's Critical count (Style beforeHits runs first, so crit is filled) */
+const critSeen: NonNullable<StyleDef['beforeHits']> = (state, side, _b, _m, crit) => {
+  const p = state.players[side]
+  p.perkData = { ...p.perkData, critTurn: crit.size ? state.turn : 0, critN: crit.size }
+}
+const critThisTurn = (state: GameState, side: Side) => state.players[side].perkData?.critTurn === state.turn
+/** a card whose effect has a Cut in it (Assassin Cut cards) */
+const isCutCard = (spec: unknown) => !!spec && JSON.stringify(spec).includes('"a":"cut"')
+/** Sabotage: Cut the enemy's newest Field cards, within the per-turn Cut cap (like the Cut primitive, no draw) */
+function cutNewest(state: GameState, side: Side, n: number, who: string) {
+  const foe = state.players[other(side)]
+  for (let k = 0; k < n; k++) {
+    if ((foe.cutTaken ?? 0) >= CUT_CAP || !foe.hand.length) return
+    const i = foe.hand.length - 1
+    const lost = foe.hand.splice(i, 1)[0]
+    foe.cutTaken = (foe.cutTaken ?? 0) + 1
+    ;(foe.discarded ??= []).push({ card: lost, slot: i + 1, reason: 'Cut' })
+    ;(state.events ??= []).push({ k: 'discard', side: other(side), uid: lost.uid, reason: 'Cut' })
+    const to = lost.owner ?? other(side)
+    lost.owner = undefined
+    state.players[to].deck.push(lost)
+    say(state, side, `${who}: Cut → enemy sends ${lost.def.id} to the deck bottom`)
+  }
+}
 /** Fury is on for this Strike (Bruiser Style 1) */
 const furyOn = (state: GameState, side: Side) => pctHp(state.players[side]) < num(state, side, 'BR:1', 'hpPct')
 
@@ -409,58 +435,185 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
 
-  'AS:1:A1': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'minChain', -v(k)) }),
-  'AS:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'dmgPerEnergy', v(k)) }),
-  'AS:1:A3': (_, k) => ({ tune: (t, v) => add(t, 'AS', 'markBurstPct', v(k)) }),
-  'AS:1:A4': (amt) => ({
+  // ---- Assassin v2 (design/assassin-ascendancy-v2-2026-10-25.md): 4 branches × (2 nodes + capstone with a Cost) ----
+  // Sonic Bliz · Overdrive
+  'AS:1:A1': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'dmgPerEnergy', v(k)) }),
+  'AS:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'minChain', -v(k)) }),
+  'AS:1:A3': (amt) => ({
     hooks: {
-      afterChain: (state, side) => {
-        const p = state.players[side]
-        if (p.styleData?.odTurn !== state.turn) return 0
-        // statuses tick at the start of a turn: 2 = it guards next turn's hits
-        p.statuses.push({ kind: 'parry', turns: 2, n: amt(state, side) })
-        say(state, side, `Afterimage: Parry ${amt(state, side)} next turn`)
-        return 0
+      noDualFill: true, // Cost: Acceleration still draws but fills no Energy
+      endTurn: (state, side) => {
+        if (state.players[side].styleData?.odTurn !== state.turn || amt(state, side) <= 0) return
+        addRes(state, side, amt(state, side))
+        say(state, side, `Afterburner: Energy ${state.players[side].res ?? 0}`)
       },
     },
   }),
+  // Sonic Bliz · Acceleration
   'AS:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'dualDraw', v(k)) }),
-  'AS:1:B2': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'startDraw', v(k)) }),
-  'AS:1:B3': (_, k) => ({ tune: (t, v) => add(t, 'AS', 'cap', v(k)) }),
-  'AS:1:B4': (amt) => ({
+  'AS:1:B2': (amt) => ({
+    hooks: {
+      actionStart: (state, side, action, enemyAction) => {
+        state.players[side].perkData = { ...state.players[side].perkData, slip: action === 'strike' && enemyAction === 'strike' ? state.turn : 0 }
+      },
+      hitCut: (state, side) => (state.players[side].perkData?.slip === state.turn ? amt(state, side) : 0),
+    },
+  }),
+  'AS:1:B3': (_, k) => ({
+    tune: (t, v) => add(t, 'AS:1', 'startDraw', -v(k)),
+    hooks: { dualOnCharge: true },
+  }),
+  // Sonic Bliz · Shadowstep (PoE Trickster)
+  'AS:1:C1': (amt) => ({
+    hooks: {
+      afterHits: (state, side, r) => {
+        if (!r.attacked || r.hitsTaken > 0 || !r.hitsBlocked || amt(state, side) <= 0) return
+        addRes(state, side, amt(state, side))
+        say(state, side, `Escape Artist: +${amt(state, side)} Energy`)
+      },
+    },
+  }),
+  'AS:1:C2': (amt) => ({
+    hooks: {
+      hitCut: (state, side) => (state.players[side].perkData?.veil ?? 0) * amt(state, side),
+      afterHits: (state, side, r) => {
+        const p = state.players[side]
+        const had = p.perkData?.veil ?? 0
+        const n = r.hitsTaken > 0 ? 0 : Math.min(num(state, side, 'AS:1', 'ascVeilMax'), had + 1)
+        if (n === had) return
+        p.perkData = { ...p.perkData, veil: n }
+        say(state, side, n ? `Ghost Veil: Veil ${n}` : 'Ghost Veil: Veil is gone')
+      },
+    },
+  }),
+  'AS:1:C3': (amt) => ({
+    setup: (p, v) => addMaxHp(p, -v('ascWraithFormCost')),
+    hooks: { surgeLess: (state, side) => amt(state, side) },
+  }),
+  // Sonic Bliz · Sabotage (PoE Saboteur): free Cuts on turns nobody Strikes
+  'AS:1:D1': (amt) => ({
     hooks: {
       endTurn: (state, side, action, enemyAction) => {
-        if (action !== 'strike' || enemyAction !== 'strike' || state.players[side].hp <= 0) return
-        state.players[side].statuses.push({ kind: 'blockPlus', turns: 2, n: amt(state, side) })
-        say(state, side, `Blur: Block next turn stops ${amt(state, side)} more hits`)
+        if (action === 'charge' && enemyAction === 'block') cutNewest(state, side, amt(state, side), 'Snare')
+      },
+    },
+  }),
+  'AS:1:D2': (amt) => ({
+    hooks: {
+      endTurn: (state, side, action, enemyAction) => {
+        if (action === 'block' && enemyAction === 'charge') cutNewest(state, side, amt(state, side), 'Tripwire')
+      },
+    },
+  }),
+  'AS:1:D3': (amt) => ({
+    hooks: {
+      cutMore: (state, side) => amt(state, side),
+      beforeHits: (state, side, bonus, _m, _c, chain) => {
+        const n = num(state, side, 'AS:1', 'ascDemolitionCost')
+        chain?.forEach((c, i) => {
+          if (n > 0 && i < bonus.length && isCutCard(c.def.effectSpec)) bonus[i] -= n
+        })
       },
     },
   }),
 
-  'AS:2:A1': (_, k) => ({ setup: (p, v) => (p.styleData = { ...p.styleData, attacks: v(k) }) }),
-  'AS:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'redHpPct', v(k)) }),
-  'AS:2:A3': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'redCritMult', v(k)) }),
-  'AS:2:A4': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'blockedCritPct', v(k)) }),
-  'AS:2:B1': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'blockedCritPct', v(k)) }),
-  'AS:2:B2': (amt) => ({
+  // Fatal Rhythm · Execution
+  'AS:2:A1': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'redHpPct', v(k)) }),
+  'AS:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'redCritMult', v(k)) }),
+  'AS:2:A3': (amt) => ({
+    tune: (t, v) => add(t, 'AS:2', 'critMult', -v('ascExecutionerCost')),
     hooks: {
-      beforeHits: (state, side, _b, _m, crit) => {
-        if (!crit.size) return
-        const got = styleHeal(state, side, amt(state, side) * crit.size)
-        if (got) say(state, side, `Siphon: Critical heals ${got}`)
+      beforeHits: critSeen,
+      afterChain: (state, side) => {
+        const foe = state.players[other(side)]
+        if (!critThisTurn(state, side) || foe.hp <= 0 || foe.hp * 100 > foe.maxHp * amt(state, side)) return 0
+        hurt(state, other(side), foe.hp)
+        say(state, side, `Executioner: the Critical finishes the enemy`)
+        return 0
       },
     },
   }),
-  'AS:2:B3': (_, k) => ({ setup: (p, v) => addMaxHp(p, v(k)) }),
-  'AS:2:B4': (amt) => ({
+  // Fatal Rhythm · Crescendo
+  'AS:2:B1': (_, k) => ({ setup: (p, v) => (p.styleData = { ...p.styleData, attacks: v(k) }) }),
+  'AS:2:B2': (amt) => ({
     hooks: {
-      beforeHits: (state, side, bonus, _m, crit) => {
+      afterHits: (state, side, r) => {
+        const n = Math.min(amt(state, side), r.hitsBlocked)
+        if (n <= 0) return
         const p = state.players[side]
-        if (p.perkData?.shadowMark) {
-          for (let i = 0; i < bonus.length; i++) bonus[i] += amt(state, side)
-          say(state, side, `Shadow Mark: every chain card +${amt(state, side)} dmg`)
-        }
-        p.perkData = { ...p.perkData, shadowMark: crit.size ? 1 : 0 }
+        p.styleData = { ...p.styleData, attacks: (p.styleData?.attacks ?? 0) + n }
+        say(state, side, `Off-Beat: Critical counter +${n}`)
+      },
+    },
+  }),
+  'AS:2:B3': (_, k) => ({
+    tune: (t, v) => {
+      add(t, 'AS:2', 'every', -v(k))
+      add(t, 'AS:2', 'critMult', -v('ascCrescendoCost'))
+      add(t, 'AS:2', 'redCritMult', -v('ascCrescendoCost'))
+    },
+  }),
+  // Fatal Rhythm · Venom (PoE Assassin poison): a debuff status on the enemy, capped
+  'AS:2:C1': (amt) => ({
+    hooks: {
+      beforeHits: critSeen,
+      afterChain: (state, side) => {
+        const n = (state.players[side].perkData?.critN ?? 0) * amt(state, side)
+        if (!critThisTurn(state, side) || n <= 0) return 0
+        const foe = state.players[other(side)]
+        const max = num(state, side, 'AS:2', 'ascVenomMax')
+        const s = foe.statuses.find((x) => x.kind === 'venom')
+        const now = Math.min(max, (s?.n ?? 0) + n)
+        if (s) s.n = now
+        else foe.statuses.push({ kind: 'venom', turns: 9999, n: now })
+        say(state, side, `Toxic Strike: enemy Venom ${now}/${max}`)
+        return 0
+      },
+      endTurn: (state, side) => {
+        const foe = state.players[other(side)]
+        const s = foe.statuses.find((x) => x.kind === 'venom')
+        if (!s?.n || foe.hp <= 0) return
+        const noxious = state.players[side].perks?.includes('asc:AS:2:C3')
+        const n = s.n * (1 + (noxious ? num(state, side, 'AS:2', 'ascNoxious') : 0))
+        hurt(state, other(side), n)
+        say(state, side, `Venom ${s.n}: enemy loses ${n} HP`)
+        if (!noxious) s.n--
+        if (!s.n) foe.statuses = foe.statuses.filter((x) => x !== s)
+      },
+    },
+  }),
+  'AS:2:C2': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const v = state.players[other(side)].statuses.find((x) => x.kind === 'venom')?.n ?? 0
+        if (v < num(state, side, 'AS:2', 'ascVirulentAt') || amt(state, side) <= 0) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += amt(state, side)
+        say(state, side, `Virulent: every chain card +${amt(state, side)} dmg`)
+      },
+    },
+  }),
+  'AS:2:C3': () => ({ lastTune: (t) => add(t, 'AS:2', 'blockedCritPct', -1_000_000) }), // Cost after every node (Feint too)
+  // Fatal Rhythm · Shadow (PoE Trickster)
+  'AS:2:D1': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'blockedCritPct', v(k)) }),
+  'AS:2:D2': (amt) => ({
+    hooks: {
+      beforeHits: critSeen,
+      afterChain: (state, side) => {
+        if (!critThisTurn(state, side) || amt(state, side) <= 0) return 0
+        // statuses tick at the start of a turn: 2 = it guards next turn's hits only, so it never piles up
+        state.players[side].statuses.push({ kind: 'parry', turns: 2, n: amt(state, side) })
+        say(state, side, `Ghost Dance: Parry ${amt(state, side)} next turn`)
+        return 0
+      },
+    },
+  }),
+  'AS:2:D3': (_, k) => ({
+    tune: (t, v) => add(t, 'AS:2', 'every', v(k)),
+    hooks: {
+      beforeHits: (state, side, _b, _m, crit, _chain, pierce) => {
+        if (!pierce || !crit.size) return
+        for (const i of crit) if (i < pierce.length) pierce[i] = 1
+        say(state, side, 'Unseen Strike: Criticals ignore Block')
       },
     },
   }),
@@ -773,6 +926,7 @@ export function applyLoadout(p: PlayerState, l: Loadout | undefined, gameTuning:
   const at = (tun: Tuning, group: string) => (key: string) => (tun as Record<string, Record<string, number>>)[group]?.[key] ?? 0
   // numbers first (read from the game's numbers so pieces don't feed each other), then the start
   for (const k of keys) PIECES[k].tune?.(t, at(gameTuning, PIECES[k].group), p.championId)
+  for (const k of keys) PIECES[k].lastTune?.(t, at(gameTuning, PIECES[k].group), p.championId)
   p.tuning = t
   for (const k of keys) PIECES[k].setup?.(p, at(t, PIECES[k].group))
   const res = resourceOf(p.championId, t)
