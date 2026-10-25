@@ -35,6 +35,7 @@ export const TUNING_FIELDS = {
     { key: 'perFacing', label: 'Max HP per facing pair', def: 3, min: 0 },
     { key: 'maxHpCap', label: 'Max HP cap', def: 500, min: 1 },
     { key: 'hpPerDmg', label: 'Max HP grown per +1 dmg', def: 20, min: 1 },
+    { key: 'perDebuff', label: 'Max HP per debuff stack (end of turn)', def: 2, min: 0, help: 'Ignite / Chill count each stack; Silence, Frozen, can\'t Block / Charge, Vulnerable, Mark, Block − count 1 each' },
   ],
   // ---- Bruiser ----
   BR: [
@@ -99,8 +100,8 @@ export const TUNING_FIELDS = {
     { key: 'igniteMax', label: 'Ignite max stacks', def: 4, min: 1 },
     { key: 'igniteTurns', label: 'Ignite turns', def: 3, min: 1 },
     { key: 'igniteFlat', label: 'Ignite HP per stack', def: 2, min: 0 },
-    { key: 'ignitePctMaxHp', label: 'Ignite % Max HP per stack', def: 1, min: 0, decimal: true },
-    { key: 'healCutPerStack', label: 'Heal cut % per stack', def: 25, min: 0, max: 100 },
+    { key: 'ignitePctMaxHp', label: 'Ignite % Max HP per stack', def: 0.5, min: 0, decimal: true },
+    { key: 'healCutPerStack', label: 'Heal cut % per stack', def: 10, min: 0, max: 100 },
     { key: 'healCutMax', label: 'Heal cut max %', def: 50, min: 0, max: 100 },
     { key: 'moltenMaxMana', label: 'Molten Shield max Mana', def: 3, min: 0 },
     { key: 'moltenShieldPerMana', label: 'Molten Shield per Mana', def: 5, min: 0 },

@@ -51,23 +51,23 @@ describe('Pyromancer', () => {
     off.players.p1.hand = [skill(5)]
     expect(ignite(resolveTurn(off, { p1: 'strike', p2: 'charge' }))).toBeUndefined()
   })
-  it('Ignite burns 2 HP + 1% Max HP per stack at the end of this turn and the next 2', () => {
+  it('Ignite burns 2 HP + 0.5% Max HP per stack at the end of this turn and the next 2', () => {
     let s = game('MG:1')
     s.players.p2.maxHp = 200
     s.players.p1.hand = [skill(1)]
     const hp = s.players.p2.hp
     s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-    expect(hp - s.players.p2.hp).toBe(1 + 12) // the hit, then 3 burns of 2 + 2
+    expect(hp - s.players.p2.hp).toBe(1 + 9) // the hit, then 3 burns of 2 + 1
     expect(ignite(s)).toBeUndefined()
   })
-  it('heals are cut 25% per stack, at most 50%', () => {
+  it('heals are cut 10% per stack, at most 50%', () => {
     const s = game('MG:1')
     s.players.p2.hp = 50
     s.players.p2.statuses.push({ kind: 'ignite', turns: 3, n: 1 })
-    expect(heal(s, 'p2', 20)).toBe(15)
+    expect(heal(s, 'p2', 20)).toBe(18)
     s.players.p2.statuses[0].n = 4
-    expect(heal(s, 'p2', 20)).toBe(10)
+    expect(heal(s, 'p2', 20)).toBe(12)
   })
   it('Molten Shield: Block spends up to 3 Mana for Shield 5 per Mana; each blocked hit Ignites the attacker', () => {
     const s = game('MG:1')

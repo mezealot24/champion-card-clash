@@ -65,6 +65,18 @@ describe('Titan Bloom', () => {
     s.players.p2.hand = [hit(1), hit(1), hit(1)]
     expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.maxHp).toBe(500)
   })
+
+  it('end of turn: +2 Max HP per debuff stack on you (Q buff 2026-10-25)', () => {
+    const s = game('TK:2', 210, 300)
+    // 3 Ignite stacks + can't Block = 4 stacks
+    s.players.p1.statuses = [{ kind: 'ignite', turns: 3, n: 3 }, { kind: 'noBlock', turns: 2 }]
+    const after = resolveTurn(s, { p1: 'charge', p2: 'charge' }).players.p1
+    expect(after.maxHp).toBe(308)
+    expect(after.styleData?.grown).toBe(8)
+    const clean = game('TK:2', 210, 300)
+    clean.players.p1.statuses = [{ kind: 'shield', turns: 2, n: 10 }, { kind: 'blockPlus', turns: 1, n: 1 }]
+    expect(resolveTurn(clean, { p1: 'charge', p2: 'charge' }).players.p1.maxHp).toBe(300)
+  })
 })
 
 describe('Bruiser Styles', () => {
