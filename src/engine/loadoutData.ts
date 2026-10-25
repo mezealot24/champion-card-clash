@@ -89,6 +89,9 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
  * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage, Tank, Assassin: A1..D3); take them top-down in a branch, the last node = capstone.
  * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank / Assassin v2: named asc keys).
  */
+/** Shown under the Lifeline Style text (Q 2026-10-25): what one Endurance does; numbers filled from TK:1 */
+export const ENDURANCE_TEXT = '⛨ Endurance (from Lifeline Ascendancy): max {ascEnduranceMax}. Each Endurance cuts {ascEnduranceCut} dmg from every hit that reaches you and regens {ascEnduranceRegen}% Max HP a turn, at {ascEndurancePower}% strength (rounded down over all your Endurance). Fades after {ascEnduranceTurns} turns without a new one.'
+
 export const TREES: Record<string, TreeData> = {
   /**
    * Tank v2 (Q 2026-10-25, design/tank-ascendancy-v2-2026-10-25.md): same shape as Mage v2, from PoE Juggernaut

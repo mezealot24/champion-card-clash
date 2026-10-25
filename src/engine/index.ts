@@ -8,4 +8,4 @@ export { compileSpec, type EffectSpec, type EffectRule, type CondSpec, type ActS
 export { RESOURCES, resourceOf, costOf, type ResourceDef } from './resources'
 export { TUNING_FIELDS, TUNING_GROUPS, fieldsOf, DEFAULT_TUNING, resolveTuning, tuningFromRows, tuningOf, rulesFromConfig, RULE_KEYS, tuningErrors, cleanParams, fillText, unknownPlaceholders, type TuningParams, isTuningGroup, type Tuning, type TuningGroup, type TuningOverrides, type TuneField } from './tuning'
 export { applyLoadout, fillAsc, perkKeys, randomLoadout, treePoints, treeShape, validAsc, RED_PCT, type Loadout } from './loadout'
-export { OATHS, MINORS, TREES, LOADOUT_FIELDS, minorConfigKey, type PieceData, type TreeData } from './loadoutData'
+export { OATHS, MINORS, TREES, ENDURANCE_TEXT, LOADOUT_FIELDS, minorConfigKey, type PieceData, type TreeData } from './loadoutData'
