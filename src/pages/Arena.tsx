@@ -736,6 +736,8 @@ function TokenView({ side, tok, playing, locked, foe }: { side: Side; tok: Token
 }
 
 type Tip = { title: string; body: string }
+/** Tank Lifeline Endurance numbers (Ascendancy keys live in the Style's group, untyped) */
+const enduranceNum = (game: GameState, side: Side) => tuningOf(game, side)['TK:1'] as unknown as Record<string, number>
 type Chip = { label: string; tone: 'buff' | 'debuff'; tip: string }
 
 const turnsLeft = (s: Status) => (s.turns > 0 && s.turns < 50 ? `\n${s.turns} turn${s.turns === 1 ? '' : 's'} left.` : '')
@@ -805,7 +807,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
       : []),
     // Tank Lifeline: Endurance stacks (perkData), with their cut / regen
     ...(p.perkData?.endurance
-      ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${tuningOf(game, side)['TK:1'].ascEnduranceMax}`, tone: 'buff' as const, tip: `${p.perkData.endurance} Endurance: hits that reach you deal ${Math.floor((p.perkData.endurance * tuningOf(game, side)['TK:1'].ascEnduranceCut * tuningOf(game, side)['TK:1'].ascEndurancePower) / 100)} less dmg, and you regain ${Math.floor((p.maxHp * p.perkData.endurance * tuningOf(game, side)['TK:1'].ascEnduranceRegen * tuningOf(game, side)['TK:1'].ascEndurancePower) / 10000)} HP at the end of every turn. Fades after ${tuningOf(game, side)['TK:1'].ascEnduranceTurns} turns without a new one.` }]
+      ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${enduranceNum(game, side).ascEnduranceMax}`, tone: 'buff' as const, tip: `${p.perkData.endurance} Endurance: hits that reach you deal ${Math.floor((p.perkData.endurance * enduranceNum(game, side).ascEnduranceCut * enduranceNum(game, side).ascEndurancePower) / 100)} less dmg, and you regain ${Math.floor((p.maxHp * p.perkData.endurance * enduranceNum(game, side).ascEnduranceRegen * enduranceNum(game, side).ascEndurancePower) / 10000)} HP at the end of every turn. Fades after ${enduranceNum(game, side).ascEnduranceTurns} turns without a new one.` }]
       : []),
     ...((p.perkData?.undyingUntil ?? 0) >= game.turn
       ? [{ label: '💀 Undying', tone: 'buff' as const, tip: `Your HP can't drop below 1 until turn ${p.perkData!.undyingUntil}, and every chain card deals bonus dmg. When it ends you heal the bonus dmg that landed.` }]
