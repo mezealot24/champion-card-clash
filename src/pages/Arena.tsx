@@ -750,6 +750,7 @@ function statusChip(s: Status, frozen: boolean): Chip {
     : s.kind === 'parry' ? [`Parry ${n}`, 'buff', `The next ${n} hit${n === 1 ? '' : 's'} that get past your Block deal 0.`]
     : s.kind === 'subZero' ? ['❄ Sub-Zero', 'buff', 'Your next Strike: every clean hit gives the enemy 1 Chill.']
     : s.kind === 'frozenTomb' ? ['🧊 Frozen Tomb', 'buff', "Sealed in ice: you can't Strike or Charge this turn, and you heal."]
+    : s.kind === 'thaw' ? ['💧 Thaw', 'buff', "Just thawed: you can't be Frozen again yet."]
     : s.kind === 'noBlock' ? ['No Block', 'debuff', "You can't Block this turn."]
     : s.kind === 'noStrike' ? (frozen ? ['🧊 Frozen', 'debuff', "Frozen: you can't Strike."] : ['No Strike', 'debuff', "You can't Strike this turn."])
     : s.kind === 'noCharge' ? ['No Charge', 'debuff', "You can't Charge this turn."]

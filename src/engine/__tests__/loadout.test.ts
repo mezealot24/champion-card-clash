@@ -44,7 +44,9 @@ describe('loadout', () => {
     expect(treePoints('MG:1', 5)).toBe(6)
     expect(treePoints('TK:1', 5)).toBe(6)
     expect(treePoints('BR:1', 5)).toBe(6)
-    expect(validAsc(['A1', 'A2', 'A3', 'D1', 'D2', 'D3'], 6, 'MG:2')).toBe(true)
+    expect(validAsc(['A1', 'A2', 'A3', 'D1', 'D2'], 6, 'MG:2')).toBe(true)
+    // Mage: one capstone per tree (Q 2026-10-25)
+    expect(validAsc(['A1', 'A2', 'A3', 'D1', 'D2', 'D3'], 6, 'MG:2')).toBe(false)
     expect(validAsc(['A1', 'A2', 'A3', 'A4'], 6, 'MG:2')).toBe(false)
     expect(validAsc(['C1', 'D1'], 6, 'TK:1')).toBe(true)
     expect(validAsc(['C1', 'D1'], 6, 'BR:1')).toBe(true)
@@ -147,13 +149,10 @@ describe('randomLoadout', () => {
       expect(tuningOf(mg('MG:1', ['C1', 'C2', 'C3']), 'p1')['MG:1'].moltenIgnite).toBe(0)
       expect(mg('MG:1', ['D1', 'D2', 'D3']).players.p1.maxHp).toBe(110)
     })
-    it('Hoarfrost tops Shield up to its cap, as one Shield', () => {
-      let s = mg('MG:2', ['C1'])
-      s.players.p1.statuses = s.players.p1.statuses.filter((x) => x.kind !== 'shield') // no Frost Armor
-      for (let i = 0; i < 12; i++) s = resolveTurn(s, { p1: 'block', p2: 'charge' })
-      const shields = s.players.p1.statuses.filter((x) => x.kind === 'shield')
-      expect(shields.reduce((t, x) => t + (x.n ?? 0), 0)).toBe(24)
-      expect(shields.length).toBe(1)
+    it('Hoarfrost: Frost Armor regrows faster and to a higher cap', () => {
+      const s = mg('MG:2', ['C1'])
+      expect(tuningOf(s, 'p1')['MG:2'].frostArmorRegen).toBe(12)
+      expect(tuningOf(s, 'p1')['MG:2'].frostArmorCap).toBe(56)
     })
   })
 

@@ -17,7 +17,7 @@ type Props = {
 /** The picked Style's tree. Every point must be spent before the next step. */
 export function AscTree({ champ, style, points: base, saved, onChange, fill }: Props & { style: string; points: number }) {
   const points = treePoints(style, base)
-  const { letters, depth } = treeShape(style)
+  const { letters, depth, maxCapstones } = treeShape(style)
   const tree = TREES[style]
   const taken = saved.asc?.[style] ?? []
   const setAsc = (ids: string[]) => onChange({ ...saved, asc: { ...saved.asc, [style]: ids } })
@@ -44,7 +44,7 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
           ))}
         </span>
       </h2>
-      <p className="lo-note">Spend every point. Take nodes from the top of a branch down. The last node (★) is the capstone: optional, with a Cost. Respec is free.</p>
+      <p className="lo-note">Spend every point. Take nodes from the top of a branch down. The last node (★) is the capstone: optional, with a Cost{maxCapstones === 1 ? ', one per tree' : ''}. Respec is free.</p>
       <div className="lo-tree">
         {tree.branches.map((name, bi) => {
           const b = letters[bi]

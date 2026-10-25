@@ -57,8 +57,9 @@ export const MINORS: PieceData[] = [
  * branches: one name per branch, ids A.., B.., C.., D.. in order. depth: nodes per branch (default 4), the last is the capstone.
  * bonusPoints: points this tree gets on top of game_config asc_points (Mage v2: +1, Q 2026-10-25).
  * rev: bump when the nodes change meaning, so trees saved on a device for an older version start empty.
+ * maxCapstones: how many capstones one loadout may take (Mage: 1, Q 2026-10-25, two of them clashed).
  */
-export type TreeData = { branches: string[]; nodes: PieceData[]; depth?: number; bonusPoints?: number; rev?: number }
+export type TreeData = { branches: string[]; nodes: PieceData[]; depth?: number; bonusPoints?: number; rev?: number; maxCapstones?: number }
 
 const node = (id: string, name: string, text: string, key: string, label: string, def: number, min = 0, max?: number): PieceData => ({
   id,
@@ -354,6 +355,7 @@ export const TREES: Record<string, TreeData> = {
     branches: ['Inferno', 'Wildfire', 'Molten Core', 'Phoenix'],
     depth: 3,
     bonusPoints: 1,
+    maxCapstones: 1,
     nodes: [
       node('A1', 'Flashpoint', 'Your cards deal +{ascFlashpoint} dmg for each Ignite stack on the enemy.', 'ascFlashpoint', 'dmg per enemy Ignite', 1),
       node('A2', 'Stockpile', 'Ignite max stacks +{ascStockpile}.', 'ascStockpile', 'max stacks +', 2),
@@ -384,6 +386,7 @@ export const TREES: Record<string, TreeData> = {
     branches: ['Shatter', 'Permafrost', 'Glacier', 'Rime Hex'],
     depth: 3,
     bonusPoints: 1,
+    maxCapstones: 1,
     nodes: [
       node('A1', 'Brittle', 'Your cards deal +{ascBrittle}% dmg for each Chill stack on the enemy.', 'ascBrittle', 'dmg % per enemy Chill', 10),
       node('A2', 'Cold Snap', 'While the enemy is Frozen, your cards deal +{ascColdSnap} dmg.', 'ascColdSnap', 'dmg +', 4),
@@ -397,12 +400,12 @@ export const TREES: Record<string, TreeData> = {
       capstone('B3', 'Eternal Winter', 'Chill never freezes and never runs out: it stacks up to {ascEternalWinter}.', 'No Freeze and no Shatter from Chill (Absolute Zero still freezes).', [
         ['ascEternalWinter', 'max Chill', 6, 1],
       ]),
-      // Hoarfrost tops up to a cap (Q 2026-10-25: uncapped it stacked Shield 8 every Block, nothing got through)
+      // Frost Armor regrows on Block in the base Style now (Q 2026-10-25); Hoarfrost makes it grow faster and higher
       {
         id: 'C1',
         name: 'Hoarfrost',
-        text: 'At the end of every turn you Block, gain Shield {ascHoarfrost}, up to {ascHoarfrostCap} Shield in total.',
-        fields: [f('ascHoarfrost', 'Asc C1 Hoarfrost: Shield', 8), f('ascHoarfrostCap', 'Asc C1 Hoarfrost: Shield cap (total)', 24)],
+        text: 'Frost Armor regrows {ascHoarfrost} more Shield per Block, and its cap is {ascHoarfrostCap} higher.',
+        fields: [f('ascHoarfrost', 'Asc C1 Hoarfrost: regrow per Block +', 4), f('ascHoarfrostCap', 'Asc C1 Hoarfrost: Shield cap +', 16)],
       },
       node('C2', 'Ice Lance', 'While you have Shield, chain slot 1 deals +{ascIceLance} dmg.', 'ascIceLance', 'slot 1 dmg +', 6),
       capstone('C3', 'Avalanche', 'When you Strike, all your Shield breaks into the chain: every card +1 dmg per {ascAvalanche} Shield.', 'Your Shield is gone for that turn\'s hits.', [
@@ -410,7 +413,7 @@ export const TREES: Record<string, TreeData> = {
       ]),
       node('D1', 'Cold Hands', 'When you Freeze the enemy, their {ascColdHands} oldest Field cards go to the bottom of their deck.', 'ascColdHands', 'cards', 1),
       node('D2', 'Frost Lock', 'When the enemy has {ascFrostLock}+ Chill after your chain, they can\'t Charge next turn.', 'ascFrostLock', 'Chill needed', 3, 1),
-      capstone('D3', 'Glacial Prison', 'Frozen lasts {ascGlacialPrison} more turn: the enemy can\'t Strike for longer.', 'Freeze needs {ascGlacialPrisonCost} more Chill.', [
+      capstone('D3', 'Glacial Prison', 'Frozen (and Thaw after it) lasts {ascGlacialPrison} more turn: the enemy can\'t Strike for longer.', 'Freeze needs {ascGlacialPrisonCost} more Chill.', [
         ['ascGlacialPrison', 'turns +', 1],
         ['ascGlacialPrisonCost', 'Cost: stacks to freeze +', 1],
       ]),
