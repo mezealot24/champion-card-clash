@@ -257,7 +257,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
       afterHits: (state, side) => {
         const p = state.players[side]
-        const lost = (p.perkData?.preHitHp ?? p.hp) - p.hp
+        // Q 19:02: only ascUnrelentingPct% (50) of the hit dmg is delayed; the rest lands now
+        const lost = Math.floor((((p.perkData?.preHitHp ?? p.hp) - p.hp) * num(state, side, 'TK:1', 'ascUnrelentingPct')) / 100)
         if (lost <= 0) return
         p.hp += lost
         const turns = Math.max(1, num(state, side, 'TK:1', 'ascUnrelentingTurns'))
