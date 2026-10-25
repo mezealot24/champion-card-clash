@@ -37,6 +37,18 @@ describe('Tank heal conditions', () => {
     expect(top([])).toBe(50) // slot 1
   })
 
+  it('onDraw + facing card: needs an enemy card in the slot it lands in', () => {
+    const spec: EffectSpec = [{ hook: 'onDraw', if: [{ c: 'enteredAt', n: 1 }, { c: 'hasFacing' }], do: heal10 }]
+    const draw = (enemy: CardInst[]) => {
+      const s = game([], enemy)
+      s.players.p1.deck = [{ uid: `d${uid++}`, def: { id: 'AA-003', type: 'S', dmg: 1, effectText: '', effectSpec: spec } }, ...s.players.p1.deck]
+      drawCards(s, 'p1', 1)
+      return s.players.p1.hp
+    }
+    expect(draw([foe('P')])).toBe(60)
+    expect(draw([])).toBe(50)
+  })
+
   it('hit by a Kick counts only Kicks that got through', () => {
     const spec: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'hitBy', n: 1, type: 'K' }], do: heal10 }]
     // Charge: both enemy hits land; one is a Kick

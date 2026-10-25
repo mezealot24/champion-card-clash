@@ -115,7 +115,7 @@ export function drawCards(state: GameState, side: Side, n: number): number {
       p.drawsSinceShuffle = 0
       log(state, `${side} drew the whole deck: deck reshuffled`)
     }
-    effectOf(state, side, card)?.onDraw?.({ state, self: side, enemy: side === 'p1' ? 'p2' : 'p1', card, pending: null })
+    effectOf(state, side, card)?.onDraw?.({ state, self: side, enemy: side === 'p1' ? 'p2' : 'p1', card, pending: null, slot: p.hand.length - 1 })
   }
   return drawn
 }

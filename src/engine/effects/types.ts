@@ -10,6 +10,8 @@ export type BaseCtx = {
   enemy: Side
   card: CardInst
   pending: Record<Side, number> | null
+  /** Field position (0-based); on draw, the slot the card landed in */
+  slot?: number
 }
 
 /**
