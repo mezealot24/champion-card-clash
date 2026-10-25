@@ -198,6 +198,12 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     const n = draw ? drawCards(state, side, draw) : 0
     log(state, `${side} Acceleration (Dual Strike): ${fill ? 'Energy full, ' : ''}draws ${n}`)
   }
+  // end-of-turn draws from Styles/pieces (Cryomancer Flash Freeze)
+  for (const side of SIDES) {
+    if (state.players[side].hp <= 0) continue
+    const want = hooksOf(state.players[side]).reduce((t, h) => t + (h.endDraw?.(state, side) ?? 0), 0)
+    if (want > 0) log(state, `${side} ❄ Flash Freeze: draws ${drawCards(state, side, want)}`)
+  }
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.endTurn?.(state, side, actions[side], actions[other(side)])
   // Ignite burns at the end of every turn it's on (Pyromancer)
   for (const side of SIDES) {

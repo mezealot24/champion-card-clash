@@ -40,8 +40,8 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  * parry = the next n hits that get past your Block are deflected and deal 0, nothing goes back (this turn; Q 2026-10-17: a Block is 2 Parries)
  */
 /** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts. chill = Cryomancer's slow (n = stacks, CHILL_*).
- * frozen = marker for "can't Strike this turn" (lasts 1 turn longer than its noStrike so cards can read it). skillSilence = Skill cards' effects off (Bitter Cold). subZero = next Strike: every clean hit gives 1 Chill (Arcane Sub-Zero) */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'venom' | 'woundUp'
+ * frozen = marker for "can't Strike this turn" (lasts 1 turn longer than its noStrike so cards can read it). skillSilence = Skill cards' effects off (Bitter Cold). subZero = next Strike: every clean hit gives 1 Chill (Arcane Sub-Zero). thaw = can't be Frozen (after a Freeze, Cryomancer) */
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'thaw' | 'venom' | 'woundUp'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 /** A side loses at most this many Field cards to Cut effects per turn (Claude default 2026-10-16). Charge break doesn't count. */
 export const CUT_CAP = 2

@@ -5,13 +5,29 @@
 import type { Action, CardType, GameState, Side } from './types'
 import { tuningOf } from './tuning'
 
-/** Freeze a side: Chill clears and it can't Strike next turn. `frozen` outlasts noStrike by a turn so cards can read it that turn. */
-export function freeze(state: GameState, side: Side, why: string) {
+const foe = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1')
+
+/**
+ * Freeze a side: Chill clears and it can't Strike next turn. `frozen` outlasts noStrike by a turn so cards can read it that turn.
+ * Thaw (Q 2026-10-25, from PoE2): after it, the side can't be Frozen again for thawTurns turns (no lock loops).
+ * Flash Freeze: whoever froze it draws freezeDraw cards at the end of the turn (their Field is often empty after the Strike).
+ * Returns false when Thaw stopped it.
+ */
+export function freeze(state: GameState, side: Side, why: string): boolean {
   const p = state.players[side]
+  if (p.statuses.some((s) => s.kind === 'thaw')) {
+    state.log.push(`T${state.turn} ${side} 💧 Thaw: can't be Frozen yet`)
+    return false
+  }
+  const t = tuningOf(state, foe(side))['MG:2']
   p.statuses = p.statuses.filter((s) => s.kind !== 'chill' && s.kind !== 'frozen')
   if (!p.statuses.some((s) => s.kind === 'noStrike')) p.statuses.push({ kind: 'noStrike', turns: 1 })
   p.statuses.push({ kind: 'frozen', turns: 2 })
+  if (t.thawTurns > 0) p.statuses.push({ kind: 'thaw', turns: 2 + t.thawTurns })
+  const by = state.players[foe(side)]
+  by.styleData = { ...by.styleData, freezeDraw: (by.styleData?.freezeDraw ?? 0) + t.freezeDraw }
   state.log.push(`T${state.turn} ${side} 🧊 Frozen: ${why} → can't Strike next turn`)
+  return true
 }
 
 /** One slot of the chain. Before hits, blocked/clean are both false. */
@@ -29,7 +45,6 @@ export type ComboDef = {
 }
 
 const say = (state: GameState, side: Side, line: string) => state.log.push(`T${state.turn} ${side} ${line}`)
-const foe = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1')
 const allClean = (h: ComboHit[]) => h.every((x) => x.clean)
 
 /** Mark of Assassin lasts the rest of the game (statuses count down, so: a number no game reaches). Burst % = tuning AS.markBurstPct */
@@ -73,7 +88,7 @@ export const COMBOS: Record<string, ComboDef[]> = {
   ],
   /**
    * Mage · S + S + S, all clean: the opponent can't Block next turn.
-   * Under Cryomancer it is Absolute Zero (Q 2026-10-18): the opponent is also Frozen, whatever its Chill,
+   * Under Cryomancer it is Absolute Zero (Q 2026-10-18): the opponent is also Frozen, whatever its Chill (not through Thaw),
    * so it can't Strike or Block next turn and is left with Charge.
    */
   MG: [

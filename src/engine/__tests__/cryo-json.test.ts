@@ -40,7 +40,7 @@ describe('Cryomancer cards', () => {
     n.players.p1.hand = [mg('MG-044', 8)]
     const hp = n.players.p2.hp
     n = resolveTurn(n, { p1: 'strike', p2: 'charge' })
-    expect(hp - n.players.p2.hp).toBe(38)
+    expect(hp - n.players.p2.hp).toBe(38 + 15) // + Shatter: first clean hit on a Frozen enemy, 15% of 100
   })
   it('MG-045 Arcane Sub-Zero: next turn each clean hit gives 1 Chill', () => {
     let s = resolveTurn(game([mg('MG-045')]), { p1: 'strike', p2: 'charge' })

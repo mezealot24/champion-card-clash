@@ -1198,18 +1198,10 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
   // Cryomancer · Glacier (Shield as ammo)
-  'MG:2:C1': (amt) => ({
-    hooks: {
-      endTurn: (state, side, action) => {
-        const p = state.players[side]
-        const n = Math.min(amt(state, side), num(state, side, 'MG:2', 'ascHoarfrostCap') - shieldOf(p))
-        if (action !== 'block' || p.hp <= 0 || n <= 0) return
-        // one lasting Shield that grows, not a new one per Block
-        const lasting = p.statuses.find((s) => s.kind === 'shield' && s.turns > 9000)
-        if (lasting) lasting.n = (lasting.n ?? 0) + n
-        else status(p, 'shield', n)
-        say(state, side, `Hoarfrost: Shield +${n}`)
-      },
+  'MG:2:C1': (_, k) => ({
+    tune: (t, v) => {
+      add(t, 'MG:2', 'frostArmorRegen', v(k))
+      add(t, 'MG:2', 'frostArmorCap', v('ascHoarfrostCap'))
     },
   }),
   'MG:2:C2': (amt) => ({
@@ -1263,7 +1255,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     hooks: {
       endTurn: (state, side) => {
         if (!freshFreeze(state, side, 2) || amt(state, side) <= 0) return
-        for (const s of state.players[other(side)].statuses) if (s.kind === 'noStrike' || s.kind === 'frozen') s.turns += amt(state, side)
+        for (const s of state.players[other(side)].statuses) if (s.kind === 'noStrike' || s.kind === 'frozen' || s.kind === 'thaw') s.turns += amt(state, side)
         say(state, side, `Glacial Prison: enemy stays Frozen ${amt(state, side)} more turn`)
       },
     },
@@ -1308,7 +1300,7 @@ const LETTERS = 'ABCDEFGH'
 /** Branch letters and nodes per branch of a Style's tree (no tree: the classic 2 × 4). */
 export const treeShape = (style?: string) => {
   const t = style ? TREES[style] : undefined
-  return { letters: LETTERS.slice(0, t?.branches.length ?? 2), depth: t?.depth ?? 4 }
+  return { letters: LETTERS.slice(0, t?.branches.length ?? 2), depth: t?.depth ?? 4, maxCapstones: t?.maxCapstones ?? Infinity }
 }
 /** Points a Style's tree gets: game_config asc_points + the tree's own bonus. */
 export const treePoints = (style: string | undefined, base: number) => base + ((style && TREES[style]?.bonusPoints) || 0)
@@ -1316,7 +1308,8 @@ export const treePoints = (style: string | undefined, base: number) => base + ((
 /** Can these node ids be taken together in this Style's tree? Top-down per branch, at most `points` of them. */
 export function validAsc(ids: string[], points: number, style?: string): boolean {
   if (ids.length > points || new Set(ids).size !== ids.length) return false
-  const { letters, depth } = treeShape(style)
+  const { letters, depth, maxCapstones } = treeShape(style)
+  if (ids.filter((id) => Number(id.slice(1)) === depth).length > maxCapstones) return false
   return ids.every((id) => {
     const n = Number(id.slice(1))
     return id.length === 2 && letters.includes(id[0]) && n >= 1 && n <= depth && (n === 1 || ids.includes(`${id[0]}${n - 1}`))
