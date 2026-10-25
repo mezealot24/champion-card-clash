@@ -129,13 +129,14 @@ describe('Bruiser v2 Ascendancy', () => {
       expect(100 - s.players.p2.hp).toBe(2 + 2 + 20) // + Fury 10 on slots 1-2
     })
 
-    it('Rally: a Strike taking 15%+ of Max HP heals 4 + 10% missing; Fury line −10%', () => {
+    it('Rally: a Strike taking 15%+ of Max HP heals 4 + 10% missing; −15 Max HP', () => {
       let s = br('BR:1', ['D1', 'D2', 'D3'])
-      expect(t(s, 'BR:1').hpPct).toBe(40)
-      s.players.p1.hp = 110
+      expect(s.players.p1.maxHp).toBe(195)
+      expect(t(s, 'BR:1').hpPct).toBe(50)
+      s.players.p1.hp = 115
       s.players.p1.hand = [hit(20)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(s.players.p1.hp).toBe(110 + 4 + 10)
+      expect(s.players.p1.hp).toBe(115 + 4 + 8) // 10% of 80 missing
     })
   })
 
@@ -193,6 +194,14 @@ describe('Bruiser v2 Ascendancy', () => {
       s.players.p1.hand = [hit(20), hit(20)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(s.players.p1.hp).toBeGreaterThan(100)
+    })
+
+    it('Gorged works with Insatiable below max (Lifesteal from 3 stacks)', () => {
+      let s = br('BR:2', ['C1', 'C2', 'C3'])
+      s.players.p1.comboData = { conqueror: 3 }
+      s.players.p2.hand = [hit(10)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(190 - s.players.p1.hp).toBe(8)
     })
 
     it('Plating: after a turn you were hit, hits deal 2 less', () => {

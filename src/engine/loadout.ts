@@ -107,8 +107,12 @@ function cutNewest(state: GameState, side: Side, n: number, who: string) {
     say(state, side, `${who}: Cut → enemy sends ${lost.def.id} to the deck bottom`)
   }
 }
-/** Juggernaut Momentum is at max, so its Lifesteal is on (Bruiser Style 2) */
-const momentumLifesteal = (state: GameState, side: Side) => (state.players[side].comboData?.conqueror ?? 0) >= num(state, side, 'BR:2', 'conquerorMax')
+/** Juggernaut Momentum Lifesteal is on: at max stacks, or from Insatiable's stacks when this side took it (Bruiser Style 2) */
+const momentumLifesteal = (state: GameState, side: Side) => {
+  const p = state.players[side]
+  const need = p.perks?.includes('asc:BR:2:C3') ? Math.min(num(state, side, 'BR:2', 'ascInsatiable'), num(state, side, 'BR:2', 'conquerorMax')) : num(state, side, 'BR:2', 'conquerorMax')
+  return (p.comboData?.conqueror ?? 0) >= need
+}
 /** Quake (Juggernaut capstone) is guarding this turn */
 const quakeOn = (state: GameState, side: Side) => {
   const from = state.players[side].perkData?.quakeFrom
@@ -511,7 +515,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
   'BR:1:D3': (amt) => ({
-    tune: (t, v) => add(t, 'BR:1', 'hpPct', -v('ascRallyCost')),
+    // Cost is Max HP, not the Fury line: a smaller Fury window would fight Bloodletting in the same branch (sim 2026-10-25)
+    setup: (p, v) => addMaxHp(p, -v('ascRallyCost')),
     hooks: {
       strikeStart: (state, side) => {
         state.players[side].perkData = { ...state.players[side].perkData, foeHpAt: state.players[other(side)].hp }

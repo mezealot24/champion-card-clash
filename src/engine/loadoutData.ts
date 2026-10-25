@@ -200,11 +200,11 @@ export const TREES: Record<string, TreeData> = {
       ]),
       node('D1', 'Bloodletting', 'Lifesteal {ascBloodletting}% while Fury is on.', 'ascBloodletting', 'Lifesteal %', 10, 0, 100),
       node('D2', 'Underdog', 'While the enemy has more HP than you, your cards deal +{ascUnderdog} dmg.', 'ascUnderdog', 'dmg +', 1),
-      capstone('D3', 'Rally', 'When one Strike takes {ascRally}%+ of the enemy\'s Max HP, heal {ascRallyHeal} + {ascRallyPct}% of your missing HP.', 'Fury HP line −{ascRallyCost}%.', [
+      capstone('D3', 'Rally', 'When one Strike takes {ascRally}%+ of the enemy\'s Max HP, heal {ascRallyHeal} + {ascRallyPct}% of your missing HP.', '−{ascRallyCost} Max HP.', [
         ['ascRally', 'enemy Max HP % needed', 15, 1, 100],
         ['ascRallyHeal', 'heal', 4, 4],
         ['ascRallyPct', 'heal % of missing HP', 10, 0, 100],
-        ['ascRallyCost', 'Cost: Fury HP line % −', 10],
+        ['ascRallyCost', 'Cost: Max HP −', 15],
       ]),
     ],
   },
