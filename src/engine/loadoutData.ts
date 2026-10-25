@@ -173,21 +173,28 @@ export const TREES: Record<string, TreeData> = {
     branches: ['Carnage', 'Blood Rite', 'Payback', 'Comeback'],
     depth: 3,
     bonusPoints: 1,
-    rev: 2,
+    rev: 3,
     nodes: [
-      node('A1', 'Short Fuse', 'Fury HP line +{ascShortFuse}%.', 'ascShortFuse', 'HP line % +', 5),
-      node('A2', 'Heavy Hands', 'Fury bonus +{ascHeavyHands} dmg.', 'ascHeavyHands', 'bonus dmg +', 2),
+      multi('A1', 'Short Fuse', 'Fury HP line +{ascShortFuse}%. The first time Fury turns on in a match, gain {ascShortFuseRage} Rage.', [
+        ['ascShortFuse', 'HP line % +', 10],
+        ['ascShortFuseRage', 'Rage the first time Fury turns on', 5],
+      ]),
+      multi('A2', 'Heavy Hands', 'Every chain card +{ascHeavyHands} dmg, or +{ascHeavyHandsFury} while Fury is on.', [
+        ['ascHeavyHands', 'dmg + (no Fury)', 1],
+        ['ascHeavyHandsFury', 'dmg + while Fury is on', 3],
+      ]),
       capstone('A3', 'Bloodbath', 'Fury reaches every chain slot.', 'While Fury is on, hits that reach you deal +{ascBloodbathCost} dmg.', [
         ['ascBloodbathCost', 'Cost: dmg taken + per hit', 2],
       ]),
-      node('B1', 'Seething', '+{ascSeething} Rage per clean hit.', 'ascSeething', 'Rage per clean hit +', 1),
-      multi('B2', 'War Cry', 'When you Strike, chain slot 1 +1 dmg per {ascWarCry} Rage you have (max +{ascWarCryCap}).', [
+      node('B1', 'Seething', '+{ascSeething} Rage each time you lose HP (your own cards or the enemy) and per clean hit.', 'ascSeething', 'Rage +', 1),
+      multi('B2', 'War Cry', 'When you Strike, every chain card +1 dmg per {ascWarCry} Rage you have (max +{ascWarCryCap} a card).', [
         ['ascWarCry', 'Rage per +1 dmg', 5, 1],
-        ['ascWarCryCap', 'dmg cap', 4],
+        ['ascWarCryCap', 'dmg cap per card', 3],
       ]),
-      capstone('B3', 'Blood Rite', 'Rage cap +{ascBloodRite} and you never lose Rage on a quiet turn.', 'At the end of every turn, lose 1 HP per {ascBloodRiteCost} Rage you have (never below 1 HP).', [
+      // Cost was an HP burn every turn, which stacked with Bruiser's own HP-cost cards and lost games (sim 2026-10-25)
+      capstone('B3', 'Blood Rite', 'Rage cap +{ascBloodRite} and you never lose Rage on a quiet turn.', 'Your Block stops {ascBloodRiteCost} fewer hit.', [
         ['ascBloodRite', 'Rage cap +', 10],
-        ['ascBloodRiteCost', 'Cost: Rage per 1 HP lost', 5, 1],
+        ['ascBloodRiteCost', 'Cost: Block stops − hits', 1],
       ]),
       node('C1', 'One-Two', 'Every 2nd P card in your chain deals +{ascOneTwo} dmg.', 'ascOneTwo', 'dmg + on every 2nd P', 3),
       multi('C2', 'Wind Up', 'Charge while you have Rage: you are Wound Up. Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left, +{ascPayback} dmg per Rage. If a hit reaches you the turn you wind up, Wound Up is lost and you gain {ascFlinchRage} Rage.', [
@@ -212,12 +219,17 @@ export const TREES: Record<string, TreeData> = {
     branches: ['Arena', 'Verdict', 'Hunger', 'Bulwark'],
     depth: 3,
     bonusPoints: 1,
-    rev: 2,
+    rev: 3,
     nodes: [
-      node('A1', 'Unshaken', 'A Block costs {ascUnshaken} fewer Momentum.', 'ascUnshaken', 'stacks lost −', 1),
-      node('A2', 'Riposte', "When your Block stops every hit, your next Strike's slot 1 deals +{ascRiposte} dmg (doesn't stack).", 'ascRiposte', 'slot 1 dmg +', 4),
-      capstone('A3', 'Retaliation', 'Each hit your Block stops gives +1 Momentum (max {ascRetaliation} a turn).', 'Lifesteal at max Momentum −{ascRetaliationCost}%.', [
+      node('A1', 'Take the Hit', "After a turn the enemy Strikes you (into your Block or not), your next Strike's slot 1 deals +{ascTakeHit} dmg (doesn't stack).", 'ascTakeHit', 'slot 1 dmg +', 4),
+      multi('A2', 'Riposte', 'A Block costs {ascUnshaken} fewer Momentum. When your Block stops every hit, your next Strike: every card +{ascRiposte} dmg (doesn\'t stack).', [
+        ['ascRiposte', 'dmg + every card', 2],
+        ['ascUnshaken', 'Block Momentum loss −', 1],
+      ]),
+      capstone('A3', 'Retaliation', 'Each hit your Block stops gives +1 Momentum (max {ascRetaliation} a turn). When you Strike, take up to {ascSunder} enemy Shield per Momentum and keep it as your Shield (max {ascSunderCap}).', 'Lifesteal at max Momentum −{ascRetaliationCost}%.', [
         ['ascRetaliation', 'Momentum per turn (cap)', 2],
+        ['ascSunder', 'Shield taken per Momentum', 2],
+        ['ascSunderCap', 'Shield taken cap', 8],
         ['ascRetaliationCost', 'Cost: Lifesteal % −', 5],
       ]),
       node('B1', 'Cleave', 'While the enemy is in the red (30% HP), your cards deal +{ascCleave} dmg.', 'ascCleave', 'dmg +', 2),

@@ -24,7 +24,7 @@ describe('Bruiser v2 Ascendancy', () => {
       expect(TREES[k].branches).toHaveLength(4)
       expect(TREES[k].depth).toBe(3)
       expect(TREES[k].bonusPoints).toBe(1)
-      expect(TREES[k].rev).toBe(2)
+      expect(TREES[k].rev).toBe(3)
       expect(TREES[k].nodes).toHaveLength(12)
       expect(TREES[k].nodes.filter((n) => n.cost)).toHaveLength(4)
     }
@@ -33,35 +33,65 @@ describe('Bruiser v2 Ascendancy', () => {
   it('a Bruiser tree saved before v2 is dropped, other trees stay', () => {
     const l = dropOldTrees({ asc: { 'BR:1': ['A1', 'A2', 'A3', 'B1', 'B2'], 'MG:1': ['A1'] } })
     expect(l.asc).toEqual({ 'MG:1': ['A1'] })
-    expect(dropOldTrees({ asc: { 'BR:1': ['A1'] }, ascRev: { 'BR:1': 2 } }).asc).toEqual({ 'BR:1': ['A1'] })
+    expect(dropOldTrees({ asc: { 'BR:1': ['A1'] }, ascRev: { 'BR:1': 3 } }).asc).toEqual({ 'BR:1': ['A1'] })
   })
 
   describe('Fury', () => {
     it('Bloodbath: Fury on every slot; hits reach you +2 while Fury is on', () => {
       let s = br('BR:1', ['A1', 'A2', 'A3'])
       expect(t(s, 'BR:1').slots).toBe(5)
-      expect(t(s, 'BR:1').hpPct).toBe(55)
+      expect(t(s, 'BR:1').hpPct).toBe(60)
       s.players.p1.hp = 100
       s.players.p2.hand = [hit(10)]
       s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
       expect(100 - s.players.p1.hp).toBe(12)
     })
 
-    it('War Cry: slot 1 +1 per 5 Rage, max +4', () => {
-      let s = br('BR:1', ['B1', 'B2'])
-      s.players.p1.res = 20
-      s.players.p1.hand = [hit(10)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(100 - s.players.p2.hp).toBe(14)
+    it('Short Fuse: the first time Fury turns on, +5 Rage (once)', () => {
+      let s = br('BR:1', ['A1'])
+      s.players.p1.hp = 100 // 48% < 60%
+      s = resolveTurn(s, { p1: 'block', p2: 'block' })
+      expect(s.players.p1.res).toBe(5)
+      expect(said(s, 'Short Fuse')).toBe(true)
+      s = resolveTurn(s, { p1: 'block', p2: 'block' })
+      expect(s.log.filter((l) => l.includes('Short Fuse'))).toHaveLength(1)
     })
 
-    it('Blood Rite: Rage cap 30, no quiet-turn loss, burns 1 HP per 5 Rage', () => {
+    it('Heavy Hands: every card +1, +3 while Fury is on', () => {
+      let s = br('BR:1', ['A1', 'A2'])
+      s.players.p1.hand = [hit(1), hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(said(s, 'Heavy Hands: every chain card +1')).toBe(true)
+      s.players.p1.hp = 100
+      s.players.p1.hand = [hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(said(s, 'Heavy Hands: every chain card +3')).toBe(true)
+    })
+
+    it('Seething: +1 Rage per HP loss of any kind and per clean hit', () => {
+      const s = br('BR:1', ['B1'])
+      const b = tuningOf(s, 'p1').BR
+      expect([b.perHitTaken, b.perSelfDmg, b.perCleanHit]).toEqual([3, 2, 2])
+    })
+
+    it('War Cry: every chain card +1 per 5 Rage, max +3 a card', () => {
+      let s = br('BR:1', ['B1', 'B2'])
+      s.players.p1.res = 20
+      s.players.p1.hand = [hit(10), hit(10)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(100 - s.players.p2.hp).toBe(26)
+    })
+
+    it('Blood Rite: Rage cap 30, no quiet-turn loss, no HP burn; Block stops 1 fewer hit', () => {
       let s = br('BR:1', ['B1', 'B2', 'B3'])
       expect(tuningOf(s, 'p1').BR.cap).toBe(30)
       s.players.p1.res = 25
       s = resolveTurn(s, { p1: 'block', p2: 'block' })
       expect(s.players.p1.res).toBe(25)
-      expect(s.players.p1.hp).toBe(205)
+      expect(s.players.p1.hp).toBe(210)
+      s.players.p2.hand = [hit(5), hit(5)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      expect(s.players.p1.hp).toBe(205) // 2nd hit gets through
     })
 
     it('One-Two: every 2nd P card +3', () => {
@@ -141,13 +171,23 @@ describe('Bruiser v2 Ascendancy', () => {
   })
 
   describe('Juggernaut', () => {
-    it('Riposte: a full Block powers the next slot 1', () => {
-      let s = br('BR:2', ['A1', 'A2'])
+    it('Take the Hit: after the enemy Strikes you, next slot 1 +4', () => {
+      let s = br('BR:2', ['A1'])
       s.players.p2.hand = [hit(5)]
-      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
       s.players.p1.hand = [hit(1)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(said(s, 'Riposte')).toBe(true)
+      expect(said(s, 'Take the Hit: slot 1 +4')).toBe(true)
+    })
+
+    it('Riposte: a full Block powers every card of the next Strike', () => {
+      let s = br('BR:2', ['A1', 'A2'])
+      expect(t(s, 'BR:2').blockLoss).toBe(tuningOf(br('BR:2', []), 'p1')['BR:2'].blockLoss - 1)
+      s.players.p2.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      s.players.p1.hand = [hit(1), hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(said(s, 'Riposte: every chain card +2')).toBe(true)
     })
 
     it('Retaliation: blocked hits give Momentum (max 2 a turn), Lifesteal −5', () => {
@@ -155,7 +195,16 @@ describe('Bruiser v2 Ascendancy', () => {
       expect(t(s, 'BR:2').omnivampPct).toBe(5)
       s.players.p2.hand = [hit(5), hit(5), hit(5)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.players.p1.comboData?.conqueror).toBe(2) // +2, Unshaken: Block costs 0
+      expect(s.players.p1.comboData?.conqueror).toBe(2) // +2, Riposte: Block costs 0
+    })
+
+    it('Retaliation · Sunder: Strike takes 2 enemy Shield per Momentum (max 8)', () => {
+      let s = br('BR:2', ['A1', 'A2', 'A3'])
+      s.players.p1.comboData = { conqueror: 3 }
+      s.players.p2.statuses.push({ kind: 'shield', turns: 3, n: 10 })
+      s.players.p1.hand = [hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      expect(said(s, 'Sunder: took 8 Shield')).toBe(true) // Strike makes it 4 Momentum → 8 (cap)
     })
 
     it('Bloodhound: putting the enemy in the red gives +3 Momentum once', () => {

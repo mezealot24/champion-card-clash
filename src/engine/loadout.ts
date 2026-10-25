@@ -406,22 +406,49 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
 
   // ---- Bruiser v2 (design/bruiser-ascendancy-v2-2026-10-25.md): 4 branches × (2 nodes + capstone with a Cost) ----
   // Fury · Carnage (PoE Berserker: more dmg, more dmg taken)
-  'BR:1:A1': (_, k) => ({ tune: (t, v) => add(t, 'BR:1', 'hpPct', v(k)) }),
-  'BR:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'BR:1', 'bonusDmg', v(k)) }),
+  'BR:1:A1': (_, k) => ({
+    tune: (t, v) => add(t, 'BR:1', 'hpPct', v(k)),
+    hooks: {
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        if (p.hp <= 0 || p.perkData?.furyOnce || !furyOn(state, side)) return
+        p.perkData = { ...p.perkData, furyOnce: 1 }
+        addRes(state, side, num(state, side, 'BR:1', 'ascShortFuseRage'))
+        say(state, side, `Short Fuse: Fury on, Rage ${p.res}`)
+      },
+    },
+  }),
+  'BR:1:A2': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const n = furyOn(state, side) ? num(state, side, 'BR:1', 'ascHeavyHandsFury') : amt(state, side)
+        if (!bonus.length || n <= 0) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        say(state, side, `Heavy Hands: every chain card +${n} dmg`)
+      },
+    },
+  }),
   'BR:1:A3': (amt) => ({
     tune: (t) => add(t, 'BR:1', 'slots', 5),
     // Cost: a negative cut adds dmg to every hit that gets past Block
     hooks: { hitCut: (state, side) => (furyOn(state, side) ? -amt(state, side) : 0) },
   }),
   // Fury · Blood Rite (PoE Berserker Rage)
-  'BR:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'BR', 'perCleanHit', v(k)) }),
+  // Seething: Bruiser's HP-cost cards feed Rage too
+  'BR:1:B1': (_, k) => ({
+    tune: (t, v) => {
+      add(t, 'BR', 'perHitTaken', v(k))
+      add(t, 'BR', 'perSelfDmg', v(k))
+      add(t, 'BR', 'perCleanHit', v(k))
+    },
+  }),
   'BR:1:B2': (amt) => ({
     hooks: {
       beforeHits: (state, side, bonus) => {
         const n = Math.min(num(state, side, 'BR:1', 'ascWarCryCap'), Math.floor((state.players[side].res ?? 0) / Math.max(1, amt(state, side))))
         if (!bonus.length || n <= 0) return
-        bonus[0] += n
-        say(state, side, `War Cry: slot 1 +${n} dmg`)
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        say(state, side, `War Cry: every chain card +${n} dmg`)
       },
     },
   }),
@@ -430,16 +457,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       add(t, 'BR', 'cap', v(k))
       add(t, 'BR', 'quietLoss', -1_000_000)
     },
-    hooks: {
-      endTurn: (state, side) => {
-        const p = state.players[side]
-        const n = Math.min(p.hp - 1, Math.floor((p.res ?? 0) / Math.max(1, num(state, side, 'BR:1', 'ascBloodRiteCost'))))
-        if (p.hp <= 0 || n <= 0) return
-        p.hp -= n
-        ;(state.events ??= []).push({ k: 'hp', side, delta: -n })
-        say(state, side, `Blood Rite: ${p.res} Rage burns ${n} HP`)
-      },
-    },
+    // Cost: Block, not HP (an HP burn stacked with Bruiser's own HP-cost cards, sim 2026-10-25)
+    hooks: { blockBonus: (state, side) => -num(state, side, 'BR:1', 'ascBloodRiteCost') },
   }),
   // Fury · Payback (LoL Sett: left-right punches, stored grit let out in one punch; uses the Rage you already have)
   'BR:1:C1': (amt) => ({
@@ -535,8 +554,22 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
 
   // Juggernaut · Arena (PoE Gladiator: Block and retaliate)
-  'BR:2:A1': (_, k) => ({ tune: (t, v) => add(t, 'BR:2', 'blockLoss', -v(k)) }),
+  'BR:2:A1': (amt) => ({
+    hooks: {
+      afterHits: (state, side, r) => {
+        if (r.attacked && r.hitsBlocked + r.hitsTaken > 0) state.players[side].perkData = { ...state.players[side].perkData, takeHit: 1 }
+      },
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        if (!p.perkData?.takeHit || !bonus.length) return
+        bonus[0] += amt(state, side)
+        p.perkData = { ...p.perkData, takeHit: 0 }
+        say(state, side, `Take the Hit: slot 1 +${amt(state, side)} dmg`)
+      },
+    },
+  }),
   'BR:2:A2': (amt) => ({
+    tune: (t, v) => add(t, 'BR:2', 'blockLoss', -v('ascUnshaken')),
     hooks: {
       afterHits: (state, side, r) => {
         if (r.attacked && r.hitsBlocked && !r.hitsTaken) state.players[side].perkData = { ...state.players[side].perkData, riposte: 1 }
@@ -544,9 +577,9 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       beforeHits: (state, side, bonus) => {
         const p = state.players[side]
         if (!p.perkData?.riposte || !bonus.length) return
-        bonus[0] += amt(state, side)
+        for (let i = 0; i < bonus.length; i++) bonus[i] += amt(state, side)
         p.perkData = { ...p.perkData, riposte: 0 }
-        say(state, side, `Riposte: slot 1 +${amt(state, side)} dmg`)
+        say(state, side, `Riposte: every chain card +${amt(state, side)} dmg`)
       },
     },
   }),
@@ -561,6 +594,25 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         if (n === was) return
         p.comboData = { ...p.comboData, conqueror: n }
         say(state, side, `Retaliation: Momentum ${n}/${max}`)
+      },
+      // Sunder: the longer you hold the Arena (Momentum), the more of the enemy's Shield you take
+      strikeStart: (state, side) => {
+        const p = state.players[side]
+        const foe = state.players[other(side)]
+        let want = Math.min(num(state, side, 'BR:2', 'ascSunderCap'), (p.comboData?.conqueror ?? 0) * num(state, side, 'BR:2', 'ascSunder'))
+        let took = 0
+        for (const st of foe.statuses) {
+          if (want <= 0) break
+          if (st.kind !== 'shield' || !(st.n ?? 0)) continue
+          const n = Math.min(want, st.n ?? 0)
+          st.n = (st.n ?? 0) - n
+          want -= n
+          took += n
+        }
+        if (!took) return
+        foe.statuses = foe.statuses.filter((st) => st.kind !== 'shield' || (st.n ?? 0) > 0)
+        p.statuses.push({ kind: 'shield', turns: 1, n: took })
+        say(state, side, `Sunder: took ${took} Shield`)
       },
     },
   }),
