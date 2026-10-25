@@ -26,6 +26,8 @@ export type CondSpec =
   | { c: 'chainLength'; op: '=' | '>='; n: number }
   | { c: 'slotIs'; n: number }
   | { c: 'hasFacing' }
+  | { c: 'noFacing' }
+  | { c: 'lostHp' }
   | { c: 'facingSameType' }
   | { c: 'hpAtMost'; n: number }
   | { c: 'hpNotAbove' }
@@ -54,7 +56,7 @@ export type ActSpec =
   | { a: 'maxHp'; who: P.Who; n: number }
   | { a: 'status'; who: P.Who; kind: StatusKind; turns: number; n?: number; per?: P.Per }
   | { a: 'grow'; n: number; dur: 'next' | 'game'; stack?: boolean }
-  | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType; per?: P.Per }
+  | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType; per?: P.Per; max?: number }
   | { a: 'mulDmg'; target: P.DmgTarget; pct: number; onlyType?: CardType }
   | { a: 'blockNow'; who: P.Who; n: number }
   | { a: 'pierce'; target: 'this' | 'next' | 'following' | 'chain' }
@@ -89,6 +91,8 @@ function cond(s: CondSpec): Cond {
     case 'chainLength': return P.chainLength(s.op, s.n)
     case 'slotIs': return P.slotIs(s.n)
     case 'hasFacing': return P.hasFacing
+    case 'noFacing': return P.noFacing
+    case 'lostHp': return P.lostHp
     case 'facingSameType': return P.facingSameType
     case 'tookDmg': return P.tookDmg(s.n)
     case 'hpAtMost': return P.hpAtMost(s.n)
@@ -121,7 +125,7 @@ function act(s: ActSpec): Act {
     case 'maxHp': return P.maxHp(s.who, s.n)
     case 'status': return P.status(s.who, s.kind, s.turns, P.SIZED.includes(s.kind) ? (s.n ?? 1) : undefined, P.SIZED.includes(s.kind) ? s.per : undefined)
     case 'grow': return P.grow(s.n, s.dur ?? 'game', s.stack)
-    case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType, s.per)
+    case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType, s.per, s.max)
     case 'mulDmg': return P.mulDmg(s.target, s.pct, s.onlyType)
     case 'blockNow': return P.blockNow(s.who, s.n)
     case 'pierce': return P.pierce(s.target)

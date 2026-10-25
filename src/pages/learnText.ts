@@ -36,6 +36,8 @@ export function shortCond(c: CondSpec): string {
     case 'chainLength': return c.op === '=' ? `Chain = ${c.n}` : `Chain ${c.n}+`
     case 'slotIs': return `Slot ${c.n}`
     case 'hasFacing': return 'Facing card'
+    case 'noFacing': return 'No facing card'
+    case 'lostHp': return 'Lost HP (this/last turn)'
     case 'facingSameType': return 'Facing same type'
     case 'facingIs': return `Facing ${c.type}`
     case 'prevIs': return `After a ${c.type}`
@@ -67,7 +69,7 @@ function target(t: unknown, only?: CardType): { head: string; tail: string } {
 }
 const PER: Record<string, string> = {
   hitBlocked: 'blocked hit', chainCard: 'chain card', selfCard: 'card you hold', enemyCard: 'foe card', chainP: 'P', chainK: 'K', chainS: 'S',
-  missingHp10: '10 missing HP', enemyIgnite: 'foe Ignite', enemyChill: 'foe Chill',
+  missingHp10: '10 missing HP', missingHp5: '5 missing HP', enemyIgnite: 'foe Ignite', enemyChill: 'foe Chill',
 }
 const per = (a: { per?: string }) => (a.per && PER[a.per] ? ` per ${PER[a.per]}` : '')
 
@@ -90,7 +92,7 @@ export function shortAct(a: ActSpec, res = 'res'): string {
     case 'grow': return `${signed(a.n)} dmg ${a.dur === 'next' ? 'next hit' : 'for good'}`
     case 'addDmg': {
       const { head, tail } = target(a.target, a.onlyType)
-      return `${head}${signed(a.n)} dmg${tail}${per(a)}`
+      return `${head}${signed(a.n)} dmg${tail}${per(a)}${a.max != null ? ` (max ${a.max})` : ''}`
     }
     case 'mulDmg': {
       const { head, tail } = target(a.target, a.onlyType)

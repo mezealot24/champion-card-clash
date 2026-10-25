@@ -18,6 +18,8 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   chainLength: { c: 'chainLength', op: '=', n: 1 },
   slotIs: { c: 'slotIs', n: 1 },
   hasFacing: { c: 'hasFacing' },
+  noFacing: { c: 'noFacing' },
+  lostHp: { c: 'lostHp' },
   facingSameType: { c: 'facingSameType' },
   tookDmg: { c: 'tookDmg', n: 1 },
   hpAtMost: { c: 'hpAtMost', n: 30 },
@@ -50,6 +52,8 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   chainLength: 'Your chain length is…',
   slotIs: 'This card is in slot N',
   hasFacing: 'There is a facing card',
+  noFacing: 'There is no facing card',
+  lostHp: 'You lost HP this turn or last turn',
   facingSameType: 'Facing card is the same type',
   tookDmg: 'You take N+ dmg from hits this turn',
   hpAtMost: 'Your HP ≤ N',
@@ -351,6 +355,11 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
           <option value="">(flat)</option>
           {Object.entries(PER_LABEL).map(([k, label]) => <option key={k} value={k}>per {label}</option>)}
         </select>
+      )}
+      {value.a === 'addDmg' && value.per && (
+        <label title="Cap on the bonus (empty = no cap)">
+          max <input type="number" style={{ width: 56 }} value={value.max ?? ''} onChange={(e) => onChange({ ...value, max: e.target.value === '' ? undefined : +e.target.value })} />
+        </label>
       )}
       <span className="muted">→ {describeAct(value)}</span>
     </>

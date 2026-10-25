@@ -220,6 +220,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     // Shields from before this turn lose a turn; used-up or expired ones go
     for (const s of p.statuses) if (oldShields.includes(s)) s.turns--
     p.statuses = p.statuses.filter((s) => s.kind !== 'shield' || (s.turns > 0 && (s.n ?? 0) > 0))
+    // for the lostHp condition ("you lost HP this turn or last turn")
+    if (state.events?.some((e) => e.k === 'hp' && e.side === side && e.delta < 0)) p.lostHpTurn = state.turn
   }
 
   const dead = SIDES.filter((s) => state.players[s].hp <= 0)
