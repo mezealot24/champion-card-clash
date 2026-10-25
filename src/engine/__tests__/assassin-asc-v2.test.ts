@@ -1,7 +1,6 @@
 // Assassin Ascendancy v2 (Q 2026-10-25, design/assassin-ascendancy-v2-2026-10-25.md): Sonic Bliz + Fatal Rhythm.
 import { describe, expect, it } from 'vitest'
 import { createGame, resolveTurn, TREES } from '../index'
-import { isDebuff } from '../styles'
 import type { CardDef, CardInst, GameState } from '../index'
 import type { EffectSpec } from '../effects/spec'
 import { tuningOf } from '../tuning'
@@ -26,19 +25,18 @@ describe('Assassin v2 Ascendancy', () => {
   })
 
   describe('Sonic Bliz', () => {
-    it('Afterburner: Energy back after an Overdrive, never a full bar; Acceleration no longer fills', () => {
+    it('Echo: an Overdrive replays its strongest card at 50%, Block stops it; loses 1 Energy', () => {
       let s = as('AS:1', ['A1', 'A2', 'A3'])
-      expect(t(s, 'AS:1').minChain).toBe(2)
-      s.players.p1.res = 3
-      s.players.p1.hand = [hit(1), hit(1)]
+      s.players.p1.res = 2
+      s.players.p1.hand = [hit(4), hit(10)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(said(s, 'Afterburner')).toBe(true)
-      expect(s.players.p1.res).toBe(2) // 0 after Overdrive, +1 a turn, Afterburner stops below a full bar (Surge)
-      s.players.p1.res = 0
-      s.players.p1.hand = [hit(1, 'S')]
-      s.players.p2.hand = [hit(1)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'strike' })
-      expect(s.players.p1.res).toBeLessThan(3)
+      expect(said(s, 'Echo: replays the strongest card for')).toBe(true)
+      expect(said(s, 'Echo: loses 1 Energy')).toBe(true) // 0 after Overdrive, the turn's +1 is lost
+      expect(s.players.p1.res).toBe(0)
+      s.players.p1.res = 2
+      s.players.p1.hand = [hit(4), hit(10)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      expect(said(s, 'Echo: Blocked')).toBe(true)
     })
 
     it('Mach Speed: Strike into Charge draws 1, no Energy; one fewer card at start', () => {
@@ -78,15 +76,17 @@ describe('Assassin v2 Ascendancy', () => {
       expect(s.players.p1.perkData?.veil).toBe(0)
     })
 
-    it('Wraith Form: Wraith Step lets 0 through, −20 Max HP', () => {
+    it("Phantom: no hit reaches you → next Strike's first card ignores Block; −20 Max HP", () => {
       let s = as('AS:1', ['C1', 'C2', 'C3'])
       expect(s.players.p1.maxHp).toBe(140)
-      s.players.p1.res = 3
-      const hp = s.players.p1.hp
-      s.players.p2.hand = [hit(10), hit(10), hit(10), hit(10)]
+      s.players.p2.hand = [hit(5)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(said(s, 'Energy Surge')).toBe(true)
-      expect(s.players.p1.hp).toBe(hp)
+      expect(s.players.p1.perkData?.phantom).toBe(1)
+      const hp = s.players.p2.hp
+      s.players.p1.hand = [hit(6), hit(6)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      expect(hp - s.players.p2.hp).toBe(6)
+      expect(s.players.p1.perkData?.phantom).toBe(0)
     })
 
     it('Snare and Tripwire Cut the newest card on Charge vs Block', () => {
@@ -123,59 +123,51 @@ describe('Assassin v2 Ascendancy', () => {
       expect(said(s, 'Executioner')).toBe(true)
     })
 
-    it('Crescendo: every 3rd, ×2 (×4 vs low HP stays); Off-Beat counts stopped hits up to 2', () => {
+    it('Build-up: each Critical makes the next one bigger; a hit or a Blocked Critical resets it', () => {
       let s = as('AS:2', ['B1', 'B2', 'B3'])
-      expect(t(s, 'AS:2').every).toBe(3)
-      expect(t(s, 'AS:2').critMult).toBe(2)
-      expect(t(s, 'AS:2').redCritMult).toBe(4)
-      expect(s.players.p1.styleData?.attacks).toBe(2)
-      s.players.p2.hand = [hit(1), hit(1), hit(1)]
-      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.players.p1.styleData?.attacks).toBe(4)
-    })
-
-    it('Toxic Strike: Venom per Critical (capped), burns 1 per stack and fades by 1; it is a debuff', () => {
-      let s = as('AS:2', ['C1', 'C2'])
       s.players.p1.styleData = { attacks: 3 }
-      s.players.p1.hand = [hit(1)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-      const v = s.players.p2.statuses.find((x) => x.kind === 'venom')!
-      expect(v.n).toBe(1) // 2 given, 2 burned, 1 fades
-      expect(said(s, 'enemy loses 2 HP')).toBe(true)
-      expect(isDebuff(v)).toBe(true)
-      v.n = 9
-      s.players.p1.styleData = { attacks: 3 }
-      s.players.p1.hand = [hit(1)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-      expect(said(s, 'Venom 6/6')).toBe(true)
-    })
-
-    it('Virulent: +1 dmg per card at 3+ Venom', () => {
-      let s = as('AS:2', ['C1', 'C2'])
-      s.players.p2.statuses.push({ kind: 'venom', turns: 9999, n: 3 })
-      s.players.p1.hand = [hit(4)]
+      s.players.p1.hand = [hit(5)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(said(s, 'Virulent')).toBe(true)
+      expect(s.players.p1.perkData?.buildUp).toBe(1)
+      const hp = s.players.p2.hp
+      s.players.p1.styleData = { attacks: 3 }
+      s.players.p1.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(hp - s.players.p2.hp).toBe(20) // ×(3+1)
+      s.players.p1.styleData = { attacks: 3 }
+      s.players.p1.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      expect(s.players.p1.perkData?.buildUp).toBe(0)
     })
 
-    it('Noxious: Venom stays; blocked Criticals deal 0 even with Feint, Venom max 4', () => {
-      let s = as('AS:2', ['C1', 'C2', 'C3', 'D1'])
+    it('Pursuit: Chase adds to the counter, Run Down Cuts, Hunt multiplies Criticals into a Charge; blocked Criticals deal 0', () => {
+      let s = as('AS:2', ['C1', 'C2', 'C3'])
       expect(t(s, 'AS:2').blockedCritPct).toBe(0)
-      expect(t(s, 'AS:2').ascVenomMax).toBe(4)
-      s.players.p2.statuses.push({ kind: 'venom', turns: 9999, n: 3 })
-      s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-      expect(100 - s.players.p2.hp).toBe(3)
-      expect(s.players.p2.statuses.find((x) => x.kind === 'venom')?.n).toBe(3)
+      s.players.p1.styleData = { attacks: 2 }
+      s.players.p1.hand = [hit(5)]
+      s.players.p2.hand = [hit(1), hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(said(s, 'Chase')).toBe(true)
+      expect(said(s, 'Hunt')).toBe(true)
+      expect(said(s, 'Run Down')).toBe(true)
+      expect(100 - s.players.p2.hp).toBe(20) // ×(3+1)
     })
 
-    it('Ghost Dance gives Parry after a Critical; Unseen Strike: Criticals ignore Block, −15 Max HP', () => {
+    it('Ghost Dance gives Parry after a Critical; Shadow Mark: next Strike breaks Parry/Shield, first card ignores Block, −15 Max HP', () => {
       let s = as('AS:2', ['D1', 'D2', 'D3'])
       expect(s.players.p1.maxHp).toBe(145)
       s.players.p1.styleData = { attacks: 3 }
       s.players.p1.hand = [hit(5)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-      expect(100 - s.players.p2.hp).toBe(15)
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(s.players.p1.statuses.some((x) => x.kind === 'parry')).toBe(true)
+      expect(said(s, 'Shadow Mark: the enemy is Marked')).toBe(true)
+      s.players.p2.statuses.push({ kind: 'shield', turns: 9999, n: 10 })
+      const hp = s.players.p2.hp
+      s.players.p1.styleData = { attacks: 0 }
+      s.players.p1.hand = [hit(6)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      expect(hp - s.players.p2.hp).toBe(6)
+      expect(s.players.p2.statuses.some((x) => x.kind === 'shield')).toBe(false)
     })
   })
 })

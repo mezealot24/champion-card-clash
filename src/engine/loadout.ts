@@ -103,6 +103,15 @@ const critSeen: NonNullable<StyleDef['beforeHits']> = (state, side, _b, _m, crit
   const p = state.players[side]
   p.perkData = { ...p.perkData, critTurn: crit.size ? state.turn : 0, critN: crit.size }
 }
+/** what the enemy played this turn, for pieces whose hooks don't get it (actionStart runs first) */
+const foeActSeen: NonNullable<StyleDef['actionStart']> = (state, side, _a, enemyAction) => {
+  const p = state.players[side]
+  p.perkData = { ...p.perkData, foeActTurn: state.turn, foeAct: enemyAction === 'strike' ? 1 : enemyAction === 'charge' ? 2 : enemyAction === 'block' ? 3 : 0 }
+}
+const foeDid = (state: GameState, side: Side, a: 'strike' | 'charge' | 'block') => {
+  const d = state.players[side].perkData
+  return d?.foeActTurn === state.turn && d?.foeAct === { strike: 1, charge: 2, block: 3 }[a]
+}
 const critThisTurn = (state: GameState, side: Side) => state.players[side].perkData?.critTurn === state.turn
 /** a card whose effect has a Cut in it (Assassin Cut cards) */
 const isCutCard = (spec: unknown) => !!spec && JSON.stringify(spec).includes('"a":"cut"')
@@ -786,14 +795,33 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   'AS:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'minChain', -v(k)) }),
   'AS:1:A3': (amt) => ({
     hooks: {
-      noDualFill: true, // Cost: Acceleration still draws but fills no Energy
+      actionStart: foeActSeen,
+      beforeHits: (state, side, bonus, mult, _c, chain) => {
+        const p = state.players[side]
+        if (p.styleData?.odTurn !== state.turn || !chain?.length) return
+        // strongest chain card after Overdrive and every other boost so far
+        const best = Math.max(...chain.map((c, i) => Math.max(0, (c.def.dmg ?? 0) + (bonus[i] ?? 0)) * (mult[i] ?? 1)))
+        p.perkData = { ...p.perkData, echo: Math.floor((best * amt(state, side)) / 100), echoTurn: state.turn }
+      },
+      afterChain: (state, side) => {
+        const p = state.players[side]
+        if (p.perkData?.echoTurn !== state.turn) return 0
+        const n = p.perkData?.echo ?? 0
+        if (foeDid(state, side, 'block')) {
+          say(state, side, 'Echo: Blocked')
+          return 0
+        }
+        if (n <= 0 || state.players[other(side)].hp <= 0) return 0
+        hurt(state, other(side), n)
+        say(state, side, `Echo: replays the strongest card for ${n} dmg`)
+        return 1
+      },
       endTurn: (state, side) => {
         const p = state.players[side]
-        // never to a full bar: a full bar would be eaten by Energy Surge next turn
-        const room = (resourceOf(p.championId, tuningOf(state, side))?.cap ?? 0) - 1 - (p.res ?? 0)
-        if (p.styleData?.odTurn !== state.turn || amt(state, side) <= 0 || room <= 0) return
-        addRes(state, side, Math.min(amt(state, side), room))
-        say(state, side, `Afterburner: Energy ${state.players[side].res ?? 0}`)
+        const n = num(state, side, 'AS:1', 'ascEchoCost')
+        if (p.perkData?.echoTurn !== state.turn || n <= 0 || !(p.res ?? 0)) return
+        p.res = Math.max(0, (p.res ?? 0) - n)
+        say(state, side, `Echo: loses ${n} Energy`)
       },
     },
   }),
@@ -834,9 +862,23 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  'AS:1:C3': () => ({
-    setup: (p, v) => addMaxHp(p, -v('ascWraithFormCost')),
-    hooks: { wraithZero: true },
+  'AS:1:C3': (amt) => ({
+    setup: (p, v) => addMaxHp(p, -v('ascPhantomCost')),
+    hooks: {
+      afterHits: (state, side, r) => {
+        const p = state.players[side]
+        if (!r.attacked || r.hitsTaken > 0 || p.perkData?.phantom) return
+        p.perkData = { ...p.perkData, phantom: 1 }
+        say(state, side, "Phantom: next Strike's first card can't be Blocked")
+      },
+      beforeHits: (state, side, _b, _m, _c, _chain, pierce) => {
+        const p = state.players[side]
+        if (!p.perkData?.phantom || !pierce?.length) return
+        for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
+        p.perkData = { ...p.perkData, phantom: 0 }
+        say(state, side, "Phantom: the first card can't be Blocked")
+      },
+    },
   }),
   // Sonic Bliz · Sabotage (PoE Saboteur): free Cuts on turns nobody Strikes
   'AS:1:D1': (amt) => ({
@@ -894,56 +936,54 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  'AS:2:B3': (_, k) => ({
-    tune: (t, v) => {
-      add(t, 'AS:2', 'every', -v(k))
-      add(t, 'AS:2', 'critMult', -v('ascCrescendoCost'))
+  'AS:2:B3': (amt) => ({
+    hooks: {
+      actionStart: foeActSeen,
+      beforeHits: (state, side, _b, mult, crit) => {
+        const p = state.players[side]
+        const had = p.perkData?.buildUp ?? 0
+        if (!crit.size) return
+        if (had > 0) for (const i of crit) if (i < mult.length) mult[i] += had
+        const n = foeDid(state, side, 'block') ? 0 : Math.min(num(state, side, 'AS:2', 'ascBuildUpMax'), had + amt(state, side) * crit.size)
+        p.perkData = { ...p.perkData, buildUp: n }
+        say(state, side, had > 0 ? `Build-up: Criticals ×${had} more, now ${n}` : `Build-up: ${n}`)
+      },
+      afterHits: (state, side, r) => {
+        const p = state.players[side]
+        if (r.hitsTaken <= 0 || !p.perkData?.buildUp) return
+        p.perkData = { ...p.perkData, buildUp: 0 }
+        say(state, side, 'Build-up: reset (hit)')
+      },
     },
   }),
-  // Fatal Rhythm · Venom (PoE Assassin poison): a debuff status on the enemy, capped
+  // Fatal Rhythm · Pursuit: punish the enemy's Charge
   'AS:2:C1': (amt) => ({
     hooks: {
       beforeHits: critSeen,
-      afterChain: (state, side) => {
-        const n = (state.players[side].perkData?.critN ?? 0) * amt(state, side)
-        if (!critThisTurn(state, side) || n <= 0) return 0
-        const foe = state.players[other(side)]
-        const max = num(state, side, 'AS:2', 'ascVenomMax')
-        const s = foe.statuses.find((x) => x.kind === 'venom')
-        const now = Math.min(max, (s?.n ?? 0) + n)
-        if (s) s.n = now
-        else foe.statuses.push({ kind: 'venom', turns: 9999, n: now })
-        say(state, side, `Toxic Strike: enemy Venom ${now}/${max}`)
-        return 0
-      },
-      endTurn: (state, side) => {
-        const foe = state.players[other(side)]
-        const s = foe.statuses.find((x) => x.kind === 'venom')
-        if (!s?.n || foe.hp <= 0) return
-        const noxious = state.players[side].perks?.includes('asc:AS:2:C3')
-        const n = s.n
-        hurt(state, other(side), n)
-        say(state, side, `Venom ${s.n}: enemy loses ${n} HP`)
-        if (!noxious) s.n--
-        if (!s.n) foe.statuses = foe.statuses.filter((x) => x !== s)
+      endTurn: (state, side, action, enemyAction) => {
+        if (action === 'strike' && enemyAction === 'charge' && critThisTurn(state, side)) cutNewest(state, side, amt(state, side), 'Run Down')
       },
     },
   }),
   'AS:2:C2': (amt) => ({
     hooks: {
-      beforeHits: (state, side, bonus) => {
-        const v = state.players[other(side)].statuses.find((x) => x.kind === 'venom')?.n ?? 0
-        if (v < num(state, side, 'AS:2', 'ascVirulentAt') || amt(state, side) <= 0) return
-        for (let i = 0; i < bonus.length; i++) bonus[i] += amt(state, side)
-        say(state, side, `Virulent: every chain card +${amt(state, side)} dmg`)
+      actionStart: (state, side, action, enemyAction) => {
+        if (action !== 'strike' || enemyAction !== 'charge' || amt(state, side) <= 0) return
+        const p = state.players[side]
+        p.styleData = { ...p.styleData, attacks: (p.styleData?.attacks ?? 0) + amt(state, side) }
+        say(state, side, `Chase: Critical counter +${amt(state, side)}`)
       },
     },
   }),
-  'AS:2:C3': () => ({
-    // Cost after every node (Feint too)
-    lastTune: (t, v) => {
-      add(t, 'AS:2', 'blockedCritPct', -1_000_000)
-      add(t, 'AS:2', 'ascVenomMax', -v('ascNoxiousCost'))
+  'AS:2:C3': (amt) => ({
+    lastTune: (t) => add(t, 'AS:2', 'blockedCritPct', -1_000_000), // Cost after every node (Feint too)
+    hooks: {
+      actionStart: foeActSeen,
+      beforeHits: (state, side, _b, mult, crit) => {
+        if (!crit.size || !foeDid(state, side, 'charge') || amt(state, side) <= 0) return
+        for (const i of crit) if (i < mult.length) mult[i] += amt(state, side)
+        say(state, side, `Hunt: Criticals into a Charge ×${amt(state, side)} more`)
+      },
     },
   }),
   // Fatal Rhythm · Shadow (PoE Trickster)
@@ -960,13 +1000,20 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  'AS:2:D3': (_, k) => ({
-    setup: (p, v) => addMaxHp(p, -v(k)),
+  'AS:2:D3': (amt, k) => ({
+    setup: (p, v) => addMaxHp(p, -v(`${k}Cost`)),
     hooks: {
       beforeHits: (state, side, _b, _m, crit, _chain, pierce) => {
-        if (!pierce || !crit.size) return
-        for (const i of crit) if (i < pierce.length) pierce[i] = 1
-        say(state, side, 'Unseen Strike: Criticals ignore Block')
+        const p = state.players[side]
+        const marked = (p.perkData?.markAt ?? 0) > 0 && (p.perkData?.markAt ?? 0) < state.turn
+        if (marked && pierce?.length) {
+          for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
+          const foe = state.players[other(side)]
+          foe.statuses = foe.statuses.filter((x) => x.kind !== 'parry' && x.kind !== 'shield')
+          say(state, side, 'Shadow Mark: Parry and Shield break, the first card ignores Block')
+        }
+        p.perkData = { ...p.perkData, markAt: crit.size ? state.turn : 0 }
+        if (crit.size) say(state, side, 'Shadow Mark: the enemy is Marked')
       },
     },
   }),
