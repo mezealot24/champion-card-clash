@@ -790,7 +790,7 @@ export function applyLoadout(p: PlayerState, l: Loadout | undefined, gameTuning:
   if (res && !res.payWithHp) p.res = Math.min(res.cap, res.start)
 }
 
-/** A random full loadout for the AI: any Oath, any Minor, and all points spent down random branches of its Style's tree. */
+/** A random full loadout for the AI: any Oath (no Minor: Sigil II is off, Q 2026-10-25), and all points spent down random branches of its Style's tree. */
 export function randomLoadout(champ: string, style: string | undefined, points: number, rand: () => number = Math.random): Loadout {
   const pick = <T,>(xs: T[]): T | undefined => xs[Math.floor(rand() * xs.length)]
   const asc: string[] = []
@@ -803,5 +803,5 @@ export function randomLoadout(champ: string, style: string | undefined, points: 
       asc.push(id)
     }
   }
-  return { oath: pick(OATHS[champ] ?? [])?.id, minor: pick(MINORS)?.id, asc, points: pts }
+  return { oath: pick(OATHS[champ] ?? [])?.id, asc, points: pts }
 }

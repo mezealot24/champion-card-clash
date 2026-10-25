@@ -120,7 +120,7 @@ describe('randomLoadout', () => {
       for (let i = 0; i < 30; i++) {
         const l = randomLoadout(champ, style, 5)
         expect(OATHS[champ].some((o) => o.id === l.oath)).toBe(true)
-        expect(MINORS.some((m) => m.id === l.minor)).toBe(true)
+        expect(l.minor).toBeUndefined() // Sigil II · Minor is off
         expect(l.asc).toHaveLength(treePoints(style, 5))
         expect(validAsc(l.asc!, treePoints(style, 5), style)).toBe(true)
       }
