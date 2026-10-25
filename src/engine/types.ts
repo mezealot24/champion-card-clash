@@ -31,6 +31,7 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
 
 /** trueDmg = your hits ignore dmg cuts (only Block stops them) */
 /** deathMark = on the side that carries it: every Strike against it bursts for 50% of that chain's total dmg (Assassin combo, rest of game) */
+/** venom = n stacks (Fatal Rhythm Toxic Strike): lose 1 HP per stack at the end of every turn, then 1 stack fades; a debuff */
 /** guardBreak = Guard Crush: on your next Strike, blocked hits deal half and a Blocking opponent loses their 2 oldest Field cards */
 /**
  * silence = your cards' effects don't fire this turn (Styles and combos still work)
@@ -39,8 +40,11 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  */
 /** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts. chill = Cryomancer's slow (n = stacks, CHILL_*).
  * frozen = marker for "can't Strike this turn" (lasts 1 turn longer than its noStrike so cards can read it). skillSilence = Skill cards' effects off (Bitter Cold). subZero = next Strike: every clean hit gives 1 Chill (Arcane Sub-Zero) */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb'
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'venom'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
+/** A side loses at most this many Field cards to Cut effects per turn (Claude default 2026-10-16). Charge break doesn't count. */
+export const CUT_CAP = 2
+
 export type Status = { kind: StatusKind; turns: number; n?: number }
 
 export type PlayerState = {
