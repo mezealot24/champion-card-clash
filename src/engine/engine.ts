@@ -191,7 +191,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     if (enemy !== 'strike') continue
     const ds = getStyle(state.players[side].style)?.dualStrike
     if (!ds) continue
-    const fill = ds.fillRes && !hooks.some((h) => h.noDualFill)
+    const fill = ds.fillRes
     const cap = resourceOf(state.players[side].championId, tuningOf(state, side))?.cap ?? 0
     if (fill && state.rules.resources) addRes(state, side, cap)
     const draw = ds.draw?.(tuningOf(state, side)) ?? 0
@@ -350,8 +350,7 @@ function resolveStrikes(
       const enemy = other(side)
       let dealt = dealtOf(side, i)
       // Energy Surge: Wraith Step caps hits past Block at 1, Shroud halves them
-      // Wraith Form (Assassin Ascendancy): Wraith Step lets nothing through
-      if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, hooksOf(state.players[enemy]).some((h) => h.wraithZero) ? 0 : 1)
+      if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, 1)
       if (env.shroud[enemy]) dealt = Math.floor(dealt / 2)
       if (hitCut[enemy] && !isBlocked(side, i)) dealt = Math.max(0, dealt - hitCut[enemy])
       const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
