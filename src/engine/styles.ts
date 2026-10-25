@@ -30,7 +30,7 @@ export function addChill(state: GameState, side: Side, n: number): number {
   if (!cur && n <= 0) return 0
   const stacks = Math.min(t.chillMax, (cur?.n ?? 0) + n)
   p.statuses = p.statuses.filter((s) => s.kind !== 'chill')
-  if (stacks >= t.chillMax) {
+  if (stacks >= t.chillMax && !t.chillNoFreeze) {
     const lost = Math.floor((p.maxHp * t.shatterPct) / 100)
     p.hp = Math.max(0, p.hp - lost)
     for (const h of hooksOf(p)) h.onHpLoss?.(state, side)
@@ -369,13 +369,14 @@ Object.assign(STYLES, {
       p.res = (p.res ?? 0) - spent
       // turns 1: an old-shield tick at the end of this turn removes it
       p.statuses.push({ kind: 'shield', turns: 1, n: spent * f.moltenShieldPerMana })
-      p.styleData = { ...p.styleData, molten: 1 }
+      p.styleData = { ...p.styleData, molten: 1, moltenSpent: spent }
       say(state, side, `Molten Shield: spends ${spent} Mana → Shield ${spent * f.moltenShieldPerMana} this turn, blocked hits Ignite`)
     },
     afterHits: (state, side, r) => {
       const p = state.players[side]
-      if (!p.styleData?.molten || !r.hitsBlocked) return
-      const n = addIgnite(state, other(side), r.hitsBlocked)
+      const per = tuningOf(state, side)['MG:1'].moltenIgnite
+      if (!p.styleData?.molten || !r.hitsBlocked || per <= 0) return
+      const n = addIgnite(state, other(side), r.hitsBlocked * per)
       say(state, side, `Molten Shield: blocked ${r.hitsBlocked} hits → enemy gets 🔥 Ignite (${n} stacks)`)
     },
     endTurn: (state, side) => {
