@@ -97,7 +97,7 @@ export const TREES: Record<string, TreeData> = {
     depth: 3,
     bonusPoints: 1,
     nodes: [
-      multi('A1', 'Unflinching', 'Each turn 2+ hits reach you, gain 1 Endurance (max {ascEnduranceMax}). Each Endurance: hits that reach you deal 1 less dmg. Endurance fades after {ascEnduranceTurns} turns without a new one.', [
+      multi('A1', 'Unflinching', 'Each turn 2+ hits reach you (an Ignite burn counts as 1), gain 1 Endurance (max {ascEnduranceMax}). Each Endurance: hits that reach you deal 1 less dmg. Endurance fades after {ascEnduranceTurns} turns without a new one.', [
         ['ascEnduranceMax', 'max Endurance', 3, 1],
         ['ascEnduranceTurns', 'turns before it fades', 3, 1],
       ]),

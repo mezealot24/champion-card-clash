@@ -168,7 +168,9 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     hooks: {
       afterHits: (state, side, r) => {
         const p = state.players[side]
-        if (r.hitsTaken < 2 || p.hp <= 0) return
+        // Q 2026-10-25: an Ignite burn this turn counts as 1 hit (vs Pyromancer)
+        const hits = r.hitsTaken + (igniteStacks(p) > 0 ? 1 : 0)
+        if (hits < 2 || p.hp <= 0) return
         const max = num(state, side, 'TK:1', 'ascEnduranceMax')
         const n = Math.min(max, endurance(p) + (p.perks?.includes('asc:TK:1:A3') ? 2 : 1))
         p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn }
