@@ -100,11 +100,12 @@ export const TREES: Record<string, TreeData> = {
     bonusPoints: 1,
     nodes: [
       // Q 2026-10-25 (after sim): Endurance = −dmg per hit + HP regen per charge; gained by Charge or by taking 2+ hits
-      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Each Endurance: hits that reach you deal {ascEnduranceCut} less dmg, and you regain {ascEnduranceRegen}% Max HP at the end of every turn. Endurance fades after {ascEnduranceTurns} turns without a new one.', [
+      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Each Endurance: hits that reach you deal {ascEnduranceCut} less dmg, and you regain {ascEnduranceRegen}% Max HP at the end of every turn, at {ascEndurancePower}% strength (rounded down over all your Endurance). Endurance fades after {ascEnduranceTurns} turns without a new one.', [
         ['ascEnduranceMax', 'max Endurance', 3, 1],
         ['ascEnduranceTurns', 'turns before it fades', 3, 1],
         ['ascEnduranceCut', 'dmg cut per hit, per Endurance', 2],
         ['ascEnduranceRegen', 'regen % Max HP per Endurance', 1],
+        ['ascEndurancePower', 'Endurance effect % (cut + regen)', 25, 0, 100],
       ]),
       multi('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance. Endurance max +{ascUnyieldingMax}.', [
         ['ascUnyielding', 'dmg per Endurance', 2],

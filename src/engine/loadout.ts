@@ -1278,7 +1278,8 @@ for (const [style, tree] of Object.entries(TREES))
 PIECES['asc:TK:1:END'] = {
   group: 'TK:1',
   hooks: {
-    hitCut: (state, side) => endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut'),
+    // Q 2026-10-25 18:47: Endurance effects at ascEndurancePower% (25) of their full size
+    hitCut: (state, side) => Math.floor((endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut') * num(state, side, 'TK:1', 'ascEndurancePower')) / 100),
     endTurn: (state, side) => {
       const p = state.players[side]
       const n = endurance(p)
@@ -1288,7 +1289,7 @@ PIECES['asc:TK:1:END'] = {
         say(state, side, 'Endurance fades')
         return
       }
-      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
+      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen') * num(state, side, 'TK:1', 'ascEndurancePower')) / 10000))
       if (got) say(state, side, `Endurance: ${n} regen ${got}`)
     },
   },
