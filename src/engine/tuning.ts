@@ -26,13 +26,8 @@ export const TUNING_FIELDS = {
     { key: 'comboHealPct', label: 'P+K+P combo heal %', def: 10, min: 0, max: 100, help: '% of current HP healed when the enemy Blocks one of the combo cards' },
   ],
   'TK:1': [
-    // Iron Will (Q 2026-10-25 19:06, was Lifeline): starts with Endurance, carries the 4 Ascendancy Costs
-    { key: 'hpPct', label: 'Second Wind HP line %', def: 30, min: 1, max: 100, help: 'Second Wind (Untiring ★) switches on below this % of Max HP' },
-    { key: 'startEndurance', label: 'Endurance at the start', def: 1, min: 0 },
-    { key: 'costLeakPct', label: 'Cost: % dmg of blocked hits after the first', def: 50, min: 0, max: 100 },
-    { key: 'costHealCut', label: 'Cost: heal / regen cut %', def: 50, min: 0, max: 100 },
-    { key: 'costSHpPct', label: 'Cost: S card cost, % of current HP', def: 10, min: 0, max: 100, help: '0 = normal S cost' },
-    { key: 'costVulnPct', label: 'Cost: Vulnerable % when Endurance runs out', def: 25, min: 0, max: 100 },
+    { key: 'hpPct', label: 'Lifeline HP line %', def: 30, min: 1, max: 100, help: 'Heals only while HP is below this % of Max HP' },
+    { key: 'healPctPerHit', label: 'Heal % of missing HP per hit', def: 4, min: 0, max: 100 },
   ],
   'TK:2': [
     { key: 'perHitTaken', label: 'Max HP per hit taken', def: 1, min: 0 },

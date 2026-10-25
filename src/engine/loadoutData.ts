@@ -111,22 +111,20 @@ export const TREES: Record<string, TreeData> = {
         ['ascUnyielding', 'dmg per Endurance', 2],
         ['ascUnyieldingMax', 'max Endurance +', 1],
       ]),
-      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. {ascUnrelentingPct}% of the hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'None (Iron Will carries the Costs).', [
+      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. {ascUnrelentingPct}% of the hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'When you Block, only the first hit is fully stopped: each later blocked hit still deals {ascUnrelentingLeak}% dmg.', [
         ['ascUnrelenting', 'max Endurance +', 2],
+        ['ascUnrelentingLeak', '% dmg of blocked hits after the first', 50, 0],
         ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
         ['ascUnrelentingPct', '% of hit dmg delayed', 50, 0, 100],
       ]),
       // Q 2026-10-25 14:58: Untiring = Endurance from HP lost / Blocks / Second Wind (uses Unflinching's Endurance numbers)
-      multi('B1', 'Early Rally', 'Second Wind HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn).', [
+      multi('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn).', [
         ['ascEarlyRally', 'HP line % +', 5],
         ['ascEarlyRallyLoss', '% Max HP lost per Endurance', 15, 1],
       ]),
       node('B2', 'Untiring', 'A turn your Block stops a hit, gain 1 Endurance.', 'ascUntiring', 'unused', 0),
-      capstone('B3', 'Second Wind', 'Once per match, when your HP drops below the HP line: Endurance max +{ascSecondWindMax} and fill it. For {ascSecondWindTurns} turns, at the end of the turn heal {ascSecondWind} + {ascSecondWindPct}% of missing HP per Endurance.', 'None (Iron Will carries the Costs).', [
-        ['ascSecondWind', 'heal per Endurance per turn', 4],
-        ['ascSecondWindMax', 'Endurance max +', 2],
-        ['ascSecondWindTurns', 'regen turns', 3, 1],
-        ['ascSecondWindPct', 'heal % of missing HP per Endurance', 4],
+      capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off. Gain 1 Endurance at the end of every turn.', 'Every heal and regen you get is {ascSecondWindHealCut}% smaller.', [
+        ['ascSecondWindHealCut', 'Cost: heal cut %', 50, 0, 100],
       ]),
       // Q 2026-10-25 15:06: Unstoppable + Unbroken merged into C; D = Undeniable (spend Endurance on offence)
       multi('C1', 'Unstoppable', 'When a Charge break hits you, gain {ascUnstoppableEnd} Endurance, and it can\'t throw away your first {ascUnstoppable} Field cards.', [
@@ -138,10 +136,11 @@ export const TREES: Record<string, TreeData> = {
         ['ascLastBastionPct', 'Shield % of missing HP', 10],
         ['ascDefiance', 'dmg cut per hit in the red', 2],
       ]),
-      capstone('C3', 'Grasp of the Undying', 'Once per match, a hit that would knock you out leaves you on 1 HP and Undying for {ascUndyingTurns} turns: your HP can\'t drop below 1, and every chain card deals +{ascUndyingPct}% of your Max HP. When Undying ends, heal the bonus dmg it landed.', 'None (Iron Will carries the Costs).', [
+      capstone('C3', 'Grasp of the Undying', 'Once per match, a hit that would knock you out leaves you on 1 HP and Undying for {ascUndyingTurns} turns: your HP can\'t drop below 1, and every chain card deals +{ascUndyingPct}% of your Max HP. When Undying ends, heal the bonus dmg it landed.', 'Your S cards cost {ascUndyingCost}% of your current HP each (instead of their usual cost).', [
         ['ascUnbroken', 'times per match', 1],
         ['ascUndyingTurns', 'Undying turns', 3, 1],
         ['ascUndyingPct', 'dmg per card, % Max HP', 5],
+        ['ascUndyingCost', 'Cost: S cost % of current HP', 10, 1, 100],
       ]),
       multi('D1', 'Momentum', 'Each Strike in a row (no other action between) gives every chain card +{ascMomentum} dmg, up to +{ascMomentumCap}. A chain of {ascMomentumCards}+ cards gives {ascMomentumEnd} Endurance.', [
         ['ascMomentum', 'dmg per Strike in a row', 1],
@@ -153,8 +152,9 @@ export const TREES: Record<string, TreeData> = {
         ['ascUndeniable', 'slots that ignore Block', 1, 0, 5],
         ['ascUndeniableHalf', 'slot 1 dmg cut % with no Endurance', 50, 0, 100],
       ]),
-      capstone('D3', 'Unleashed', 'When you Strike, spend all Endurance: every chain card +{ascUnleashed} dmg per Endurance spent.', 'The spent Endurance is gone.', [
+      capstone('D3', 'Unleashed', 'When you Strike, spend all Endurance: every chain card +{ascUnleashed} dmg per Endurance spent.', 'The spent Endurance is gone, and you are Vulnerable (+{ascUnleashedVuln}% dmg taken) next turn.', [
         ['ascUnleashed', 'dmg per Endurance', 3],
+        ['ascUnleashedVuln', 'Cost: Vulnerable %', 25, 0, 100],
       ]),
     ],
   },
