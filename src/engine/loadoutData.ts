@@ -94,7 +94,7 @@ export const TREES: Record<string, TreeData> = {
    * (Lifeline) and Guardian (Titan Bloom). Everything that stacks has a cap (Hoarfrost lesson).
    */
   'TK:1': {
-    branches: ['Endurance', 'Untiring', 'Unstoppable', 'Unbroken'],
+    branches: ['Endurance', 'Untiring', 'Unbroken', 'Undeniable'],
     depth: 3,
     bonusPoints: 1,
     nodes: [
@@ -120,21 +120,26 @@ export const TREES: Record<string, TreeData> = {
         ['ascEarlyRallyLoss', '% Max HP lost per Endurance', 15, 1],
       ]),
       node('B2', 'Untiring', 'A turn your Block stops a hit, gain 1 Endurance.', 'ascUntiring', 'unused', 0),
-      capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off. Gain 1 Endurance at the end of every turn.', '−{ascSecondWindCost} Max HP, and every heal and regen you get is {ascSecondWindHealCut}% smaller.', [
-        ['ascSecondWindCost', 'Cost: Max HP −', 20],
+      capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off. Gain 1 Endurance at the end of every turn.', 'Every heal and regen you get is {ascSecondWindHealCut}% smaller.', [
         ['ascSecondWindHealCut', 'Cost: heal cut %', 50, 0, 100],
       ]),
+      // Q 2026-10-25 15:06: Unstoppable + Unbroken merged into C; D = Undeniable (spend Endurance on offence)
       node('C1', 'Unstoppable', 'A charge break can\'t throw away your first {ascUnstoppable} Field cards.', 'ascUnstoppable', 'safe slots', 2, 0, 5),
-      node('C2', 'Unbreakable', 'The turn after you Charge, your Block stops {ascUnbreakable} more hit.', 'ascUnbreakable', 'Block stops +', 1),
-      capstone('C3', 'Undeniable', 'Chain slot 1 ignores Block.', 'Your S cards cost {ascUndeniableCost}% more HP.', [
-        ['ascUndeniableSlots', 'slots that ignore Block', 1, 0, 5],
-        ['ascUndeniableCost', 'Cost: S cost % +', 50],
+      multi('C2', 'Last Bastion', 'The first time your HP drops into the red, gain Shield {ascLastBastion}. While your HP is in the red, hits that reach you deal {ascDefiance} less dmg.', [
+        ['ascLastBastion', 'Shield', 30],
+        ['ascDefiance', 'dmg cut per hit in the red', 2],
       ]),
-      node('D1', 'Last Bastion', 'The first time your HP drops into the red, gain Shield {ascLastBastion}.', 'ascLastBastion', 'Shield', 30),
-      node('D2', 'Defiance', 'While your HP is in the red, hits that reach you deal {ascDefiance} less dmg.', 'ascDefiance', 'dmg cut per hit', 2),
-      capstone('D3', 'Unbroken', 'Once per match, a hit that would knock you out leaves you on 1 HP.', '−{ascUnbrokenCost} Max HP.', [
+      capstone('C3', 'Unbroken', 'Once per match, a hit that would knock you out leaves you on 1 HP.', '−{ascUnbrokenCost} Max HP.', [
         ['ascUnbroken', 'times per match', 1],
         ['ascUnbrokenCost', 'Cost: Max HP −', 30],
+      ]),
+      multi('D1', 'Momentum', 'Each Strike in a row (no other action between) gives every chain card +{ascMomentum} dmg, up to +{ascMomentumCap}.', [
+        ['ascMomentum', 'dmg per Strike in a row', 1],
+        ['ascMomentumCap', 'max dmg', 3],
+      ]),
+      node('D2', 'Undeniable', 'Your first {ascUndeniable} chain card ignores Block.', 'ascUndeniable', 'slots that ignore Block', 1, 0, 5),
+      capstone('D3', 'Unleashed', 'When you Strike, spend all Endurance: every chain card +{ascUnleashed} dmg per Endurance spent.', 'The spent Endurance is gone (its dmg cut and regen too).', [
+        ['ascUnleashed', 'dmg per Endurance', 3],
       ]),
     ],
   },

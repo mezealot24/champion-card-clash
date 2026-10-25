@@ -101,7 +101,7 @@ describe('loadout', () => {
   })
 
   it('Unbroken: a knockout hit leaves the Tank at 1 HP once', () => {
-    let s = game('TK', { asc: ['D1', 'D2', 'D3'] }, 'TK:1')
+    let s = game('TK', { asc: ['C1', 'C2', 'C3'] }, 'TK:1')
     s.players.p1.hp = 5
     s.players.p2.hand = [hit(50)]
     s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
@@ -227,12 +227,18 @@ describe('randomLoadout', () => {
       s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
       expect(s.log.some((l) => l.includes('Endurance (HP lost)'))).toBe(true)
     })
-    it('Undeniable: S cost +50% and slot 1 ignores Block', () => {
-      let s = tk('TK:1', ['C1', 'C2', 'C3'])
-      expect(s.players.p1.costMod?.pct).toBe(50)
+    it('Undeniable: slot 1 ignores Block, Strikes in a row build Momentum, Unleashed spends Endurance', () => {
+      let s = tk('TK:1', ['A1', 'D1', 'D2', 'D3'])
+      s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
+      expect(s.players.p1.perkData?.endurance).toBe(1)
       s.players.p1.hand = [hit(10), hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'strike', p2: 'block' })
       expect(s.players.p2.hp).toBeLessThan(250)
+      expect(s.log.some((l) => l.includes('Unleashed: spends 1 Endurance'))).toBe(true)
+      expect(s.players.p1.perkData?.endurance).toBe(0)
+      s.players.p1.hand = [hit(10)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.log.some((l) => l.includes('Momentum: Strike 2 in a row'))).toBe(true)
     })
     it('Time of Need: every 5 turns removes every debuff and heals 4 + 5% missing HP, cap −100', () => {
       let s = tk('TK:2', ['D1', 'D2', 'D3'])

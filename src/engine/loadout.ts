@@ -302,7 +302,6 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
   'TK:1:B3': () => ({
     setup: (p, v) => {
-      addMaxHp(p, -v('ascSecondWindCost'))
       p.perkData = { ...p.perkData, healPct: 100 - v('ascSecondWindHealCut') }
     },
     hooks: {
@@ -315,28 +314,9 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  // Lifeline · Unstoppable
+  // Lifeline · Unbroken (Q 2026-10-25 15:06: Unstoppable + Unbroken merged)
   'TK:1:C1': (amt) => ({ hooks: { chargeBreakSafe: (state, side) => amt(state, side) } }),
   'TK:1:C2': (amt) => ({
-    hooks: {
-      blockBonus: (state, side) => (state.players[side].perkData?.chargedTurn === state.turn - 1 ? amt(state, side) : 0),
-      endTurn: (state, side, action) => {
-        if (action === 'charge') state.players[side].perkData = { ...state.players[side].perkData, chargedTurn: state.turn }
-      },
-    },
-  }),
-  'TK:1:C3': (amt) => ({
-    setup: (p, v) => cost(p, v('ascUndeniableCost'), 0),
-    hooks: {
-      beforeHits: (state, side, _b, _m, _c, _chain, pierce) => {
-        if (!pierce?.length || amt(state, side) <= 0) return
-        for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
-        say(state, side, 'Undeniable: slot 1 ignores Block')
-      },
-    },
-  }),
-  // Lifeline · Unbroken
-  'TK:1:D1': (amt) => ({
     hooks: {
       onHpLoss: (state, side) => {
         const p = state.players[side]
@@ -344,10 +324,10 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         status(p, 'shield', amt(state, side))
         say(state, side, `Last Bastion: Shield ${amt(state, side)}`)
       },
+      hitCut: (state, side) => (pctHp(state.players[side]) < RED_PCT ? num(state, side, 'TK:1', 'ascDefiance') : 0),
     },
   }),
-  'TK:1:D2': (amt) => ({ hooks: { hitCut: (state, side) => (pctHp(state.players[side]) < RED_PCT ? amt(state, side) : 0) } }),
-  'TK:1:D3': (amt) => ({
+  'TK:1:C3': (amt) => ({
     setup: (p, v) => addMaxHp(p, -v('ascUnbrokenCost')),
     hooks: {
       onHpLoss: (state, side) => {
@@ -356,6 +336,41 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         p.hp = 1
         p.perkData = { ...p.perkData, unbroken: (p.perkData?.unbroken ?? 0) + 1 }
         say(state, side, 'Unbroken: stays on 1 HP')
+      },
+    },
+  }),
+  // Lifeline · Undeniable (offence: Strike streaks, pierce, spend Endurance)
+  'TK:1:D1': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        const streak = p.perkData?.strikeAt === state.turn - 1 ? (p.perkData?.streak ?? 0) + 1 : 1
+        p.perkData = { ...p.perkData, streak, strikeAt: state.turn }
+        const n = Math.min(num(state, side, 'TK:1', 'ascMomentumCap'), (streak - 1) * amt(state, side))
+        if (!n) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        say(state, side, `Momentum: Strike ${streak} in a row, every card +${n} dmg`)
+      },
+    },
+  }),
+  'TK:1:D2': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, _b, _m, _c, _chain, pierce) => {
+        if (!pierce?.length || amt(state, side) <= 0) return
+        for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
+        say(state, side, 'Undeniable: slot 1 ignores Block')
+      },
+    },
+  }),
+  'TK:1:D3': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        const n = endurance(p)
+        if (!n || !bonus.length) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n * amt(state, side)
+        p.perkData = { ...p.perkData, endurance: 0 }
+        say(state, side, `Unleashed: spends ${n} Endurance, every card +${n * amt(state, side)} dmg`)
       },
     },
   }),
