@@ -196,7 +196,7 @@ describe('randomLoadout', () => {
       s.players.p1.hp = 200
       s.players.p2.hand = [hit(10), hit(10), hit(10), hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.log.some((l) => l.includes('Untiring: heals 4'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Untiring: heals 6'))).toBe(true)
     })
     it('Undeniable: S cost +50% and slot 1 ignores Block', () => {
       let s = tk('TK:1', ['C1', 'C2', 'C3'])

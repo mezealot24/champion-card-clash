@@ -104,11 +104,11 @@ export const TREES: Record<string, TreeData> = {
       node('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance.', 'ascUnyielding', 'dmg per Endurance', 1),
       capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}, and you gain 2 at a time. While your HP is in the red, at the end of the turn all your Endurance turns into a heal: {ascUnrelentingHeal} per stack.', 'The Endurance you heal with is gone, dmg cut and all.', [
         ['ascUnrelenting', 'max Endurance +', 2],
-        ['ascUnrelentingHeal', 'heal per Endurance', 3],
+        ['ascUnrelentingHeal', 'heal per Endurance', 4],
       ]),
       node('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%.', 'ascEarlyRally', 'HP line % +', 5),
       multi('B2', 'Untiring', 'Each hit your Block stops heals {ascUntiring}, up to {ascUntiringCap} a turn.', [
-        ['ascUntiring', 'heal per stopped hit', 2],
+        ['ascUntiring', 'heal per stopped hit', 4],
         ['ascUntiringCap', 'heal cap per turn', 6],
       ]),
       capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off.', '−{ascSecondWindCost} Max HP.', [['ascSecondWindCost', 'Cost: Max HP −', 20]]),
@@ -243,7 +243,7 @@ export const TREES: Record<string, TreeData> = {
         ['ascEruption', 'dmg per Mana', 2],
       ]),
       node('D1', 'Ember Heart', 'While your HP is in the red (30%), each paid Skill card gives the enemy {ascEmberHeart} more Ignite.', 'ascEmberHeart', 'Ignite +', 1),
-      node('D2', 'Cauterize', 'At the end of every turn, heal {ascCauterize} for each Ignite stack on the enemy.', 'ascCauterize', 'heal per stack', 1),
+      node('D2', 'Cauterize', 'At the end of every turn, heal {ascCauterize} for each Ignite stack on the enemy.', 'ascCauterize', 'heal per stack', 4),
       capstone('D3', 'Rebirth', 'Once per match, a hit that would knock you out leaves you on 1 HP: heal {ascRebirth}% Max HP and the enemy gets max Ignite.', '−{ascRebirthCost} Max HP.', [
         ['ascRebirth', 'heal % Max HP', 30, 0, 100],
         ['ascRebirthCost', 'Cost: Max HP −', 20],
