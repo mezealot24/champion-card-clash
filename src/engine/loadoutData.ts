@@ -207,7 +207,13 @@ export const TREES: Record<string, TreeData> = {
       capstone('B3', 'Eternal Winter', 'Chill never freezes and never runs out: it stacks up to {ascEternalWinter}.', 'No Freeze and no Shatter from Chill (Absolute Zero still freezes).', [
         ['ascEternalWinter', 'max Chill', 6, 1],
       ]),
-      node('C1', 'Hoarfrost', 'At the end of every turn you Block, gain Shield {ascHoarfrost}.', 'ascHoarfrost', 'Shield', 8),
+      // Hoarfrost tops up to a cap (Q 2026-10-25: uncapped it stacked Shield 8 every Block, nothing got through)
+      {
+        id: 'C1',
+        name: 'Hoarfrost',
+        text: 'At the end of every turn you Block, gain Shield {ascHoarfrost}, up to {ascHoarfrostCap} Shield in total.',
+        fields: [f('ascHoarfrost', 'Asc C1 Hoarfrost: Shield', 8), f('ascHoarfrostCap', 'Asc C1 Hoarfrost: Shield cap (total)', 24)],
+      },
       node('C2', 'Ice Lance', 'While you have Shield, chain slot 1 deals +{ascIceLance} dmg.', 'ascIceLance', 'slot 1 dmg +', 6),
       capstone('C3', 'Avalanche', 'When you Strike, all your Shield breaks into the chain: every card +1 dmg per {ascAvalanche} Shield.', 'Your Shield is gone for that turn\'s hits.', [
         ['ascAvalanche', 'Shield per +1 dmg', 10, 1],

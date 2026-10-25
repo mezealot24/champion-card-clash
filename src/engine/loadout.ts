@@ -513,9 +513,13 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     hooks: {
       endTurn: (state, side, action) => {
         const p = state.players[side]
-        if (action !== 'block' || p.hp <= 0 || amt(state, side) <= 0) return
-        status(p, 'shield', amt(state, side))
-        say(state, side, `Hoarfrost: Shield +${amt(state, side)}`)
+        const n = Math.min(amt(state, side), num(state, side, 'MG:2', 'ascHoarfrostCap') - shieldOf(p))
+        if (action !== 'block' || p.hp <= 0 || n <= 0) return
+        // one lasting Shield that grows, not a new one per Block
+        const lasting = p.statuses.find((s) => s.kind === 'shield' && s.turns > 9000)
+        if (lasting) lasting.n = (lasting.n ?? 0) + n
+        else status(p, 'shield', n)
+        say(state, side, `Hoarfrost: Shield +${n}`)
       },
     },
   }),

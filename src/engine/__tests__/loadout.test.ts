@@ -142,6 +142,13 @@ describe('randomLoadout', () => {
       expect(tuningOf(mg('MG:1', ['C1', 'C2', 'C3']), 'p1')['MG:1'].moltenIgnite).toBe(0)
       expect(mg('MG:1', ['D1', 'D2', 'D3']).players.p1.maxHp).toBe(110)
     })
+    it('Hoarfrost tops Shield up to its cap, as one Shield', () => {
+      let s = mg('MG:2', ['C1'])
+      s.players.p1.statuses = s.players.p1.statuses.filter((x) => x.kind !== 'shield') // no Frost Armor
+      for (let i = 0; i < 12; i++) s = resolveTurn(s, { p1: 'block', p2: 'charge' })
+      const shields = s.players.p1.statuses.filter((x) => x.kind === 'shield')
+      expect(shields.reduce((t, x) => t + (x.n ?? 0), 0)).toBe(24)
+      expect(shields.length).toBe(1)
+    })
   })
 })
-
