@@ -1302,15 +1302,19 @@ export function applyLoadout(p: PlayerState, l: Loadout | undefined, gameTuning:
 /** A random full loadout for the AI: any Oath (no Minor: Sigil II is off, Q 2026-10-25), and all points spent down random branches of its Style's tree. */
 export function randomLoadout(champ: string, style: string | undefined, points: number, rand: () => number = Math.random): Loadout {
   const pick = <T,>(xs: T[]): T | undefined => xs[Math.floor(rand() * xs.length)]
-  const asc: string[] = []
   const pts = treePoints(style, points)
-  if (style && TREES[style]) {
-    for (let i = 0; i < pts; i++) {
-      const next = [...treeShape(style).letters].map((b) => `${b}${asc.filter((x) => x[0] === b).length + 1}`).filter((id) => validAsc([...asc, id], pts, style))
-      const id = pick(next)
-      if (!id) break
-      asc.push(id)
-    }
-  }
+  const asc = fillAsc(style, pts, [], rand)
   return { oath: pick(OATHS[champ] ?? [])?.id, asc, points: pts }
+}
+
+/** Spend the points left after `taken` down random branches (AI loadout, the player's Quick build). */
+export function fillAsc(style: string | undefined, pts: number, taken: string[] = [], rand: () => number = Math.random): string[] {
+  const asc = validAsc(taken, pts, style) ? [...taken] : []
+  if (!style || !TREES[style]) return asc
+  while (asc.length < pts) {
+    const next = [...treeShape(style).letters].map((b) => `${b}${asc.filter((x) => x[0] === b).length + 1}`).filter((id) => validAsc([...asc, id], pts, style))
+    if (!next.length) break
+    asc.push(next[Math.floor(rand() * next.length)])
+  }
+  return asc
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
@@ -6,8 +6,7 @@ import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
 import { DeckBuilder } from './deck/DeckBuilder'
 import { deckRows, deckRulesFromConfig, loadDeck } from './deck/deck'
-import { LoadoutBuilder } from './loadout/LoadoutBuilder'
-import { ascPointsFromConfig, loadoutFor } from './loadout/loadout'
+import { ascPointsFromConfig, firstOpenStep, loadLoadout, loadoutFor, saveLoadout, savedStyle, type SavedLoadout, type Step } from './loadout/loadout'
 import { Online } from './Online'
 import { ChampionSelect, type FoeKind } from './select/ChampionSelect'
 import { CHAMP_INFO } from './select/info'
@@ -33,10 +32,21 @@ const missLine = (code: string) =>
 /** The game screen. Data comes from Supabase (BattlePage) or a bundled snapshot (play.tsx). */
 export function Battle({ data }: { data: BattleData }) {
   const [picks, setPicks] = useState({ p1: 'BR', p2: 'BR' })
-  // Style per side: "CHAMP:slot", or '' for none. Defaults to slot 1 when it works in the engine.
-  const [stylePick, setStylePick] = useState<Record<Side, string | null>>({ p1: null, p2: null })
-  const stylesOf = (id: string) => (data.styles ?? []).filter((s) => s.champion_id === id && s.name)
-  const styleKey = (side: Side) => stylePick[side] ?? (STYLES[`${picks[side]}:1`] ? `${picks[side]}:1` : '')
+  // A Style is required (Q 2026-10-25). The player's is saved with their loadout ('' until picked, e.g. a save from
+  // before the rule); the AI's defaults to slot 1 when it works in the engine.
+  const [foeStyle, setFoeStyle] = useState<string | null>(null)
+  const stylesOf = (id: string) => (data.styles ?? []).filter((s) => s.champion_id === id && s.name).sort((a, b) => a.slot - b.slot)
+  const playable = (id: string) => stylesOf(id).map((s) => `${s.champion_id}:${s.slot}`).filter((k) => STYLES[k])
+  // loadLoadout is cached in memory: bump re-reads it after a save
+  const [, bump] = useReducer((n: number) => n + 1, 0)
+  const saved = loadLoadout(picks.p1)
+  const setSaved = (l: SavedLoadout) => {
+    saveLoadout(picks.p1, l)
+    bump()
+  }
+  const styleKey = (side: Side) =>
+    side === 'p1' ? (savedStyle(saved, playable(picks.p1)) ?? '') : (foeStyle ?? playable(picks.p2)[0] ?? '')
+  const [step, setStep] = useState<Step>('champion')
   const [game, setGame] = useState<GameState | null>(null)
   // a resolved turn the arena is still playing back; game moves to turn.next when it's done
   const [turn, setTurn] = useState<Turn | null>(null)
@@ -49,7 +59,6 @@ export function Battle({ data }: { data: BattleData }) {
   const [history, setHistory] = useState<{ mine: Action; theirs: Action }[]>([])
   const [tutorial, setTutorial] = useState(false)
   const [deckEdit, setDeckEdit] = useState(false)
-  const [loadoutEdit, setLoadoutEdit] = useState(false)
   // the AI's loadout for this match (rolled at random each start)
   const [foeLoadout, setFoeLoadout] = useState<Loadout | undefined>()
   // new match = new id, so the turn timer restarts even when the turn number repeats
@@ -92,12 +101,18 @@ export function Battle({ data }: { data: BattleData }) {
   )
 
   function start() {
+    const myStyle = styleKey('p1') || undefined
+    // the steps only offer Fight when all is set; an old save that slipped through goes back to the step it misses
+    const open = firstOpenStep(picks.p1, myStyle, ascPoints, saved)
+    if (open !== 'fight') {
+      setGame(null)
+      return setStep(open)
+    }
     if (foe === 'online') return setOnline(true)
     setTurn(null)
     setLine('')
     setHistory([])
     setMatch((m) => m + 1)
-    const myStyle = styleKey('p1') || undefined
     const foeStyle = styleKey('p2') || undefined
     const foeL = randomLoadout(picks.p2, foeStyle, ascPoints)
     setFoeLoadout(foeL)
@@ -153,21 +168,6 @@ export function Battle({ data }: { data: BattleData }) {
     )
   }
 
-  if (loadoutEdit) {
-    const style = styleKey('p1') || undefined
-    return (
-      <LoadoutBuilder
-        champ={picks.p1}
-        champName={champTitle(picks.p1)}
-        style={style}
-        styleName={style ? STYLES[style]?.name : undefined}
-        points={ascPoints}
-        fill={fill}
-        onClose={() => setLoadoutEdit(false)}
-      />
-    )
-  }
-
   if (deckEdit) {
     const style = styleKey('p1') || undefined
     return (
@@ -193,10 +193,15 @@ export function Battle({ data }: { data: BattleData }) {
         picks={picks}
         setChamp={(side, id) => {
           setPicks({ ...picks, [side]: id })
-          setStylePick({ ...stylePick, [side]: null })
+          if (side === 'p2') setFoeStyle(null)
         }}
         styleKey={styleKey}
-        setStyle={(side, key) => setStylePick({ ...stylePick, [side]: key })}
+        setStyle={(side, key) => (side === 'p1' ? setSaved({ ...saved, style: key }) : setFoeStyle(key))}
+        step={step}
+        setStep={setStep}
+        saved={saved}
+        setSaved={setSaved}
+        points={ascPoints}
         foe={foe}
         setFoe={setFoe}
         canTuktah={!!sample}
@@ -206,7 +211,6 @@ export function Battle({ data }: { data: BattleData }) {
         deckSaved={(id) => !!loadDeck(id)}
         onEditDeck={() => setDeckEdit(true)}
         loadout={loadoutLines(picks.p1, styleKey('p1') || undefined, loadoutFor(picks.p1, styleKey('p1') || undefined, ascPoints))}
-        onEditLoadout={() => setLoadoutEdit(true)}
         missing={missingOf}
         onStart={start}
         onTutorial={() => setTutorial(true)}
