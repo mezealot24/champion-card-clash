@@ -18,7 +18,7 @@
 
 /* Portrait: frame 1 (idle) of a pose sheet (fighters.ts). bust = zoomed on head and chest, in a square. */
 .portrait { position: relative; display: block; aspect-ratio: 320 / 270; overflow: hidden; pointer-events: none; }
-.portrait .face { position: absolute; inset: 0; background: var(--sheet) 0 0 / 800% 100% no-repeat; }
+.portrait .face { position: absolute; inset: 0; background: var(--sheet) 0 0 / 2400% 100% no-repeat; }
 .portrait.bust { aspect-ratio: 1; }
 .portrait.bust .face { inset: -4% -30% -31%; }
 .portrait .doll { position: absolute; inset: 4% 20% 0; }
