@@ -130,12 +130,12 @@ export type StyleDef = {
   blockLeakPct?: (state: GameState, side: Side) => number
   /** extra cards a Charge that isn't broken draws, decided per turn */
   extraChargeDraw?: (state: GameState, side: Side) => number
-  /** Energy Surge switches on at this much less than a full bar (Wraith Form) */
-  surgeLess?: (state: GameState, side: Side) => number
+  /** Energy Surge Wraith Step: hits past this side's Block deal 0 instead of 1 (Wraith Form) */
+  wraithZero?: boolean
   /** Acceleration (dualStrike) draws but doesn't fill the bar (Afterburner's Cost) */
   noDualFill?: boolean
-  /** Acceleration also fires when this side Strikes into a Charge (Mach Speed) */
-  dualOnCharge?: boolean
+  /** Mach Speed: when this side Strikes into a Charge, a small Acceleration: draw this many, no Energy */
+  dualOnCharge?: (state: GameState, side: Side) => number
   /** this side's Cut effects Cut n more cards (still within CUT_CAP a turn) */
   cutMore?: (state: GameState, side: Side) => number
 }

@@ -788,8 +788,11 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     hooks: {
       noDualFill: true, // Cost: Acceleration still draws but fills no Energy
       endTurn: (state, side) => {
-        if (state.players[side].styleData?.odTurn !== state.turn || amt(state, side) <= 0) return
-        addRes(state, side, amt(state, side))
+        const p = state.players[side]
+        // never to a full bar: a full bar would be eaten by Energy Surge next turn
+        const room = (resourceOf(p.championId, tuningOf(state, side))?.cap ?? 0) - 1 - (p.res ?? 0)
+        if (p.styleData?.odTurn !== state.turn || amt(state, side) <= 0 || room <= 0) return
+        addRes(state, side, Math.min(amt(state, side), room))
         say(state, side, `Afterburner: Energy ${state.players[side].res ?? 0}`)
       },
     },
@@ -806,7 +809,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
   'AS:1:B3': (_, k) => ({
     tune: (t, v) => add(t, 'AS:1', 'startDraw', -v(k)),
-    hooks: { dualOnCharge: true },
+    hooks: { dualOnCharge: (state, side) => num(state, side, 'AS:1', 'ascMachDraw') },
   }),
   // Sonic Bliz · Shadowstep (PoE Trickster)
   'AS:1:C1': (amt) => ({
@@ -831,9 +834,9 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  'AS:1:C3': (amt) => ({
+  'AS:1:C3': () => ({
     setup: (p, v) => addMaxHp(p, -v('ascWraithFormCost')),
-    hooks: { surgeLess: (state, side) => amt(state, side) },
+    hooks: { wraithZero: true },
   }),
   // Sonic Bliz · Sabotage (PoE Saboteur): free Cuts on turns nobody Strikes
   'AS:1:D1': (amt) => ({
@@ -866,7 +869,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   'AS:2:A1': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'redHpPct', v(k)) }),
   'AS:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'redCritMult', v(k)) }),
   'AS:2:A3': (amt) => ({
-    tune: (t, v) => add(t, 'AS:2', 'critMult', -v('ascExecutionerCost')),
+    setup: (p, v) => addMaxHp(p, -v('ascExecutionerCost')),
     hooks: {
       beforeHits: critSeen,
       afterChain: (state, side) => {
@@ -895,7 +898,6 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     tune: (t, v) => {
       add(t, 'AS:2', 'every', -v(k))
       add(t, 'AS:2', 'critMult', -v('ascCrescendoCost'))
-      add(t, 'AS:2', 'redCritMult', -v('ascCrescendoCost'))
     },
   }),
   // Fatal Rhythm · Venom (PoE Assassin poison): a debuff status on the enemy, capped
@@ -919,7 +921,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         const s = foe.statuses.find((x) => x.kind === 'venom')
         if (!s?.n || foe.hp <= 0) return
         const noxious = state.players[side].perks?.includes('asc:AS:2:C3')
-        const n = s.n * (1 + (noxious ? num(state, side, 'AS:2', 'ascNoxious') : 0))
+        const n = s.n
         hurt(state, other(side), n)
         say(state, side, `Venom ${s.n}: enemy loses ${n} HP`)
         if (!noxious) s.n--
@@ -937,7 +939,13 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  'AS:2:C3': () => ({ lastTune: (t) => add(t, 'AS:2', 'blockedCritPct', -1_000_000) }), // Cost after every node (Feint too)
+  'AS:2:C3': () => ({
+    // Cost after every node (Feint too)
+    lastTune: (t, v) => {
+      add(t, 'AS:2', 'blockedCritPct', -1_000_000)
+      add(t, 'AS:2', 'ascVenomMax', -v('ascNoxiousCost'))
+    },
+  }),
   // Fatal Rhythm · Shadow (PoE Trickster)
   'AS:2:D1': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'blockedCritPct', v(k)) }),
   'AS:2:D2': (amt) => ({
@@ -953,7 +961,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
   'AS:2:D3': (_, k) => ({
-    tune: (t, v) => add(t, 'AS:2', 'every', v(k)),
+    setup: (p, v) => addMaxHp(p, -v(k)),
     hooks: {
       beforeHits: (state, side, _b, _m, crit, _chain, pierce) => {
         if (!pierce || !crit.size) return
