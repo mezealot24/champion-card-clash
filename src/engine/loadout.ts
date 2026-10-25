@@ -4,7 +4,7 @@
 // into the turn like a Style (StyleDef hooks, registered in PERK_HOOKS). Pieces never touch the other player's numbers.
 import { MINORS, OATHS, TREES } from './loadoutData'
 import { resourceOf } from './resources'
-import { addIgnite, chillStacks, hooksOf, igniteStacks, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
+import { addIgnite, chillStacks, debuffStacks, hooksOf, igniteStacks, isDebuff, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
 import { fieldsOf, tuningOf, type Tuning, type TuningGroup } from './tuning'
 import type { GameState, PlayerState, Side } from './types'
 import { other } from './types'
@@ -80,6 +80,8 @@ const freshFreeze = (state: GameState, side: Side, bit: number) => {
   s.n = (s.n ?? 0) | bit
   return true
 }
+/** Endurance stacks (Tank Lifeline v2) */
+const endurance = (p: PlayerState) => p.perkData?.endurance ?? 0
 /** Fury is on for this Strike (Bruiser Style 1) */
 const furyOn = (state: GameState, side: Side) => pctHp(state.players[side]) < num(state, side, 'BR:1', 'hpPct')
 
@@ -171,10 +173,95 @@ const MINOR_FX: Record<string, Piece> = {
 // ---------------- Ascendancy nodes, by "STYLE:ID" ----------------
 /** Built per node: amt(state, side) reads the node's own number in play, k is its key (for tune / setup). */
 const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, key: string) => Piece> = {
-  'TK:1:A1': (_, k) => ({ tune: (t, v) => add(t, 'TK:1', 'hpPct', v(k)) }),
-  'TK:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'TK:1', 'healPctPerHit', v(k)) }),
-  'TK:1:A3': (_, k) => ({ tune: (t, v) => add(t, 'TK', 'comboHealPct', v(k)) }),
-  'TK:1:A4': (amt) => ({
+  // ---- Tank v2 (design/tank-ascendancy-v2-2026-10-25.md): 4 branches × (2 nodes + capstone with a Cost) ----
+  // Lifeline · Endurance (PoE Juggernaut): stacks kept in perkData, capped, fade after ascEnduranceTurns without a new one
+  'TK:1:A1': () => ({
+    hooks: {
+      afterHits: (state, side, r) => {
+        const p = state.players[side]
+        if (r.hitsTaken < 2 || p.hp <= 0) return
+        const max = num(state, side, 'TK:1', 'ascEnduranceMax')
+        const n = Math.min(max, endurance(p) + (p.perks?.includes('asc:TK:1:A3') ? 2 : 1))
+        p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn }
+        say(state, side, `Unflinching: Endurance ${n}/${max}`)
+      },
+      hitCut: (state, side) => endurance(state.players[side]),
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        if (endurance(p) && state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
+          p.perkData = { ...p.perkData, endurance: 0 }
+          say(state, side, 'Unflinching: Endurance fades')
+        }
+      },
+    },
+  }),
+  'TK:1:A2': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const n = endurance(state.players[side]) * amt(state, side)
+        if (!n) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        say(state, side, `Unyielding: every chain card +${n} dmg`)
+      },
+    },
+  }),
+  'TK:1:A3': () => ({
+    tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnrelenting')),
+    hooks: {
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        const n = endurance(p)
+        if (!n || p.hp <= 0 || pctHp(p) >= RED_PCT) return
+        p.perkData = { ...p.perkData, endurance: 0 }
+        const got = styleHeal(state, side, n * num(state, side, 'TK:1', 'ascUnrelentingHeal'))
+        say(state, side, `Unrelenting: ${n} Endurance → heals ${got}`)
+      },
+    },
+  }),
+  // Lifeline · Untiring
+  'TK:1:B1': (_, k) => ({ tune: (t, v) => add(t, 'TK:1', 'hpPct', v(k)) }),
+  'TK:1:B2': (amt) => ({
+    hooks: {
+      afterHits: (state, side, r) => {
+        if (!r.hitsBlocked) return
+        const got = styleHeal(state, side, Math.min(num(state, side, 'TK:1', 'ascUntiringCap'), r.hitsBlocked * amt(state, side)))
+        if (got) say(state, side, `Untiring: heals ${got}`)
+      },
+    },
+  }),
+  'TK:1:B3': () => ({
+    setup: (p, v) => addMaxHp(p, -v('ascSecondWindCost')),
+    hooks: {
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        if (!p.styleData?.spent || !once(p, 'secondWind')) return
+        p.styleData = { ...p.styleData, spent: 0, below: 0 }
+        say(state, side, 'Second Wind: Lifeline can switch on once more')
+      },
+    },
+  }),
+  // Lifeline · Unstoppable
+  'TK:1:C1': (amt) => ({ hooks: { chargeBreakSafe: (state, side) => amt(state, side) } }),
+  'TK:1:C2': (amt) => ({
+    hooks: {
+      blockBonus: (state, side) => (state.players[side].perkData?.chargedTurn === state.turn - 1 ? amt(state, side) : 0),
+      endTurn: (state, side, action) => {
+        if (action === 'charge') state.players[side].perkData = { ...state.players[side].perkData, chargedTurn: state.turn }
+      },
+    },
+  }),
+  'TK:1:C3': (amt) => ({
+    setup: (p, v) => cost(p, v('ascUndeniableCost'), 0),
+    hooks: {
+      beforeHits: (state, side, _b, _m, _c, _chain, pierce) => {
+        if (!pierce?.length || amt(state, side) <= 0) return
+        for (let i = 0; i < Math.min(amt(state, side), pierce.length); i++) pierce[i] = 1
+        say(state, side, 'Undeniable: slot 1 ignores Block')
+      },
+    },
+  }),
+  // Lifeline · Unbroken
+  'TK:1:D1': (amt) => ({
     hooks: {
       onHpLoss: (state, side) => {
         const p = state.players[side]
@@ -184,10 +271,9 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  'TK:1:B1': (_, k) => ({ setup: (p, v) => addMaxHp(p, v(k)) }),
-  'TK:1:B2': (amt) => ({ hooks: { blockBonus: (state, side) => (pctHp(state.players[side]) < RED_PCT ? amt(state, side) : 0) } }),
-  'TK:1:B3': (_, k) => ({ setup: (p, v) => cost(p, 0, -v(k)) }),
-  'TK:1:B4': (amt) => ({
+  'TK:1:D2': (amt) => ({ hooks: { hitCut: (state, side) => (pctHp(state.players[side]) < RED_PCT ? amt(state, side) : 0) } }),
+  'TK:1:D3': (amt) => ({
+    setup: (p, v) => addMaxHp(p, -v('ascUnbrokenCost')),
     hooks: {
       onHpLoss: (state, side) => {
         const p = state.players[side]
@@ -199,6 +285,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
 
+  // Titan Bloom · Bloom (PoE Guardian)
   'TK:2:A1': (_, k) => ({ tune: (t, v) => add(t, 'TK:2', 'perFacing', v(k)) }),
   'TK:2:A2': (_, k) => ({
     setup: (p, v) => {
@@ -206,25 +293,85 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + v(k) }
     },
   }),
-  'TK:2:A3': (_, k) => ({ tune: (t, v) => add(t, 'TK:2', 'hpPerDmg', -v(k)) }),
-  'TK:2:A4': (_, k) => ({ tune: (t, v) => add(t, 'TK:2', 'perHitTaken', v(k)) }),
+  'TK:2:A3': (_, k) => ({
+    tune: (t, v) => {
+      add(t, 'TK:2', 'maxHpCap', v(k))
+      add(t, 'TK:2', 'perHitTaken', v('ascAncientHit'))
+      add(t, 'TK:2', 'hpPerDmg', 1_000_000) // Cost: no Titan Bloom dmg
+    },
+  }),
+  // Titan Bloom · Bramble
   'TK:2:B1': (_, k) => ({ tune: (t, v) => add(t, 'TK:2', 'perHitBlocked', v(k)) }),
   'TK:2:B2': (amt) => ({
     hooks: {
       afterHits: (state, side, r) => {
-        if (!r.hitsBlocked) return
-        const got = styleHeal(state, side, amt(state, side))
-        if (got) say(state, side, `Sap: heals ${got}`)
+        const n = r.hitsBlocked * amt(state, side)
+        if (n <= 0) return
+        hurt(state, other(side), n)
+        say(state, side, `Thorns: ${r.hitsBlocked} stopped hits deal ${n} back`)
       },
     },
   }),
-  'TK:2:B3': (_, k) => ({ tune: (t, v) => add(t, 'TK:2', 'maxHpCap', v(k)) }),
-  'TK:2:B4': (amt) => ({
+  'TK:2:B3': (amt) => ({
+    tune: (t) => add(t, 'TK:2', 'perHitBlocked', -1_000_000), // Cost: nodes are taken in id order, so this lands after Bark Guard
     hooks: {
-      endTurn: (state, side, action) => {
-        if (action !== 'block') return
-        const got = styleHeal(state, side, amt(state, side))
-        if (got) say(state, side, `World Tree: heals ${got}`)
+      afterHits: (state, side, r) => {
+        if (!r.hitsBlocked) return
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, briar: Math.min(num(state, side, 'TK:2', 'ascBriarWallCap'), r.hitsBlocked) }
+      },
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        const hits = p.perkData?.briar ?? 0
+        if (!hits) return
+        const n = hits * amt(state, side)
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        p.perkData = { ...p.perkData, briar: 0 }
+        say(state, side, `Briar Wall: ${hits} stopped hits → every chain card +${n} dmg`)
+      },
+    },
+  }),
+  // Titan Bloom · Timber
+  'TK:2:C1': (_, k) => ({ tune: (t, v) => add(t, 'TK:2', 'hpPerDmg', -v(k)) }),
+  'TK:2:C2': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const n = Math.min(num(state, side, 'TK:2', 'ascIronbarkCap'), Math.floor((state.players[side].styleData?.grown ?? 0) / Math.max(1, amt(state, side))))
+        if (!bonus.length || n <= 0) return
+        bonus[0] += n
+        say(state, side, `Ironbark Fist: slot 1 +${n} dmg`)
+      },
+    },
+  }),
+  'TK:2:C3': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus) => {
+        const p = state.players[side]
+        const grown = p.styleData?.grown ?? 0
+        if (bonus.length < num(state, side, 'TK:2', 'ascTimberCards') || grown <= 0) return
+        const n = Math.min(num(state, side, 'TK:2', 'ascTimberCap'), Math.floor(grown / Math.max(1, amt(state, side))))
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        p.maxHp = Math.max(1, p.maxHp - grown)
+        p.hp = Math.min(p.hp, p.maxHp)
+        p.styleData = { ...p.styleData, grown: 0 }
+        say(state, side, `🌳 Timber!: ${grown} Max HP felled → every chain card +${n} dmg`)
+      },
+    },
+  }),
+  // Titan Bloom · Time of Need
+  'TK:2:D1': (_, k) => ({ tune: (t, v) => add(t, 'TK:2', 'perDebuff', v(k)) }),
+  'TK:2:D2': (amt) => ({ hooks: { hitCut: (state, side) => (debuffStacks(state.players[side]) >= 3 ? amt(state, side) : 0) } }),
+  'TK:2:D3': (amt) => ({
+    tune: (t, v) => add(t, 'TK:2', 'maxHpCap', -v('ascTimeOfNeedCost')),
+    hooks: {
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        if (p.hp <= 0 || state.turn % Math.max(1, amt(state, side))) return
+        const n = debuffStacks(p)
+        p.statuses = p.statuses.filter((s) => !isDebuff(s))
+        const heal = num(state, side, 'TK:2', 'ascTimeOfNeedHeal') + Math.floor(((p.maxHp - p.hp) * num(state, side, 'TK:2', 'ascTimeOfNeedPct')) / 100)
+        const got = styleHeal(state, side, heal)
+        say(state, side, `Time of Need: ${n} debuff stack${n === 1 ? '' : 's'} removed, heals ${got}`)
       },
     },
   }),
@@ -620,7 +767,8 @@ export function perkKeys(champ: string, style: string | undefined, l: Loadout | 
   const out: string[] = []
   if (l.oath && PIECES[`oath:${champ}:${l.oath}`]) out.push(`oath:${champ}:${l.oath}`)
   if (l.minor && PIECES[`minor:${l.minor}`]) out.push(`minor:${l.minor}`)
-  if (style && l.asc && validAsc(l.asc, l.points ?? treePoints(style, 5), style)) for (const id of l.asc) if (PIECES[`asc:${style}:${id}`]) out.push(`asc:${style}:${id}`)
+  // id order (A1 < A2 < A3 < B1 …): a capstone's tune lands after its branch's nodes
+  if (style && l.asc && validAsc(l.asc, l.points ?? treePoints(style, 5), style)) for (const id of [...l.asc].sort()) if (PIECES[`asc:${style}:${id}`]) out.push(`asc:${style}:${id}`)
   return out
 }
 
