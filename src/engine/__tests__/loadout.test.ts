@@ -238,7 +238,7 @@ describe('randomLoadout', () => {
       const hp = s.players.p1.hp
       s.players.p2.hand = [hit(20), hit(20)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.log.some((l) => l.includes('Unrelenting: 10 hit dmg'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Unrelenting: 5 hit dmg'))).toBe(true)
       expect(s.players.p1.hp).toBeLessThanOrEqual(hp)
     })
     it('Untiring: Block, HP lost and Second Wind give Endurance; Second Wind halves heals', () => {

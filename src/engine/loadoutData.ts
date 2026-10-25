@@ -89,6 +89,9 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
  * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage, Tank, Assassin: A1..D3); take them top-down in a branch, the last node = capstone.
  * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank / Assassin v2: named asc keys).
  */
+/** Shown under the Lifeline Style text (Q 2026-10-25): what one Endurance does; numbers filled from TK:1 */
+export const ENDURANCE_TEXT = '⛨ Endurance (from Lifeline Ascendancy): max {ascEnduranceMax}. Each Endurance cuts {ascEnduranceCut} dmg from every hit that reaches you and regens {ascEnduranceRegen}% Max HP a turn, at {ascEndurancePower}% strength (rounded down over all your Endurance). Fades after {ascEnduranceTurns} turns without a new one.'
+
 export const TREES: Record<string, TreeData> = {
   /**
    * Tank v2 (Q 2026-10-25, design/tank-ascendancy-v2-2026-10-25.md): same shape as Mage v2, from PoE Juggernaut
@@ -100,20 +103,22 @@ export const TREES: Record<string, TreeData> = {
     bonusPoints: 1,
     nodes: [
       // Q 2026-10-25 (after sim): Endurance = −dmg per hit + HP regen per charge; gained by Charge or by taking 2+ hits
-      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Each Endurance: hits that reach you deal {ascEnduranceCut} less dmg, and you regain {ascEnduranceRegen}% Max HP at the end of every turn. Endurance fades after {ascEnduranceTurns} turns without a new one.', [
+      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Each Endurance: hits that reach you deal {ascEnduranceCut} less dmg, and you regain {ascEnduranceRegen}% Max HP at the end of every turn, at {ascEndurancePower}% strength (rounded down over all your Endurance). Endurance fades after {ascEnduranceTurns} turns without a new one.', [
         ['ascEnduranceMax', 'max Endurance', 3, 1],
         ['ascEnduranceTurns', 'turns before it fades', 3, 1],
         ['ascEnduranceCut', 'dmg cut per hit, per Endurance', 2],
         ['ascEnduranceRegen', 'regen % Max HP per Endurance', 1],
+        ['ascEndurancePower', 'Endurance effect % (cut + regen)', 25, 0, 100],
       ]),
-      multi('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance. Endurance max +{ascUnyieldingMax}.', [
+      multi('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance, at {ascEndurancePower}% strength (rounded down). Endurance max +{ascUnyieldingMax}.', [
         ['ascUnyielding', 'dmg per Endurance', 2],
         ['ascUnyieldingMax', 'max Endurance +', 1],
       ]),
-      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. Hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'When you Block, only the first hit is fully stopped: each later blocked hit still deals {ascUnrelentingLeak}% dmg.', [
+      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. {ascUnrelentingPct}% of the hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'When you Block, only the first hit is fully stopped: each later blocked hit still deals {ascUnrelentingLeak}% dmg.', [
         ['ascUnrelenting', 'max Endurance +', 2],
         ['ascUnrelentingLeak', '% dmg of blocked hits after the first', 50, 0],
         ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
+        ['ascUnrelentingPct', '% of hit dmg delayed', 50, 0, 100],
       ]),
       // Q 2026-10-25 14:58: Untiring = Endurance from HP lost / Blocks / Second Wind (uses Unflinching's Endurance numbers)
       multi('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn).', [

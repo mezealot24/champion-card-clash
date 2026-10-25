@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
-import { buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
+import { buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
@@ -94,7 +94,10 @@ export function Battle({ data }: { data: BattleData }) {
       Object.fromEntries(
         (data.styles ?? []).map((s) => {
           const c = data.champions.find((x) => x.id === s.champion_id)
-          return [`${s.champion_id}:${s.slot}`, fillText(s.effect, `${s.champion_id}:${s.slot}`, tuning, c ? { hpStart: c.hp_start, hpMax: c.hp_max } : {})]
+          const key = `${s.champion_id}:${s.slot}`
+          const text = fillText(s.effect, key, tuning, c ? { hpStart: c.hp_start, hpMax: c.hp_max } : {})
+          // Lifeline plays with Endurance: explain it next to the passive
+          return [key, key === 'TK:1' ? `${text}\n\n${fillText(ENDURANCE_TEXT, key, tuning)}` : text]
         }),
       ),
     [data, tuning],

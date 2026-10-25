@@ -242,7 +242,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnyieldingMax')),
     hooks: {
       beforeHits: (state, side, bonus) => {
-        const n = endurance(state.players[side]) * amt(state, side)
+        // Q 18:55: Unyielding also runs at Endurance power (25%)
+        const n = Math.floor((endurance(state.players[side]) * amt(state, side) * num(state, side, 'TK:1', 'ascEndurancePower')) / 100)
         if (!n) return
         for (let i = 0; i < bonus.length; i++) bonus[i] += n
         say(state, side, `Unyielding: every chain card +${n} dmg`)
@@ -260,7 +261,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
       afterHits: (state, side) => {
         const p = state.players[side]
-        const lost = (p.perkData?.preHitHp ?? p.hp) - p.hp
+        // Q 19:02: only ascUnrelentingPct% (50) of the hit dmg is delayed; the rest lands now
+        const lost = Math.floor((((p.perkData?.preHitHp ?? p.hp) - p.hp) * num(state, side, 'TK:1', 'ascUnrelentingPct')) / 100)
         if (lost <= 0) return
         p.hp += lost
         const turns = Math.max(1, num(state, side, 'TK:1', 'ascUnrelentingTurns'))
@@ -1335,7 +1337,8 @@ for (const [style, tree] of Object.entries(TREES))
 PIECES['asc:TK:1:END'] = {
   group: 'TK:1',
   hooks: {
-    hitCut: (state, side) => endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut'),
+    // Q 2026-10-25 18:47: Endurance effects at ascEndurancePower% (25) of their full size
+    hitCut: (state, side) => Math.floor((endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut') * num(state, side, 'TK:1', 'ascEndurancePower')) / 100),
     endTurn: (state, side) => {
       const p = state.players[side]
       const n = endurance(p)
@@ -1345,7 +1348,7 @@ PIECES['asc:TK:1:END'] = {
         say(state, side, 'Endurance fades')
         return
       }
-      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
+      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen') * num(state, side, 'TK:1', 'ascEndurancePower')) / 10000))
       if (got) say(state, side, `Endurance: ${n} regen ${got}`)
     },
   },

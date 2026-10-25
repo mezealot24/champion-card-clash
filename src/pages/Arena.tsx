@@ -736,6 +736,8 @@ function TokenView({ side, tok, playing, locked, foe }: { side: Side; tok: Token
 }
 
 type Tip = { title: string; body: string }
+/** Tank Lifeline Endurance numbers (Ascendancy keys live in the Style's group, untyped) */
+const enduranceNum = (game: GameState, side: Side) => tuningOf(game, side)['TK:1'] as unknown as Record<string, number>
 type Chip = { label: string; tone: 'buff' | 'debuff'; tip: string }
 
 const turnsLeft = (s: Status) => (s.turns > 0 && s.turns < 50 ? `\n${s.turns} turn${s.turns === 1 ? '' : 's'} left.` : '')
@@ -802,6 +804,13 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
     ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) => statusChip(s, frozen)),
     ...(p.comboData?.conqueror
       ? [{ label: conqMax(game, side) ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: `Juggernaut stacks: +1 dmg per stack on every chain card. At ${conqMaxN}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.` }]
+      : []),
+    // Tank Lifeline: Endurance stacks (perkData), with their cut / regen
+    ...(p.perkData?.endurance
+      ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${enduranceNum(game, side).ascEnduranceMax}`, tone: 'buff' as const, tip: `${p.perkData.endurance} Endurance: hits that reach you deal ${Math.floor((p.perkData.endurance * enduranceNum(game, side).ascEnduranceCut * enduranceNum(game, side).ascEndurancePower) / 100)} less dmg, and you regain ${Math.floor((p.maxHp * p.perkData.endurance * enduranceNum(game, side).ascEnduranceRegen * enduranceNum(game, side).ascEndurancePower) / 10000)} HP at the end of every turn. Fades after ${enduranceNum(game, side).ascEnduranceTurns} turns without a new one.` }]
+      : []),
+    ...((p.perkData?.undyingUntil ?? 0) >= game.turn
+      ? [{ label: '💀 Undying', tone: 'buff' as const, tip: `Your HP can't drop below 1 until turn ${p.perkData!.undyingUntil}, and every chain card deals bonus dmg. When it ends you heal the bonus dmg that landed.` }]
       : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
     ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: `If this side Strikes now with no S card, every chain card gets +${overdriveAdd(game, side)} dmg and all Energy is spent.` }] : []),
