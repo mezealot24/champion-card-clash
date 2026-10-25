@@ -113,7 +113,7 @@ export function describeAct(a: ActSpec, now = false): string {
       return `opponent discards their ${what} from the Field to the bottom of their deck (Cut)`
     }
     case 'gainRes': return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gain`} ${a.n} resource` + per(a.per)
-    case 'ignite': return a.n === 0 ? `${WHO[a.who]}'s Ignite starts its 3 turns again` : `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Ignite${per(a.per)} (each stack burns 2 HP + 1% Max HP every turn and cuts heals 25%, 3 turns, max 4)`
+    case 'ignite': return a.n === 0 ? `${WHO[a.who]}'s Ignite starts its 3 turns again` : `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Ignite${per(a.per)} (each stack burns 2 HP + 0.5% Max HP every turn and cuts heals 10%, 3 turns, max 4)`
     case 'chill': return `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Chill${per(a.per)} (each stack: hits deal 10% less, 3 turns; at 4 stacks Frozen: loses 15% Max HP and can't Strike next turn)`
     case 'infuse': return `⟡ Infuse ${a.n}${a.who === 'enemy' ? '' : ` on ${WHO[a.who]}`} (Pyromancer: ${a.n} Ignite · Cryomancer: ${a.n} Chill)`
     case 'consumeIgnite': return a.burn ? `${WHO[a.who]}'s Ignite explodes: all its remaining burn dmg at once` : `clear ${WHO[a.who]}'s Ignite`

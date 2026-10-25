@@ -10,7 +10,7 @@ import { other } from './types'
 
 /*
  * Ignite (Pyromancer, Q rework 2026-10-17): a burning debuff, stacks up to igniteMax.
- * End of every turn: lose igniteFlat HP + ignitePctMaxHp% of Max HP per stack. Heals are cut 25% per stack, at most 50% (Claude pick of Q's 50/75).
+ * End of every turn: lose igniteFlat HP + ignitePctMaxHp% of Max HP per stack. Heals are cut healCutPerStack% per stack, at most healCutMax%. Q 2026-10-25: 0.5% Max HP and 10% heal cut per stack (was 1.5 / 25).
  * Lasts igniteTurns turns (3 burns); a new stack resets the timer. (Q asked igniteFlat 3; sim 3 = 65% win, 2 = 47%, 1 = 39%: Claude pick 2.)
  *
  * Cryomancer (Mage Style 2, Q 2026-10-18 from a Gemini draft; replaces Frostbinder): numbers are Q's (picked A).
@@ -165,6 +165,18 @@ function infuseChain(state: GameState, side: Side, r: ChainReport, element: stri
 /** Titan Bloom: +1 dmg per hpPerDmg (20) Max HP grown */
 export const overgrowthDmg = (p: PlayerState, t: Tuning) => Math.floor((p.styleData?.grown ?? 0) / t['TK:2'].hpPerDmg)
 
+/** Debuff stacks on a side: Ignite / Chill count each stack, every other harmful status counts 1 (Frozen covers its noStrike). */
+export function debuffStacks(p: PlayerState): number {
+  let n = 0
+  for (const s of p.statuses) {
+    if (s.kind === 'ignite' || s.kind === 'chill') n += s.n ?? 0
+    else if (s.kind === 'blockPlus') n += (s.n ?? 0) < 0 ? 1 : 0
+    else if (['frozen', 'silence', 'skillSilence', 'noBlock', 'noCharge', 'vulnerable', 'deathMark'].includes(s.kind)) n++
+    else if (s.kind === 'noStrike' && !p.statuses.some((x) => x.kind === 'frozen')) n++
+  }
+  return n
+}
+
 export const STYLES: Record<string, StyleDef> = {
   /**
    * Tank · Lifeline: when hit while HP is red (below hpPct = 30%), heal healPctPerHit = 4% of missing HP per hit landed this turn.
@@ -200,6 +212,7 @@ export const STYLES: Record<string, StyleDef> = {
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
    * Q buff 2026-10-16: every 20 Max HP grown this way = +1 dmg on every card you strike with (Max HP lost later doesn't undo it).
+   * Q buff 2026-10-25 (vs Pyromancer): end of every turn, +perDebuff (2) Max HP per debuff stack on you (debuffStacks).
    */
   'TK:2': {
     name: 'Titan Bloom',
@@ -212,6 +225,17 @@ export const STYLES: Record<string, StyleDef> = {
       p.maxHp += gain
       p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
       say(state, side, `Titan Bloom: Max HP +${gain} → ${p.maxHp}`)
+    },
+    endTurn: (state, side) => {
+      const p = state.players[side]
+      if (p.hp <= 0) return
+      const f = tuningOf(state, side)['TK:2']
+      const stacks = debuffStacks(p)
+      const gain = Math.min(f.maxHpCap - p.maxHp, stacks * f.perDebuff)
+      if (gain <= 0) return
+      p.maxHp += gain
+      p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
+      say(state, side, `Titan Bloom: ${stacks} debuff stack${stacks === 1 ? '' : 's'}, Max HP +${gain} → ${p.maxHp}`)
     },
     beforeHits: (state, side, bonus) => {
       const n = overgrowthDmg(state.players[side], tuningOf(state, side))
