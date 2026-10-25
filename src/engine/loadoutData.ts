@@ -124,22 +124,34 @@ export const TREES: Record<string, TreeData> = {
         ['ascSecondWindHealCut', 'Cost: heal cut %', 50, 0, 100],
       ]),
       // Q 2026-10-25 15:06: Unstoppable + Unbroken merged into C; D = Undeniable (spend Endurance on offence)
-      node('C1', 'Unstoppable', 'A charge break can\'t throw away your first {ascUnstoppable} Field cards.', 'ascUnstoppable', 'safe slots', 2, 0, 5),
-      multi('C2', 'Last Bastion', 'The first time your HP drops into the red, gain Shield {ascLastBastion}. While your HP is in the red, hits that reach you deal {ascDefiance} less dmg.', [
-        ['ascLastBastion', 'Shield', 30],
+      multi('C1', 'Unstoppable', 'When a Charge break hits you, gain {ascUnstoppableEnd} Endurance, and it can\'t throw away your first {ascUnstoppable} Field cards.', [
+        ['ascUnstoppable', 'safe slots', 2, 0, 5],
+        ['ascUnstoppableEnd', 'Endurance per Charge break', 2],
+      ]),
+      multi('C2', 'Last Bastion', 'The first time your HP drops into the red, gain Shield {ascLastBastion} + {ascLastBastionPct}% of your missing HP. While your HP is in the red, hits that reach you deal {ascDefiance} less dmg.', [
+        ['ascLastBastion', 'Shield', 10],
+        ['ascLastBastionPct', 'Shield % of missing HP', 10],
         ['ascDefiance', 'dmg cut per hit in the red', 2],
       ]),
-      capstone('C3', 'Unbroken', 'Once per match, a hit that would knock you out leaves you on 1 HP.', '−{ascUnbrokenCost} Max HP.', [
+      capstone('C3', 'Grasp of the Undying', 'Once per match, a hit that would knock you out leaves you on 1 HP and Undying for {ascUndyingTurns} turns: your HP can\'t drop below 1, and every chain card deals +{ascUndyingPct}% of your Max HP. When Undying ends, heal the bonus dmg it landed.', 'Your S cards cost {ascUndyingCost}% of your current HP each (instead of their usual cost).', [
         ['ascUnbroken', 'times per match', 1],
-        ['ascUnbrokenCost', 'Cost: Max HP −', 30],
+        ['ascUndyingTurns', 'Undying turns', 3, 1],
+        ['ascUndyingPct', 'dmg per card, % Max HP', 5],
+        ['ascUndyingCost', 'Cost: S cost % of current HP', 10, 1, 100],
       ]),
-      multi('D1', 'Momentum', 'Each Strike in a row (no other action between) gives every chain card +{ascMomentum} dmg, up to +{ascMomentumCap}.', [
+      multi('D1', 'Momentum', 'Each Strike in a row (no other action between) gives every chain card +{ascMomentum} dmg, up to +{ascMomentumCap}. A chain of {ascMomentumCards}+ cards gives {ascMomentumEnd} Endurance.', [
         ['ascMomentum', 'dmg per Strike in a row', 1],
         ['ascMomentumCap', 'max dmg', 3],
+        ['ascMomentumCards', 'chain size for Endurance', 3, 1],
+        ['ascMomentumEnd', 'Endurance for a long chain', 2],
       ]),
-      node('D2', 'Undeniable', 'Your first {ascUndeniable} chain card ignores Block.', 'ascUndeniable', 'slots that ignore Block', 1, 0, 5),
-      capstone('D3', 'Unleashed', 'When you Strike, spend all Endurance: every chain card +{ascUnleashed} dmg per Endurance spent.', 'The spent Endurance is gone (its dmg cut and regen too).', [
+      multi('D2', 'Undeniable', 'With Endurance, your first {ascUndeniable} chain card ignores Block. Without it, gain 1 Endurance, but slot 1 deals {ascUndeniableHalf}% less dmg.', [
+        ['ascUndeniable', 'slots that ignore Block', 1, 0, 5],
+        ['ascUndeniableHalf', 'slot 1 dmg cut % with no Endurance', 50, 0, 100],
+      ]),
+      capstone('D3', 'Unleashed', 'When you Strike, spend all Endurance: every chain card +{ascUnleashed} dmg per Endurance spent.', 'The spent Endurance is gone, and you are Vulnerable (+{ascUnleashedVuln}% dmg taken) next turn.', [
         ['ascUnleashed', 'dmg per Endurance', 3],
+        ['ascUnleashedVuln', 'Cost: Vulnerable %', 25, 0, 100],
       ]),
     ],
   },

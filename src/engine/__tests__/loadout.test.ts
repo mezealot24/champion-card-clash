@@ -100,13 +100,14 @@ describe('loadout', () => {
     expect(s.players.p1.res).toBeLessThan(2) // paid the normal cost
   })
 
-  it('Unbroken: a knockout hit leaves the Tank at 1 HP once', () => {
+  it('Grasp of the Undying: a knockout hit leaves the Tank at 1 HP once', () => {
     let s = game('TK', { asc: ['C1', 'C2', 'C3'] }, 'TK:1')
     s.players.p1.hp = 5
     s.players.p2.hand = [hit(50)]
     s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-    // stays at 1, then Lifeline heals in the red
-    expect(s.players.p1.maxHp).toBe(220) // Cost: −30 Max HP
+    // stays at 1 and goes Undying; Cost: S cards cost 10% of current HP
+    expect(s.players.p1.costMod?.hpPct).toBe(10)
+    expect(s.log.some((l) => l.includes('Grasp of the Undying'))).toBe(true)
     expect(s.players.p1.hp).toBeGreaterThanOrEqual(1)
     expect(s.players.p1.perkData?.unbroken).toBe(1)
     expect(s.winner).toBeNull()
@@ -200,6 +201,32 @@ describe('randomLoadout', () => {
       expect(s.players.p1.perkData?.drain ?? 0).toBe(0)
       expect(hp - s.players.p1.hp).toBeGreaterThan(lost1)
     })
+    it('Unstoppable: a Charge break gives 2 Endurance; Undeniable without Endurance gives 1 and halves slot 1', () => {
+      let s = tk('TK:1', ['C1'])
+      s.players.p2.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.players.p1.perkData?.endurance).toBe(2)
+      s = tk('TK:1', ['D1', 'D2'])
+      s.players.p1.hand = [hit(10)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.log.some((l) => l.includes('no Endurance, slot 1 deals half'))).toBe(true)
+      expect(s.players.p1.perkData?.endurance).toBe(1)
+    })
+    it('Undying: HP stays at 1, cards +5% Max HP, heals the bonus when it ends', () => {
+      let s = tk('TK:1', ['C1', 'C2', 'C3'])
+      s.players.p1.hp = 3
+      s.players.p2.hand = [hit(50)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.players.p1.hp).toBeGreaterThanOrEqual(1)
+      s.players.p2.hand = [hit(50)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.players.p1.hp).toBeGreaterThanOrEqual(1)
+      s.players.p1.hand = [hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.log.some((l) => l.includes('Undying: every card +'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Undying ends: heals'))).toBe(true)
+      expect(s.winner).toBeNull()
+    })
     it('Ancient: each Charge heals 4 + 4% missing HP', () => {
       let s = tk('TK:2', ['A1', 'A2', 'A3'])
       s.players.p1.hp = 100
@@ -234,7 +261,9 @@ describe('randomLoadout', () => {
       s.players.p1.hand = [hit(10), hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'strike', p2: 'block' })
       expect(s.players.p2.hp).toBeLessThan(250)
-      expect(s.log.some((l) => l.includes('Unleashed: spends 1 Endurance'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Endurance (3-card chain)'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Unleashed: spends 3 Endurance'))).toBe(true)
+      expect(s.players.p1.statuses.some((x) => x.kind === 'vulnerable')).toBe(true)
       expect(s.players.p1.perkData?.endurance).toBe(0)
       s.players.p1.hand = [hit(10)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })

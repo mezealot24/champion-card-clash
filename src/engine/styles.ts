@@ -105,6 +105,8 @@ export type StyleDef = {
   strikeStart?: (state: GameState, side: Side, chain: CardInst[]) => void
   /** How many leading Field slots a charge break can't throw away (default 0 = oldest card is lost) */
   chargeBreakSafe?: (state: GameState, side: Side) => number
+  /** this side was hit while Charging (Charge break), after the Field card is lost */
+  onChargeBreak?: (state: GameState, side: Side) => void
   /** Dual Strike (both sides Strike this turn): at the end of the turn, after resources fill, draw n and/or fill the bar to its cap */
   dualStrike?: { draw?: (t: Tuning) => number; fillRes?: boolean }
   /** extra cards a Charge that isn't broken draws */

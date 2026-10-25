@@ -85,7 +85,7 @@ export type PlayerState = {
   /** Field size for this player when a loadout changes it (default: rules.handMax). */
   fieldMax?: number
   /** S card cost changes from the loadout: +pct % then +flat (Tank: HP). */
-  costMod?: { pct: number; flat: number }
+  costMod?: { pct: number; flat: number; hpPct?: number }
   /** Loadout bookkeeping (once-per-match pieces and the like). */
   perkData?: Record<string, number>
 }

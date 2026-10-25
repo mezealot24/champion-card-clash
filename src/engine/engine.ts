@@ -150,6 +150,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
         // empty Field: nothing to lose, the Charge still draws 1 (Q 2026-10-17)
         drawCards(state, side, 1)
       }
+      for (const h of hooksOf(p)) h.onChargeBreak?.(state, side)
     } else {
       const extra = hooksOf(p).reduce((t, h) => t + (h.chargeDraw ?? 0) + (h.extraChargeDraw?.(state, side) ?? 0), 0)
       drawCards(state, side, state.rules.chargeDraw + extra)
