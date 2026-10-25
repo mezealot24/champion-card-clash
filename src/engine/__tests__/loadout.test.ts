@@ -171,6 +171,13 @@ describe('randomLoadout', () => {
       for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
       expect(s.players.p1.perkData?.endurance).toBe(0)
     })
+    it('Unflinching: an Ignite burn counts as a hit', () => {
+      let s = tk('TK:1', ['A1'])
+      s.players.p1.statuses.push({ kind: 'ignite', turns: 3, n: 1 })
+      s.players.p2.hand = [hit(10)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.players.p1.perkData?.endurance).toBe(1)
+    })
     it('Unrelenting: 2 Endurance at a time, max 5, turned into a heal in the red', () => {
       let s = tk('TK:1', ['A1', 'A2', 'A3'])
       expect((tuningOf(s, 'p1')['TK:1'] as Record<string, number>).ascEnduranceMax).toBe(5)
@@ -189,7 +196,7 @@ describe('randomLoadout', () => {
       s.players.p1.hp = 200
       s.players.p2.hand = [hit(10), hit(10), hit(10), hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.log.some((l) => l.includes('Untiring: heals 4'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Untiring: heals 6'))).toBe(true)
     })
     it('Undeniable: S cost +50% and slot 1 ignores Block', () => {
       let s = tk('TK:1', ['C1', 'C2', 'C3'])
