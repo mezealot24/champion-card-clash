@@ -35,11 +35,6 @@ const addMaxHp = (p: PlayerState, n: number) => {
   p.maxHp = Math.max(1, p.maxHp + n)
   p.hp = Math.max(1, Math.min(p.maxHp, p.hp + n))
 }
-const cost = (p: PlayerState, pct: number, flat: number) => {
-  const c = (p.costMod ??= { pct: 0, flat: 0 })
-  c.pct += pct
-  c.flat += flat
-}
 const status = (p: PlayerState, kind: 'shield' | 'parry', n: number) => {
   if (n > 0) p.statuses.push({ kind, turns: 9999, n })
 }
