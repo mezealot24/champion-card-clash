@@ -320,7 +320,8 @@ export const and =
 // ---------- Conditions ----------
 // จำนวนการ์ดในมือ = ตอนเปิด action (ก่อนตี)
 
-const handOf = (ctx: ChainCtx, who: 'self' | 'enemy') => ctx.handAtStart[who === 'self' ? ctx.self : ctx.enemy]
+// Field at the start of the turn; on draw (no chain yet) the live Field
+const handOf = (ctx: ChainCtx, who: 'self' | 'enemy') => { const side = who === 'self' ? ctx.self : ctx.enemy; return ctx.handAtStart?.[side] ?? ctx.state.players[side].hand }
 
 export const enemyHandAtLeast = (n: number): Cond => (ctx) => handOf(ctx, 'enemy').length >= n
 export const enemyHandEmpty: Cond = (ctx) => handOf(ctx, 'enemy').length === 0
