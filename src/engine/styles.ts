@@ -417,7 +417,8 @@ Object.assign(STYLES, {
    * Chill clears and it can't Strike next turn, then Thaw keeps it from being Frozen again for a while (combos.ts freeze).
    * Shatter (Q 2026-10-25, Ice Lance pattern): your first clean hit on a Frozen enemy takes shatterPct of its Max HP,
    * so the Frozen side guesses Block (stops the hits) or Charge. Flash Freeze draws you cards for that Strike.
-   * Frost Armor regrows (Q 2026-10-25, StS Frost orb): every turn you Block, Shield +frostArmorRegen up to frostArmorCap.
+   * Frost Armor regrows (Q 2026-10-25, StS Frost orb): every turn you Block an enemy Strike, Shield +frostArmorRegen up to frostArmorCap.
+   * Block vs Charge regrows nothing (Q 2026-10-26: no free Shield from Block spam).
    * Arcane Sub-Zero (card) leaves a subZero status: the next Strike's clean hits each give 1 Chill.
    */
   'MG:2': {
@@ -487,11 +488,11 @@ Object.assign(STYLES, {
       if (n) p.styleData = { ...p.styleData, freezeDraw: 0 }
       return n
     },
-    endTurn: (state, side, action) => {
+    endTurn: (state, side, action, enemyAction) => {
       const p = state.players[side]
       if (p.styleData?.subZero) p.styleData = { ...p.styleData, subZero: 0 }
       const t = tuningOf(state, side)['MG:2']
-      if (action === 'block' && p.hp > 0) {
+      if (action === 'block' && enemyAction === 'strike' && p.hp > 0) {
         const got = growShield(p, t.frostArmorRegen, t.frostArmorCap)
         if (got) say(state, side, `Frost Armor regrows: Shield +${got}`)
       }

@@ -431,7 +431,7 @@ export const TREES: Record<string, TreeData> = {
       {
         id: 'C1',
         name: 'Hoarfrost',
-        text: 'Frost Armor regrows {ascHoarfrost} more Shield per Block, and its cap is {ascHoarfrostCap} higher.',
+        text: 'Frost Armor regrows {ascHoarfrost} more Shield per Block vs a Strike, and its cap is {ascHoarfrostCap} higher.',
         fields: [f('ascHoarfrost', 'Asc C1 Hoarfrost: regrow per Block +', 4), f('ascHoarfrostCap', 'Asc C1 Hoarfrost: Shield cap +', 16)],
       },
       node('C2', 'Ice Lance', 'While you have Shield, chain slot 1 deals +{ascIceLance} dmg.', 'ascIceLance', 'slot 1 dmg +', 6),
