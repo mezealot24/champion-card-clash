@@ -1,6 +1,7 @@
 // First-match tutorial script. Each step says what to try, which action we hope for, and what the
 // scripted opponent does that turn. After the last step the real AI takes over (free play).
 import type { Action } from '../../engine'
+import { t } from '../../i18n'
 
 export type TutStep = {
   title: string
@@ -59,7 +60,8 @@ const NAME: Record<Action, string> = { strike: 'Strike', charge: 'Charge', block
 
 /** One line on who won the action triangle this turn. */
 export function outcomeLine(mine: Action, theirs: Action): string {
-  if (mine === theirs) return `Both picked ${NAME[mine]}.`
-  if (BEATS[mine] === theirs) return `${NAME[mine]} beats ${NAME[theirs]}. You won that turn.`
-  return `${NAME[theirs]} beats ${NAME[mine]}. They won that turn.`
+  const n = (a: Action) => t(NAME[a])
+  if (mine === theirs) return t('Both picked {a}.', { a: n(mine) })
+  if (BEATS[mine] === theirs) return t('{a} beats {b}. You won that turn.', { a: n(mine), b: n(theirs) })
+  return t('{a} beats {b}. They won that turn.', { a: n(theirs), b: n(mine) })
 }

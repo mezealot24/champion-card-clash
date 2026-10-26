@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
+import { t, useLang } from '../i18n'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
@@ -25,12 +26,13 @@ export type BattleData = { champions: Champ[]; cards: Row[]; styles?: StyleRow[]
 
 /** Banner when Tuktah gave no usable pick this turn (the AI picks instead). */
 const missLine = (code: string) =>
-  code === 'rate_limited' ? 'Tuktah needs a breather. The AI plays this turn.'
-  : code === 'not_granted' ? 'Claude is not allowed on this page. The AI plays this turn.'
-  : 'Tuktah missed this turn. The AI plays it.'
+  code === 'rate_limited' ? t('Tuktah needs a breather. The AI plays this turn.')
+  : code === 'not_granted' ? t('Claude is not allowed on this page. The AI plays this turn.')
+  : t('Tuktah missed this turn. The AI plays it.')
 
 /** The game screen. Data comes from Supabase (BattlePage) or a bundled snapshot (play.tsx). */
 export function Battle({ data }: { data: BattleData }) {
+  useLang()
   const [picks, setPicks] = useState({ p1: 'BR', p2: 'BR' })
   // A Style is required (Q 2026-10-25). The player's is saved with their loadout ('' until picked, e.g. a save from
   // before the rule); the AI's defaults to slot 1 when it works in the engine.
@@ -243,14 +245,14 @@ export function Battle({ data }: { data: BattleData }) {
         names={{ p1: champName('p1'), p2: champName('p2') }}
         styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
         styleTexts={{
-          p1: [styleText[game.players.p1.style ?? ''] ?? '', ...loadoutLines(game.players.p1.championId, game.players.p1.style, myLoadout).map((l) => `${l.label}: ${l.value}.`)].filter(Boolean).join(' '),
-          p2: [styleText[game.players.p2.style ?? ''] ?? '', ...loadoutLines(game.players.p2.championId, game.players.p2.style, foeLoadout).map((l) => `${l.label}: ${l.value}.`)].filter(Boolean).join(' '),
+          p1: [styleText[game.players.p1.style ?? ''] ?? '', ...loadoutLines(game.players.p1.championId, game.players.p1.style, myLoadout).map((l) => `${t(l.label)}: ${l.value}.`)].filter(Boolean).join(' '),
+          p2: [styleText[game.players.p2.style ?? ''] ?? '', ...loadoutLines(game.players.p2.championId, game.players.p2.style, foeLoadout).map((l) => `${t(l.label)}: ${l.value}.`)].filter(Boolean).join(' '),
         }}
         settingsExtra={<TimerSetting />}
         onAction={play}
-        foe={foe === 'tuktah' ? 'Tuktah' : 'AI'}
+        foe={foe === 'tuktah' ? t('Tuktah') : t('AI')}
         busy={thinking}
-        banner={thinking ? 'Tuktah is thinking…' : line || undefined}
+        banner={thinking ? t('Tuktah is thinking…') : line || undefined}
         bannerFades={!thinking}
         onDone={() => {
           if (turn) setGame(turn.next)

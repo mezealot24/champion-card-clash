@@ -238,3 +238,8 @@ td input[type="number"], .tuning input { font-variant-numeric: tabular-nums; }
 .tune-tree.asc { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 1000px) { .tune-tree.asc { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 560px) { .tune-tree.asc { grid-template-columns: 1fr; } }
+
+/* ไทย | EN switch (player screens): inherits the screen's colours */
+.lang-toggle { display: inline-flex; border: 2px solid currentColor; border-radius: 999px; overflow: hidden; opacity: .9; }
+.lang-toggle button { background: transparent; color: inherit; border: 0; border-radius: 0; padding: 4px 10px; font-size: 12px; font-weight: 800; }
+.lang-toggle button[aria-checked="true"] { color: var(--lang-on, #22163d); background: var(--lang-on-bg, #ffd36b); }

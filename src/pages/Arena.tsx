@@ -18,6 +18,8 @@ import {
   type TurnEvent,
 } from '../engine'
 import { describeSpec } from '../engine/effects/describe'
+import { t, useLang } from '../i18n'
+import { LangToggle } from '../i18n/LangToggle'
 import { champColor, fighterHTML, type Pose } from './fighters'
 import { newChain, strikePose, type ChainCount } from './strikePoses'
 import { ComboTracker, CompactFx } from './LearnBits'
@@ -27,7 +29,8 @@ const W = 800
 const H = 390
 const SIDES: Side[] = ['p1', 'p2']
 const other = (s: Side): Side => (s === 'p1' ? 'p2' : 'p1')
-const LABEL: Record<Action, string> = { strike: 'STRIKE', block: 'BLOCK', charge: 'CHARGE' }
+const LABEL_EN: Record<Action, string> = { strike: 'STRIKE', block: 'BLOCK', charge: 'CHARGE' }
+const label = (a: Action) => t(LABEL_EN[a])
 const BEATS: Record<Action, Action> = { strike: 'charge', charge: 'block', block: 'strike' }
 const ACTIONS: { action: Action; label: string; beats: string }[] = [
   { action: 'strike', label: 'Strike', beats: 'beats Charge' },
@@ -94,8 +97,9 @@ export function Arena(props: {
   /** action buttons stay disabled while true (waiting on the opponent's pick) */
   busy?: boolean
 }) {
+  useLang()
   const { game, turn, names, styleNames } = props
-  const foe = props.foe ?? 'AI'
+  const foe = props.foe ?? t('AI')
   const stageRef = useRef<HTMLDivElement>(null)
   const fxRef = useRef<HTMLDivElement>(null)
   const poseTimers = useRef(new WeakMap<Element, number>())
@@ -263,8 +267,8 @@ export function Arena(props: {
   }
 
   // ---------- one turn ----------
-  async function playback(t: Turn) {
-    const { prev, next, actions } = t
+  async function playback(tn: Turn) {
+    const { prev, next, actions } = tn
     setPlaying(true)
     skip.current = false
     setHits('')
@@ -274,7 +278,7 @@ export function Arena(props: {
     const tokens = [q('.tok.p1'), q('.tok.p2')]
     await Promise.all(tokens.map((el) => anim(el, [{ transform: 'rotateY(0)' }, { transform: 'rotateY(90deg)' }], 150, { easing: 'ease-in' })))
     const win: Side | undefined = actions.p1 === actions.p2 ? undefined : BEATS[actions.p1] === actions.p2 ? 'p1' : 'p2'
-    const verdict = win ? `${LABEL[actions[win]]} beats ${LABEL[actions[other(win)]]}` : `${LABEL[actions.p1]} meets ${LABEL[actions.p2]}`
+    const verdict = win ? t('{a} beats {b}', { a: label(actions[win]), b: label(actions[other(win)]) }) : t('{a} meets {b}', { a: label(actions.p1), b: label(actions.p2) })
     flushSync(() => setTok({ p1: actions.p1, p2: actions.p2, shown: true, verdict, lose: win ? other(win) : undefined }))
     await Promise.all(tokens.map((el) => anim(el, [{ transform: 'rotateY(-90deg)' }, { transform: 'rotateY(0)' }], 150, { easing: 'ease-out' })))
     if (win) {
@@ -324,7 +328,7 @@ export function Arena(props: {
       const name = key ? STYLES[key]?.name : undefined
       if (name && lines.some((l) => l.includes(`${side} ${name}`) || (l.includes(name) && l.includes(side)))) {
         anim(q(`.hud.${side} .portrait .ring`), [{ opacity: 1, transform: 'scale(.9)' }, { opacity: 0, transform: 'scale(1.9)' }], 600)
-        await toast(side, 'Style', name)
+        await toast(side, t('Style'), name)
       }
     }
     if (next.winner) {
@@ -368,20 +372,20 @@ export function Arena(props: {
     await wait(320)
     if (ev.blocked && !ev.dealt) {
       spark(b.x, b.y, '#4f9dff')
-      pop(b.x, b.y - 10, 'BLOCK', 'soft')
+      pop(b.x, b.y - 10, t('BLOCK'), 'soft')
       charBlocked(foe)
     } else if (ev.parried) {
       spark(b.x, b.y, '#4f9dff')
-      pop(b.x, b.y - 10, 'PARRY', 'soft')
+      pop(b.x, b.y - 10, t('PARRY'), 'soft')
       charBlocked(foe)
     } else {
       count[ev.side]++
       spark(b.x, b.y, ev.crit ? '#ffc84a' : '#fff2b8')
-      if (ev.crit) pop(b.x, b.y - 40, 'CRITICAL', 'crit')
-      if (ev.absorbed) pop(b.x - 20, b.y - 34, `SHIELD −${ev.absorbed}`, 'soft')
+      if (ev.crit) pop(b.x, b.y - 40, t('CRITICAL'), 'crit')
+      if (ev.absorbed) pop(b.x - 20, b.y - 34, `${t('SHIELD')} −${ev.absorbed}`, 'soft')
       if (ev.dealt > 0) charHit(foe)
       shake(q(`.hud.${foe} .portrait`))
-      setHits(`${count[ev.side]} HIT${count[ev.side] > 1 ? 'S' : ''}`)
+      setHits(t(count[ev.side] > 1 ? '{n} HITS' : '{n} HIT', { n: count[ev.side] }))
     }
     commit((v) => ({ ...v, [ev.side]: { ...v[ev.side], field: v[ev.side].field.map((c) => (c.card.uid === ev.uid ? { ...c, spent: true } : c)) } }))
     const done = dash.then(() => {
@@ -466,7 +470,7 @@ export function Arena(props: {
 
   async function combo(side: Side, name: string, next: GameState) {
     const champ = next.players[side].championId
-    const [title, sub] = COMBO_TEXT[`${champ}:${name}`] ?? ['COMBO', name]
+    const [title, sub] = COMBO_TEXT[`${champ}:${name}`]?.map((s) => t(s)) ?? [t('COMBO'), name]
     const types = name.split(/[^PKS]+/).filter(Boolean)
     // light up 3 chain cards of the combo's types
     const left = [...types]
@@ -481,7 +485,7 @@ export function Arena(props: {
     flushSync(() => setGlow(lit))
     charCombo(side)
     anim(q('.fxl .dim'), [{ opacity: 0 }, { opacity: 1 }, { opacity: 1 }, { opacity: 0 }], BANNER_MS)
-    const b = add(`<div class="banner"><span>Signature combo · ${name}</span><b>${title}</b><span>${sub}</span><small>Tap to skip</small></div>`)
+    const b = add(`<div class="banner"><span>${t('Signature combo')} · ${name}</span><b>${title}</b><span>${sub}</span><small>${t('Tap to skip')}</small></div>`)
     // long enough to read (playtest feedback); a tap ends it without skipping the rest of the turn
     b.style.pointerEvents = 'auto'
     b.addEventListener('click', (e) => {
@@ -530,7 +534,7 @@ export function Arena(props: {
 
   const legal = legalActions(game, 'p1')
   const lastLines = game.log.filter((l) => l.startsWith(`T${game.turn - 1} `)).slice(-3)
-  const readable = (l: string) => l.replace(/^T\d+ /, '').replace(/\bp1\b/g, 'You').replace(/\bp2\b/g, foe)
+  const readable = (l: string) => l.replace(/^T\d+ /, '').replace(/\bp1\b/g, t('You')).replace(/\bp2\b/g, foe)
   // HP at 30% or less: a sprite Champion stands in its hurt stance (arena.css .low)
   const lowHp = (side: Side) => !down && view[side].hp > 0 && view[side].hp <= game.players[side].maxHp * 0.3
 
@@ -559,13 +563,13 @@ export function Arena(props: {
             />
           ))}
           {(['p2', 'p1'] as Side[]).map((side) => (
-            <section key={side} className={`field ${side === 'p1' ? 'me' : 'enemy'}`} aria-label={side === 'p1' ? 'Your Field' : `${foe} Field`}>
+            <section key={side} className={`field ${side === 'p1' ? 'me' : 'enemy'}`} aria-label={side === 'p1' ? t('Your Field') : t('{who} Field', { who: foe })}>
               {Array.from({ length: game.rules.handMax }, (_, i) => {
                 const vc = view[side].field[i]
                 // a slot the loadout closed (Deep Roots, Bloodlust)
                 const closed = i >= (game.players[side].fieldMax ?? game.rules.handMax)
                 return (
-                  <div className={`slot${closed ? ' closed' : ''}`} key={i} title={closed ? 'Closed by a Sigil' : undefined}>
+                  <div className={`slot${closed ? ' closed' : ''}`} key={i} title={closed ? t('Closed by a Sigil') : undefined}>
                     {closed ? '✕' : i + 1}
                     {vc && (
                       <CardView
@@ -586,7 +590,7 @@ export function Arena(props: {
           <div className="lane">
             <div className="lane-left">
               <ComboTracker game={game} side="p2" cards={view.p2.field.filter((v) => !v.gone).map((v) => v.card)} />
-              <div className="log">{playing ? '' : lastLines.map(readable).join(' · ') || 'Pick an action. Both sides lock in, then reveal together.'}</div>
+              <div className="log">{playing ? '' : lastLines.map(readable).join(' · ') || t('Pick an action. Both sides lock in, then reveal together.')}</div>
               <ComboTracker game={game} side="p1" cards={view.p1.field.filter((v) => !v.gone).map((v) => v.card)} />
             </div>
             <div className="vs">
@@ -600,13 +604,13 @@ export function Arena(props: {
           <div className="side">
             <div>
               <div className="turn">
-                TURN<b>{game.turn}</b>
+                {t('TURN')}<b>{game.turn}</b>
               </div>
               <div className="tools">
                 <button
                   type="button"
                   className="tool"
-                  aria-label="Settings"
+                  aria-label={t('Settings')}
                   onClick={(e) => {
                     e.stopPropagation()
                     if (!playing) setSheet('settings')
@@ -617,7 +621,7 @@ export function Arena(props: {
               </div>
             </div>
             <div className="acts">
-              {ACTIONS.map(({ action, label, beats }) => (
+              {ACTIONS.map(({ action, label: name, beats }) => (
                 <button
                   key={action}
                   type="button"
@@ -628,8 +632,8 @@ export function Arena(props: {
                     choose(action)
                   }}
                 >
-                  {label}
-                  <small>{beats}</small>
+                  {t(name)}
+                  <small>{t(beats)}</small>
                 </button>
               ))}
             </div>
@@ -644,15 +648,15 @@ export function Arena(props: {
           </div>
           {game.winner && !playing && !turn && (
             <div className="result">
-              <h2 className={game.winner === 'p2' ? 'lost' : ''}>{game.winner === 'draw' ? 'DRAW' : game.winner === 'p1' ? 'YOU WIN!' : 'K.O.'}</h2>
+              <h2 className={game.winner === 'p2' ? 'lost' : ''}>{game.winner === 'draw' ? t('DRAW') : game.winner === 'p1' ? t('YOU WIN!') : 'K.O.'}</h2>
               <div className="row">
                 {props.onRestart && (
                   <button type="button" className="big-btn" onClick={props.onRestart}>
-                    Play again
+                    {t('Play again')}
                   </button>
                 )}
                 <button type="button" className="big-btn alt" onClick={props.onQuit}>
-                  Change Champion
+                  {t('Change Champion')}
                 </button>
               </div>
             </div>
@@ -661,18 +665,19 @@ export function Arena(props: {
             <div className="sheet" onClick={() => setSheet(null)}>
               {sheet === 'settings' ? (
                 <div className="info settings">
-                  <b>Settings</b>
+                  <b>{t('Settings')}</b>
+                  <LangToggle />
                   <button type="button" className="big-btn" onClick={(e) => (e.stopPropagation(), cycleSpeed())}>
-                    Animation speed {speed}x
+                    {t('Animation speed {n}x', { n: speed })}
                   </button>
                   <button type="button" className="big-btn" onClick={(e) => (e.stopPropagation(), setSheet('log'))}>
-                    Match log
+                    {t('Match log')}
                   </button>
                   {props.settingsExtra && <div onClick={(e) => e.stopPropagation()}>{props.settingsExtra}</div>}
                   <button type="button" className="big-btn alt" onClick={props.onQuit}>
-                    Quit to Champion select
+                    {t('Quit to Champion select')}
                   </button>
-                  <p>Tap outside to close.</p>
+                  <p>{t('Tap outside to close.')}</p>
                 </div>
               ) : typeof sheet === 'object' && 'tip' in sheet ? (
                 <div className="info">
@@ -680,17 +685,17 @@ export function Arena(props: {
                   {sheet.tip.body.split('\n').map((l, i) => (
                     <p key={i}>{l}</p>
                   ))}
-                  <p>Tap anywhere to close.</p>
+                  <p>{t('Tap anywhere to close.')}</p>
                 </div>
               ) : sheet === 'log' ? (
                 <div className="info" style={{ maxWidth: 560, width: '100%' }}>
-                  <b>Match log</b>
+                  <b>{t('Match log')}</b>
                   <ul>
                     {game.log.map((l, i) => (
-                      <li key={i}>{l.replace(/\bp1\b/g, 'You').replace(/\bp2\b/g, foe)}</li>
+                      <li key={i}>{l.replace(/\bp1\b/g, t('You')).replace(/\bp2\b/g, foe)}</li>
                     ))}
                   </ul>
-                  <p>Tap anywhere to close.</p>
+                  <p>{t('Tap anywhere to close.')}</p>
                 </div>
               ) : (
                 <CardSheet game={game} side={sheet.side} card={sheet.card} />
@@ -702,13 +707,13 @@ export function Arena(props: {
       {portrait && !portraitOk && (
         <div className="rotate">
           <div className="phone" />
-          <b>Turn your phone sideways</b>
-          <p>The battle screen is made for landscape.</p>
+          <b>{t('Turn your phone sideways')}</b>
+          <p>{t('The battle screen is made for landscape.')}</p>
           <button type="button" className="big-btn" onClick={fullscreen}>
-            Fullscreen landscape
+            {t('Fullscreen landscape')}
           </button>
           <button type="button" className="link" onClick={() => setPortraitOk(true)}>
-            Play in portrait anyway
+            {t('Play in portrait anyway')}
           </button>
         </div>
       )}
@@ -723,8 +728,8 @@ function TokenView({ side, tok, playing, locked, foe }: { side: Side; tok: Token
     <div className={cls}>
       {a ? (
         <span>
-          <small>{side === 'p1' ? 'You' : foe}</small>
-          {LABEL[a]}
+          <small>{side === 'p1' ? t('You') : foe}</small>
+          {label(a)}
         </span>
       ) : playing || locked ? (
         '…'
@@ -740,31 +745,33 @@ type Tip = { title: string; body: string }
 const enduranceNum = (game: GameState, side: Side) => tuningOf(game, side)['TK:1'] as unknown as Record<string, number>
 type Chip = { label: string; tone: 'buff' | 'debuff'; tip: string }
 
-const turnsLeft = (s: Status) => (s.turns > 0 && s.turns < 50 ? `\n${s.turns} turn${s.turns === 1 ? '' : 's'} left.` : '')
+const turnsLeft = (s: Status) => (s.turns > 0 && s.turns < 50 ? `\n${t(s.turns === 1 ? '{n} turn left.' : '{n} turns left.', { n: s.turns })}` : '')
+/** "stack" / "stacks", "hit" / "hits": English picks the form, Thai has one */
+const pl = (n: number, one: string, many: string, vars: Record<string, string | number> = {}) => t(n === 1 ? one : many, { n, ...vars })
 /** Status chip: label, buff (good for whoever carries it) or debuff, and the tap-to-read text. */
 function statusChip(s: Status, frozen: boolean): Chip {
   const n = s.n ?? 1
   const [label, tone, tip]: [string, Chip['tone'], string] =
-    s.kind === 'blockPlus' ? (n >= 0 ? [`Block +${n}`, 'buff', `Your Block stops ${n} more hit${n === 1 ? '' : 's'}.`] : [`Block −${-n}`, 'debuff', `Your Block stops ${-n} fewer hit${n === -1 ? '' : 's'}.`])
-    : s.kind === 'trueDmg' ? ['True Dmg', 'buff', 'Your hits ignore damage cuts. Only Block stops them.']
-    : s.kind === 'guardBreak' ? ['Guard Crush', 'buff', 'Your next Strike: blocked hits still deal part of their damage, and a Blocking opponent loses their 2 oldest Field cards.']
-    : s.kind === 'shield' ? [`Shield ${s.n ?? 0}`, 'buff', `Absorbs ${s.n ?? 0} damage from hits before your HP.`]
-    : s.kind === 'parry' ? [`Parry ${n}`, 'buff', `The next ${n} hit${n === 1 ? '' : 's'} that get past your Block deal 0.`]
-    : s.kind === 'subZero' ? ['❄ Sub-Zero', 'buff', 'Your next Strike: every clean hit gives the enemy 1 Chill.']
-    : s.kind === 'frozenTomb' ? ['🧊 Frozen Tomb', 'buff', "Sealed in ice: you can't Strike or Charge this turn, and you heal."]
-    : s.kind === 'thaw' ? ['💧 Thaw', 'buff', "Just thawed: you can't be Frozen again yet."]
-    : s.kind === 'noBlock' ? ['No Block', 'debuff', "You can't Block this turn."]
-    : s.kind === 'noStrike' ? (frozen ? ['🧊 Frozen', 'debuff', "Frozen: you can't Strike."] : ['No Strike', 'debuff', "You can't Strike this turn."])
-    : s.kind === 'noCharge' ? ['No Charge', 'debuff', "You can't Charge this turn."]
-    : s.kind === 'silence' ? ['Silenced', 'debuff', "Your cards' effects don't fire this turn. Styles and combos still work."]
-    : s.kind === 'skillSilence' ? ['Skill effects off', 'debuff', "Your S cards' effects don't fire this turn. They still deal damage."]
-    : s.kind === 'vulnerable' ? [`Vulnerable ${s.n ?? 0}%`, 'debuff', `You take ${s.n ?? 0}% more damage from hits.`]
-    : s.kind === 'deathMark' ? ['💀 Mark of Assassin', 'debuff', 'Every Strike against you bursts for extra damage, even through Block.']
-    : s.kind === 'ignite' ? [`🔥 Ignite ${n}`, 'debuff', `Burning (${n} stack${n === 1 ? '' : 's'}): you lose HP every turn and your healing is cut.`]
-    : s.kind === 'venom' ? [`🐍 Venom ${n}`, 'debuff', `Poisoned (${n} stack${n === 1 ? '' : 's'}): you lose 1 HP per stack at the end of every turn.`]
-    : s.kind === 'cutGuard' ? ['✂ Cut guard', 'buff', "You just lost Field cards to Cut, so your Field can't be Cut again for now."]
-    : s.kind === 'woundUp' ? ['🥊 Wound Up', 'buff', 'Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left as extra damage.']
-    : s.kind === 'chill' ? [`❄ Chill ${n}`, 'debuff', `Chilled (${n} stack${n === 1 ? '' : 's'}): your damage is cut for each stack.`]
+    s.kind === 'blockPlus' ? (n >= 0 ? [`Block +${n}`, 'buff', pl(n, 'Your Block stops {n} more hit.', 'Your Block stops {n} more hits.')] : [`Block −${-n}`, 'debuff', pl(-n, 'Your Block stops {n} fewer hit.', 'Your Block stops {n} fewer hits.')])
+    : s.kind === 'trueDmg' ? ['True Dmg', 'buff', t('Your hits ignore damage cuts. Only Block stops them.')]
+    : s.kind === 'guardBreak' ? ['Guard Crush', 'buff', t('Your next Strike: blocked hits still deal part of their damage, and a Blocking opponent loses their 2 oldest Field cards.')]
+    : s.kind === 'shield' ? [`Shield ${s.n ?? 0}`, 'buff', t('Absorbs {n} damage from hits before your HP.', { n: s.n ?? 0 })]
+    : s.kind === 'parry' ? [`Parry ${n}`, 'buff', pl(n, 'The next {n} hit that gets past your Block deals 0.', 'The next {n} hits that get past your Block deal 0.')]
+    : s.kind === 'subZero' ? ['❄ Sub-Zero', 'buff', t('Your next Strike: every clean hit gives the enemy 1 Chill.')]
+    : s.kind === 'frozenTomb' ? ['🧊 Frozen Tomb', 'buff', t("Sealed in ice: you can't Strike or Charge this turn, and you heal.")]
+    : s.kind === 'thaw' ? ['💧 Thaw', 'buff', t("Just thawed: you can't be Frozen again yet.")]
+    : s.kind === 'noBlock' ? ['No Block', 'debuff', t("You can't Block this turn.")]
+    : s.kind === 'noStrike' ? (frozen ? ['🧊 Frozen', 'debuff', t("Frozen: you can't Strike.")] : ['No Strike', 'debuff', t("You can't Strike this turn.")])
+    : s.kind === 'noCharge' ? ['No Charge', 'debuff', t("You can't Charge this turn.")]
+    : s.kind === 'silence' ? ['Silenced', 'debuff', t("Your cards' effects don't fire this turn. Styles and combos still work.")]
+    : s.kind === 'skillSilence' ? ['Skill effects off', 'debuff', t("Your S cards' effects don't fire this turn. They still deal damage.")]
+    : s.kind === 'vulnerable' ? [`Vulnerable ${s.n ?? 0}%`, 'debuff', t('You take {n}% more damage from hits.', { n: s.n ?? 0 })]
+    : s.kind === 'deathMark' ? ['💀 Mark of Assassin', 'debuff', t('Every Strike against you bursts for extra damage, even through Block.')]
+    : s.kind === 'ignite' ? [`🔥 Ignite ${n}`, 'debuff', pl(n, 'Burning ({n} stack): you lose HP every turn and your healing is cut.', 'Burning ({n} stacks): you lose HP every turn and your healing is cut.')]
+    : s.kind === 'venom' ? [`🐍 Venom ${n}`, 'debuff', pl(n, 'Poisoned ({n} stack): you lose 1 HP per stack at the end of every turn.', 'Poisoned ({n} stacks): you lose 1 HP per stack at the end of every turn.')]
+    : s.kind === 'cutGuard' ? ['✂ Cut guard', 'buff', t("You just lost Field cards to Cut, so your Field can't be Cut again for now.")]
+    : s.kind === 'woundUp' ? ['🥊 Wound Up', 'buff', t('Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left as extra damage.')]
+    : s.kind === 'chill' ? [`❄ Chill ${n}`, 'debuff', pl(n, 'Chilled ({n} stack): your damage is cut for each stack.', 'Chilled ({n} stacks): your damage is cut for each stack.')]
     : [s.kind, 'debuff', s.kind]
   return { label, tone, tip: tip + turnsLeft(s) }
 }
@@ -782,7 +789,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
   const res = game.rules.resources ? resourceOf(p.championId, tuningOf(game, side)) : undefined
   // chips and badges sit on the stage, whose click skips playback, so taps stop there
   const tap = (t: Tip) => (e: React.MouseEvent) => (e.stopPropagation(), onTip(t))
-  const resTip = res && { title: res.payWithHp ? 'Pays with HP' : `${res.name} ${p.res ?? 0}/${res.cap}`, body: RESOURCE_TIP[p.championId] ?? res.name }
+  const resTip = res && { title: res.payWithHp ? t('Pays with HP') : `${res.name} ${p.res ?? 0}/${res.cap}`, body: RESOURCE_TIP[p.championId] ? t(RESOURCE_TIP[p.championId]) : res.name }
   const resView = !res ? null : res.payWithHp ? (
     <button type="button" className="res" onClick={tap(resTip!)}>
       S = HP
@@ -804,17 +811,17 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
     // frozen is only a marker for cards (the No Strike chip shows the freeze); Frozen Tomb's chip stands for its No Strike / No Charge
     ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) => statusChip(s, frozen)),
     ...(p.comboData?.conqueror
-      ? [{ label: conqMax(game, side) ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: `Juggernaut stacks: +1 dmg per stack on every chain card. At ${conqMaxN}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.` }]
+      ? [{ label: conqMax(game, side) ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: t('Juggernaut stacks: +1 dmg per stack on every chain card. At {max}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.', { max: conqMaxN }) }]
       : []),
     // Tank Lifeline: Endurance stacks (perkData), with their cut / regen
     ...(p.perkData?.endurance
-      ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${enduranceNum(game, side).ascEnduranceMax}`, tone: 'buff' as const, tip: `${p.perkData.endurance} Endurance: hits that reach you deal ${Math.floor((p.perkData.endurance * enduranceNum(game, side).ascEnduranceCut * enduranceNum(game, side).ascEndurancePower) / 100)} less dmg, and you regain ${Math.floor((p.maxHp * p.perkData.endurance * enduranceNum(game, side).ascEnduranceRegen * enduranceNum(game, side).ascEndurancePower) / 10000)} HP at the end of every turn. Fades after ${enduranceNum(game, side).ascEnduranceTurns} turns without a new one.` }]
+      ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${enduranceNum(game, side).ascEnduranceMax}`, tone: 'buff' as const, tip: t('{n} Endurance: hits that reach you deal {cut} less dmg, and you regain {regen} HP at the end of every turn. Fades after {turns} turns without a new one.', { n: p.perkData.endurance, cut: Math.floor((p.perkData.endurance * enduranceNum(game, side).ascEnduranceCut * enduranceNum(game, side).ascEndurancePower) / 100), regen: Math.floor((p.maxHp * p.perkData.endurance * enduranceNum(game, side).ascEnduranceRegen * enduranceNum(game, side).ascEndurancePower) / 10000), turns: enduranceNum(game, side).ascEnduranceTurns }) }]
       : []),
     ...((p.perkData?.undyingUntil ?? 0) >= game.turn
-      ? [{ label: '💀 Undying', tone: 'buff' as const, tip: `Your HP can't drop below 1 until turn ${p.perkData!.undyingUntil}, and every chain card deals bonus dmg. When it ends you heal the bonus dmg that landed.` }]
+      ? [{ label: '💀 Undying', tone: 'buff' as const, tip: t("Your HP can't drop below 1 until turn {turn}, and every chain card deals bonus dmg. When it ends you heal the bonus dmg that landed.", { turn: p.perkData!.undyingUntil! }) }]
       : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
-    ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: `If this side Strikes now with no S card, every chain card gets +${overdriveAdd(game, side)} dmg and all Energy is spent.` }] : []),
+    ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: t('If this side Strikes now with no S card, every chain card gets +{n} dmg and all Energy is spent.', { n: overdriveAdd(game, side) }) }] : []),
   ]
   const who = (
     <div className="who" key="who">
@@ -825,13 +832,13 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
       <div className="name">
         <b>{name}</b>
         <span>
-          {side === 'p1' ? 'You' : foe} ·{' '}
+          {side === 'p1' ? t('You') : foe} ·{' '}
           {style && styleText ? (
             <button type="button" className="style-link" onClick={tap({ title: style, body: styleText })}>
               {style} ⓘ
             </button>
           ) : (
-            style || 'No Style'
+            style || t('No Style')
           )}
         </span>
       </div>
@@ -853,7 +860,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
   )
   const meta = (
     <div className="meta" key="meta">
-      <div className="pile" title="Deck">
+      <div className="pile" title={t('Deck')}>
         {p.deck.length}
       </div>
       <div className="chips">
@@ -918,11 +925,11 @@ function cardFacts(game: GameState, side: Side, card: CardInst) {
   const off = !text
     ? undefined
     : p.statuses.some((s) => s.kind === 'silence')
-      ? 'Silenced'
+      ? t('Silenced')
       : type === 'S' && p.statuses.some((s) => s.kind === 'skillSilence')
-        ? 'Skills off'
+        ? t('Skills off')
         : short != null
-          ? `No ${costName}`
+          ? t('No {res}', { res: costName })
           : undefined
   return { id, type, dmg, total: base + grow, grow, short, cost, costName, text, missing, off }
 }
@@ -930,23 +937,23 @@ function cardFacts(game: GameState, side: Side, card: CardInst) {
 function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: GameState; side: Side; glow?: string; unpaid?: boolean; onOpen: () => void }) {
   const f = cardFacts(game, side, vc.card)
   // during playback the engine already knows which chain cards went unpaid this turn
-  const off = f.off ?? (unpaid && f.text ? `No ${f.costName}` : undefined)
+  const off = f.off ?? (unpaid && f.text ? t('No {res}', { res: f.costName }) : undefined)
   const cls = `card t-${f.type}${vc.spent ? ' spent' : ''}${vc.gone ? ' gone' : ''}${off ? ' off' : ''}${glow ? ` glow-${glow}` : ''}`
   return (
-    <button type="button" className={cls} data-uid={vc.card.uid} aria-label={`${f.id}, ${f.type}, ${f.total} damage`} onClick={(e) => (e.stopPropagation(), onOpen())}>
+    <button type="button" className={cls} data-uid={vc.card.uid} aria-label={`${f.id}, ${f.type}, ${t('{n} damage', { n: f.total })}`} onClick={(e) => (e.stopPropagation(), onOpen())}>
       <div className="top">
         <span className="type">{f.type}</span>
         {f.cost > 0 && (
-          <span className="cost" title={`Costs ${f.cost} ${f.costName}`}>
+          <span className="cost" title={t('Costs {n} {res}', { n: f.cost, res: f.costName })}>
             {f.cost} {f.costName === 'HP' ? 'HP' : f.costName.slice(0, 1)}
           </span>
         )}
       </div>
       <span className="dmg">{f.total}</span>
       {f.short != null ? <span className="mod down">{f.short}%</span> : f.grow ? <span className={`mod${f.grow < 0 ? ' down' : ''}`}>{f.grow > 0 ? `+${f.grow}` : f.grow}</span> : null}
-      {vc.card.owner && <span className="mod down" style={{ bottom: 17 }}>stolen</span>}
+      {vc.card.owner && <span className="mod down" style={{ bottom: 17 }}>{t('stolen')}</span>}
       <div className="fx">
-        {f.missing && <span className="rule">⚠ no code yet</span>}
+        {f.missing && <span className="rule">⚠ {t('no code yet')}</span>}
         {vc.card.def.effectSpec?.length ? (
           <CompactFx spec={vc.card.def.effectSpec} res={f.costName || undefined} />
         ) : f.text ? (
@@ -961,12 +968,12 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
             )
           })
         ) : (
-          <span className="rule when">No effect</span>
+          <span className="rule when">{t('No effect')}</span>
         )}
         <span className="mark" style={{ color: `var(--t${f.type})` }} dangerouslySetInnerHTML={{ __html: ICON[f.type] }} />
       </div>
       <div className="cid">{f.id}</div>
-      {vc.gone ? <div className="tag">Discarded · {vc.gone}</div> : off && <div className="tag off">Off · {off}</div>}
+      {vc.gone ? <div className="tag">{t('Discarded')} · {t(vc.gone)}</div> : off && <div className="tag off">{t('Off')} · {off}</div>}
     </button>
   )
 }
@@ -981,13 +988,13 @@ function CardSheet({ game, side, card }: { game: GameState; side: Side; card: Ca
       <div className="info">
         <b>{f.id}</b>
         <span>
-          {{ P: 'Punch', K: 'Kick', S: 'Skill' }[f.type]} · {f.total} dmg{f.cost > 0 ? ` · costs ${f.cost} ${f.costName}` : ''}
+          {t({ P: 'Punch', K: 'Kick', S: 'Skill' }[f.type])} · {f.total} dmg{f.cost > 0 ? ` · ${t('costs {n} {res}', { n: f.cost, res: f.costName })}` : ''}
         </span>
-        <p>{f.text || 'No effect. Plain damage.'}</p>
-        {f.short != null && <p>Not enough {f.costName}: hits for {f.short}% dmg, effect off, drawbacks still fire.</p>}
-        {f.off && f.short == null && <p>Effect off right now ({f.off}). The card still deals its damage.</p>}
-        {f.missing && <p>⚠ This effect has no code yet; it plays as plain damage.</p>}
-        <p>Tap anywhere to close.</p>
+        <p>{f.text || t('No effect. Plain damage.')}</p>
+        {f.short != null && <p>{t('Not enough {res}: hits for {pct}% dmg, effect off, drawbacks still fire.', { res: f.costName, pct: f.short })}</p>}
+        {f.off && f.short == null && <p>{t('Effect off right now ({why}). The card still deals its damage.', { why: f.off })}</p>}
+        {f.missing && <p>⚠ {t('This effect has no code yet; it plays as plain damage.')}</p>}
+        <p>{t('Tap anywhere to close.')}</p>
       </div>
     </>
   )

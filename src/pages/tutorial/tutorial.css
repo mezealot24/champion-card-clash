@@ -1,10 +1,10 @@
 /* Tutorial coach box over the Arena (arena is position:fixed, z-index 50). Top of the screen: it covers the enemy Field, never yours. */
 .coach { position: fixed; z-index: 65; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 8px);
   width: min(420px, calc(100vw - 24px)); background: #fff5e3; color: #22163d; border: 3px solid #0c0718; border-radius: 14px;
-  padding: 10px 14px; box-shadow: 0 6px 0 #0c0718; font: 600 14px/1.4 'Nunito', system-ui, sans-serif; }
+  padding: 10px 14px; box-shadow: 0 6px 0 #0c0718; font: 600 14px/1.4 'Nunito', 'Noto Sans Thai', system-ui, sans-serif; }
 .coach.min { width: auto; padding: 0; background: none; border: 0; box-shadow: none; }
 .coach small { display: block; font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: #6b5a92; }
-.coach b { display: block; font: 400 18px/1.2 'Lilita One', 'Arial Black', sans-serif; }
+.coach b { display: block; font: 400 18px/1.2 'Lilita One', 'Kanit', 'Arial Black', sans-serif; }
 .coach p { margin: 4px 0; }
 .coach .fb { background: #4be38a33; border-radius: 8px; padding: 4px 8px; }
 .coach .try { font-weight: 800; color: #b3361f; }

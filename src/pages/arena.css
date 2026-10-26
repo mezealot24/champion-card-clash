@@ -6,8 +6,8 @@
   --tP: #ff8a3d; --tK: #1fc6a6; --tS: #a96bff;
   --strike: #ff5d4a; --block: #4f9dff; --charge: #ffc84a;
   --hp: #4be38a; --hp-low: #ff5470; --danger: #ff5470;
-  --display: 'Lilita One', 'Arial Black', Impact, sans-serif;
-  --body: 'Nunito', system-ui, sans-serif;
+  --display: 'Lilita One', 'Kanit', 'Arial Black', Impact, sans-serif;
+  --body: 'Nunito', 'Noto Sans Thai', system-ui, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
   --k: 1;
   color-scheme: dark;

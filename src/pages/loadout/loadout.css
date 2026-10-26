@@ -18,7 +18,7 @@
 /* Ascendancy: two branches as tracks, nodes joined top to bottom */
 .lo-tree { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .lo-branch { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-.lo-branch h3 { margin: 0; text-align: center; font: 800 12px/1.2 'Nunito', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--tint); }
+.lo-branch h3 { margin: 0; text-align: center; font: 800 12px/1.2 'Nunito', 'Noto Sans Thai', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; color: var(--tint); }
 .lo-node { position: relative; display: flex; flex-direction: column; gap: 3px; text-align: left; background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--s-line); border-radius: 12px; padding: 8px 9px; }
 .lo-node + .lo-node::before { content: ''; position: absolute; left: 19px; top: -12px; width: 3px; height: 10px; background: var(--s-line); border-radius: 2px; }
 .lo-node.taken + .lo-node::before { background: var(--tint); }

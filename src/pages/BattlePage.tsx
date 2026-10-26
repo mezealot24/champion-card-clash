@@ -1,8 +1,10 @@
 import { supabase } from '../lib/supabase'
 import { must, useAsync } from '../lib/useAsync'
+import { t, useLang } from '../i18n'
 import { Battle, type BattleData } from './Battle'
 
 export function BattlePage() {
+  useLang()
   const { data, error } = useAsync(async (): Promise<BattleData> => {
     const [champions, cards, styles, config] = await Promise.all([
       supabase.from('champions').select('id, name, hp_start, hp_max, params').order('sort_order'),
@@ -19,6 +21,6 @@ export function BattlePage() {
   }, [])
 
   if (error) return <p className="error">{error}</p>
-  if (!data) return <p className="muted">Loading…</p>
+  if (!data) return <p className="muted">{t('Loading…')}</p>
   return <Battle data={data} />
 }
