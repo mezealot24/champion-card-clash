@@ -41,10 +41,23 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  */
 /** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts. chill = Cryomancer's slow (n = stacks, CHILL_*).
  * frozen = marker for "can't Strike this turn" (lasts 1 turn longer than its noStrike so cards can read it). skillSilence = Skill cards' effects off (Bitter Cold). subZero = next Strike: every clean hit gives 1 Chill (Arcane Sub-Zero). thaw = can't be Frozen (after a Freeze, Cryomancer) */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'thaw' | 'venom' | 'woundUp'
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'thaw' | 'venom' | 'woundUp' | 'cutGuard'
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 /** A side loses at most this many Field cards to Cut effects per turn (Claude default 2026-10-16). Charge break doesn't count. */
 export const CUT_CAP = 2
+
+/**
+ * Cut guard (Q 2026-10-26: being Cut turn after turn isn't fun): a side that lost Field cards to Cut can't be Cut
+ * again for the next AS.cutCooldown turns. status.n = the turn the guard was given, so the rest of that turn's
+ * Cuts (up to CUT_CAP) still land.
+ */
+export const cutGuarded = (state: GameState, side: Side) => state.players[side].statuses.some((s) => s.kind === 'cutGuard' && s.n !== state.turn)
+export function guardAfterCut(state: GameState, side: Side, cooldown: number) {
+  const p = state.players[side]
+  if (cooldown <= 0 || p.statuses.some((s) => s.kind === 'cutGuard' && s.n === state.turn)) return
+  p.statuses = p.statuses.filter((s) => s.kind !== 'cutGuard')
+  p.statuses.push({ kind: 'cutGuard', turns: cooldown + 1, n: state.turn })
+}
 
 export type Status = { kind: StatusKind; turns: number; n?: number }
 

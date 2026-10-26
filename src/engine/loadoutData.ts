@@ -325,10 +325,17 @@ export const TREES: Record<string, TreeData> = {
         ['ascPhantom', 'cards that ignore Block', 1, 0, 3],
         ['ascPhantomCost', 'Cost: Max HP −', 20],
       ]),
-      node('D1', 'Snare', 'When you Charge and the enemy Blocks, Cut their {ascSnare} newest Field card.', 'ascSnare', 'cards Cut', 1, 0, 2),
-      node('D2', 'Tripwire', 'When you Block and the enemy Charges, Cut their {ascTripwire} newest Field card after they draw.', 'ascTripwire', 'cards Cut', 1, 0, 2),
-      capstone('D3', 'Demolition', 'Your Cut cards Cut {ascDemolition} more card (still max 2 Cuts a turn).', 'Your Cut cards deal {ascDemolitionCost} less dmg.', [
+      multi('D1', 'Snare', 'When you Charge and the enemy Blocks with {ascSnareField}+ Field cards, Cut their {ascSnare} newest Field card.', [
+        ['ascSnare', 'cards Cut', 1, 0, 2],
+        ['ascSnareField', 'enemy Field cards needed', 4, 1, 5],
+      ]),
+      multi('D2', 'Tripwire', 'When you Block and the enemy Charges, Cut their {ascTripwire} newest Field card after they draw, if they then have {ascTripwireField}+.', [
+        ['ascTripwire', 'cards Cut', 1, 0, 2],
+        ['ascTripwireField', 'enemy Field cards needed', 5, 1, 5],
+      ]),
+      capstone('D3', 'Demolition', 'Your Cut cards Cut {ascDemolition} more card while the enemy has {ascDemolitionField}+ Field cards (still max 2 Cuts a turn).', 'Your Cut cards deal {ascDemolitionCost} less dmg.', [
         ['ascDemolition', 'Cut +', 1, 0, 2],
+        ['ascDemolitionField', 'enemy Field cards needed', 4, 1, 5],
         ['ascDemolitionCost', 'Cost: Cut card dmg −', 2],
       ]),
     ],
@@ -350,7 +357,10 @@ export const TREES: Record<string, TreeData> = {
         ['ascBuildUp', 'multiplier + per Critical', 1],
         ['ascBuildUpMax', 'max multiplier +', 3, 1],
       ]),
-      node('C1', 'Run Down', 'When your Strike with a Critical meets their Charge, Cut their {ascRunDown} newest Field card.', 'ascRunDown', 'cards Cut', 1, 0, 2),
+      multi('C1', 'Run Down', 'When your Strike with a Critical meets their Charge and they have {ascRunDownField}+ Field cards, Cut their {ascRunDown} newest Field card.', [
+        ['ascRunDown', 'cards Cut', 1, 0, 2],
+        ['ascRunDownField', 'enemy Field cards needed', 4, 1, 5],
+      ]),
       node('C2', 'Chase', 'When you Strike into their Charge, the Critical counter +{ascChase} first.', 'ascChase', 'counter +', 1, 0, 3),
       capstone('C3', 'Hunt', 'Criticals into a Charge ×{ascHunt} more.', 'Blocked Criticals deal 0.', [
         ['ascHunt', 'multiplier +', 1],

@@ -4,7 +4,7 @@ import { addRes, resourceOf } from '../resources'
 import { tuningOf } from '../tuning'
 import { drawCards, handMaxOf, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
 import { addChill, addIgnite, chillStacks, getStyle, hooksOf, igniteBurn, igniteStacks } from '../styles'
-import { CUT_CAP } from '../types'
+import { CUT_CAP, cutGuarded, guardAfterCut } from '../types'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond, HitIn } from './types'
 
@@ -209,6 +209,10 @@ export const cut =
   (ctx) => {
     const foe = ctx.state.players[ctx.enemy]
     const more = hooksOf(ctx.state.players[ctx.self]).reduce((t, h) => t + (h.cutMore?.(ctx.state, ctx.self) ?? 0), 0) // Demolition
+    if (cutGuarded(ctx.state, ctx.enemy)) {
+      log(ctx.state, `${ctx.card.def.id}: ${ctx.enemy} was Cut last turn, can't be Cut yet`)
+      return
+    }
     for (let k = 0; k < n + more; k++) {
       if ((foe.cutTaken ?? 0) >= CUT_CAP) {
         log(ctx.state, `${ctx.card.def.id}: already Cut ${CUT_CAP} cards this turn`)
@@ -219,6 +223,7 @@ export const cut =
       if (!lost) return
       foe.hand.splice(i, 1)
       foe.cutTaken = (foe.cutTaken ?? 0) + 1
+      guardAfterCut(ctx.state, ctx.enemy, tuningOf(ctx.state, ctx.self).AS.cutCooldown)
       markDiscarded(ctx.state, ctx.enemy, [{ card: lost, slot: i + 1, reason: 'Cut' }])
       toDeckBottom(ctx.state, ctx.enemy, [lost])
       log(ctx.state, `${ctx.card.def.id}: Cut → ${ctx.enemy} sends ${lost.def.id} to the deck bottom`)
