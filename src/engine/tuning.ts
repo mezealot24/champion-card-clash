@@ -117,7 +117,7 @@ export const TUNING_FIELDS = {
     { key: 'thawTurns', label: 'Thaw turns (no Freeze again)', def: 2, min: 0, help: 'After Frozen ends, this many turns the enemy can\'t be Frozen again' },
     { key: 'freezeDraw', label: 'Flash Freeze: cards drawn on a Freeze', def: 2, min: 0 },
     { key: 'frostArmorShield', label: 'Frost Armor Shield at start', def: 40, min: 0 },
-    { key: 'frostArmorRegen', label: 'Frost Armor Shield per Block', def: 8, min: 0 },
+    { key: 'frostArmorRegen', label: 'Frost Armor Shield per Block vs a Strike', def: 8, min: 0 },
     { key: 'frostArmorCap', label: 'Frost Armor Shield cap (total)', def: 40, min: 0 },
     { key: 'tombHpPct', label: 'Frozen Tomb HP line %', def: 30, min: 0, max: 100 },
     { key: 'tombHeal', label: 'Frozen Tomb heal', def: 10, min: 0 },

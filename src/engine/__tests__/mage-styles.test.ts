@@ -181,10 +181,15 @@ describe('Cryomancer', () => {
     const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     expect(frozen(n)).toBe(false)
   })
-  it('Frost Armor regrows Shield on Block, up to its cap', () => {
+  it('Frost Armor regrows Shield only on a Block vs a Strike, up to its cap', () => {
     let s = fresh()
     s.players.p1.statuses = []
-    for (let i = 0; i < 8; i++) s = resolveTurn(s, { p1: 'block', p2: 'charge' })
+    s = resolveTurn(s, { p1: 'block', p2: 'charge' })
+    expect(shield(s)).toBe(0) // Block vs Charge: nothing to regrow from
+    for (let i = 0; i < 8; i++) {
+      s.players.p2.hand = [hit(1)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+    }
     const shields = s.players.p1.statuses.filter((x) => x.kind === 'shield')
     expect(shields.reduce((t, x) => t + (x.n ?? 0), 0)).toBe(40)
     expect(shields.length).toBe(1)
