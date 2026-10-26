@@ -98,7 +98,7 @@ export function Battle({ data }: { data: BattleData }) {
           const c = data.champions.find((x) => x.id === s.champion_id)
           const key = `${s.champion_id}:${s.slot}`
           const text = fillText(s.effect, key, tuning, c ? { hpStart: c.hp_start, hpMax: c.hp_max } : {})
-          // Lifeline plays with Endurance: explain it next to the passive
+          // Second Wind plays with Endurance: explain it next to the passive
           return [key, key === 'TK:1' ? `${text}\n\n${fillText(ENDURANCE_TEXT, key, tuning)}` : text]
         }),
       ),

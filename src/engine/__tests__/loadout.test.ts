@@ -246,14 +246,14 @@ describe('randomLoadout', () => {
       expect(s.players.p1.perkData?.endurance).toBe(0)
       expect(s.log.some((l) => /Unyielding: Charge break spends 4 Endurance, heals \d+ over 5 turns/.test(l))).toBe(true)
     })
-    it('Untiring: Block, HP lost and Second Wind give Endurance; Second Wind cuts heals 25%, Early Rally raises Endurance max', () => {
+    it('Untiring: Block, HP lost and Rekindle give Endurance; Rekindle cuts heals 25%, Early Rally raises Endurance max', () => {
       let s = tk('TK:1', ['B1', 'B2', 'B3'])
       expect(s.players.p1.perkData?.healPct).toBe(75)
       expect((tuningOf(s, 'p1')['TK:1'] as unknown as Record<string, number>).ascEnduranceMax).toBe(4)
       s.players.p2.hand = [hit(10), hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
       expect(s.log.some((l) => l.includes('Endurance (Block)'))).toBe(true)
-      expect(s.log.some((l) => l.includes('Endurance (Second Wind)'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Endurance (Rekindle)'))).toBe(true)
       expect(s.players.p1.perkData?.endurance).toBe(2)
       s.players.p2.hand = [hit(50)]
       s = resolveTurn(s, { p1: 'charge', p2: 'strike' })

@@ -76,7 +76,7 @@ const freshFreeze = (state: GameState, side: Side, bit: number) => {
   s.n = (s.n ?? 0) | bit
   return true
 }
-/** Endurance stacks (Tank Lifeline v2) */
+/** Endurance stacks (Tank Second Wind v2) */
 const endurance = (p: PlayerState) => p.perkData?.endurance ?? 0
 function gainEndurance(state: GameState, side: Side, why: string, src = 'flinch', by = 1) {
   const p = state.players[side]
@@ -233,7 +233,7 @@ const MINOR_FX: Record<string, Piece> = {
 /** Built per node: amt(state, side) reads the node's own number in play, k is its key (for tune / setup). */
 const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, key: string) => Piece> = {
   // ---- Tank v2 (design/tank-ascendancy-v2-2026-10-25.md): 4 branches × (2 nodes + capstone with a Cost) ----
-  // Lifeline · Endurance (PoE Juggernaut): stacks kept in perkData, capped, fade after ascEnduranceTurns without a new one
+  // Second Wind · Endurance (PoE Juggernaut): stacks kept in perkData, capped, fade after ascEnduranceTurns without a new one
   'TK:1:A1': () => ({
     hooks: {
       afterHits: (state, side, r) => {
@@ -312,7 +312,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  // Lifeline · Untiring (Q 2026-10-25 14:58): Endurance from HP lost / Blocks / every turn
+  // Second Wind · Untiring (Q 2026-10-25 14:58): Endurance from HP lost / Blocks / every turn
   'TK:1:B1': (_, k) => ({
     // Q 2026-10-26: Untiring also raises Endurance max
     tune: (t, v) => {
@@ -349,14 +349,14 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     hooks: {
       endTurn: (state, side) => {
         const p = state.players[side]
-        if (p.hp > 0) gainEndurance(state, side, 'Second Wind', 'wind')
+        if (p.hp > 0) gainEndurance(state, side, 'Rekindle', 'wind')
         if (!p.styleData?.spent || !once(p, 'secondWind')) return
         p.styleData = { ...p.styleData, spent: 0, below: 0 }
-        say(state, side, 'Second Wind: Lifeline can switch on once more')
+        say(state, side, 'Rekindle: Second Wind can switch on once more')
       },
     },
   }),
-  // Lifeline · Unbroken (Q 2026-10-25 15:06: Unstoppable + Unbroken merged)
+  // Second Wind · Unbroken (Q 2026-10-25 15:06: Unstoppable + Unbroken merged)
   'TK:1:C1': (amt) => ({
     // Q 2026-10-26: Unbroken also raises Endurance max
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnstoppableMax')),
@@ -421,7 +421,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  // Lifeline · Undeniable (offence: Strike streaks, pierce, spend Endurance)
+  // Second Wind · Undeniable (offence: Strike streaks, pierce, spend Endurance)
   'TK:1:D1': (amt) => ({
     hooks: {
       beforeHits: (state, side, bonus) => {
@@ -1369,7 +1369,7 @@ for (const [style, tree] of Object.entries(TREES))
     const make = NODE_FX[`${style}:${n.id}`]
     if (make) PIECES[`asc:${style}:${n.id}`] = { group: style, ...make((state, side) => num(state, side, style, key), key) }
   }
-// Endurance itself (Tank Lifeline): one piece however many nodes give it, so the cut / regen count once
+// Endurance itself (Tank Second Wind): one piece however many nodes give it, so the cut / regen count once
 PIECES['asc:TK:1:END'] = {
   group: 'TK:1',
   hooks: {

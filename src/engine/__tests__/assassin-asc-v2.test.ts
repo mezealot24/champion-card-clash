@@ -119,11 +119,11 @@ describe('Assassin v2 Ascendancy', () => {
   })
 
   describe('Fatal Rhythm', () => {
-    it('Executioner: a Critical that leaves the enemy at 20% or less finishes them; −15 Max HP', () => {
+    it('Executioner: a Critical that leaves the enemy at 15% or less finishes them; −15 Max HP', () => {
       let s = as('AS:2', ['A1', 'A2', 'A3'])
       expect(s.players.p1.maxHp).toBe(145)
       s.players.p1.styleData = { attacks: 3 }
-      s.players.p2.hp = 40
+      s.players.p2.hp = 35
       s.players.p1.hand = [hit(7)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(s.players.p2.hp).toBe(0)

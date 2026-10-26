@@ -1,4 +1,4 @@
-// Tank Styles: Lifeline (TK:1) and Titan Bloom (TK:2).
+// Tank Styles: Second Wind (TK:1) and Titan Bloom (TK:2).
 import { describe, expect, it } from 'vitest'
 import { createGame, resolveTurn } from '../index'
 import type { CardDef, CardInst, GameState } from '../index'
@@ -12,7 +12,7 @@ function game(style: string, hp: number, maxHp = 100): GameState {
   return createGame({ championId: 'TK', hpStart: hp, hpMax: maxHp, deck, style }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1 })
 }
 
-describe('Lifeline', () => {
+describe('Second Wind', () => {
   it('heals 4% of missing HP per hit taken while HP is red (below 30%)', () => {
     const s = game('TK:1', 30)
     s.players.p2.hand = [hit(10), hit(10)]
@@ -43,7 +43,7 @@ describe('Lifeline', () => {
 })
 
 describe('Titan Bloom', () => {
-  it("starts at the Tank's normal HP / Max HP, same as Lifeline", () => {
+  it("starts at the Tank's normal HP / Max HP, same as Second Wind", () => {
     const s = game('TK:2', 210, 300)
     expect([s.players.p1.hp, s.players.p1.maxHp]).toEqual([210, 300])
   })

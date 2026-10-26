@@ -54,7 +54,7 @@ export const igniteBurn = (p: PlayerState, t: Tuning) => {
   const f = t['MG:1']
   return n * f.igniteFlat + Math.floor((p.maxHp * n * f.ignitePctMaxHp) / 100)
 }
-/** also a loadout heal cut (perkData.healPct, e.g. Second Wind's Cost) */
+/** also a loadout heal cut (perkData.healPct, e.g. Rekindle's Cost) */
 export const healAfterIgnite = (p: PlayerState, n: number, t: Tuning) =>
   Math.floor((n * (100 - Math.min(t['MG:1'].healCutMax, t['MG:1'].healCutPerStack * igniteStacks(p))) * (p.perkData?.healPct ?? 100)) / 10000)
 
@@ -205,11 +205,11 @@ export function debuffStacks(p: PlayerState): number {
 
 export const STYLES: Record<string, StyleDef> = {
   /**
-   * Tank · Lifeline: when hit while HP is red (below hpPct = 30%), heal healPctPerHit = 4% of missing HP per hit landed this turn.
+   * Tank · Second Wind: when hit while HP is red (below hpPct = 30%), heal healPctPerHit = 4% of missing HP per hit landed this turn.
    * Works only during the first stretch in the red: once HP is back in the green (30%+), it's off for the game (Q nerf 2026-10-16, was 60%).
    */
   'TK:1': {
-    name: 'Lifeline',
+    name: 'Second Wind',
     afterHits: (state, side, r) => {
       const p = state.players[side]
       const f = tuningOf(state, side)['TK:1']
@@ -234,7 +234,7 @@ export const STYLES: Record<string, StyleDef> = {
   },
 
   /**
-   * Tank · Titan Bloom: starts with the Tank's normal HP / Max HP, same as Lifeline (Q 2026-10-16; was Max HP 210). Each time attacked: +1 per hit taken,
+   * Tank · Titan Bloom: starts with the Tank's normal HP / Max HP, same as Second Wind (Q 2026-10-16; was Max HP 210). Each time attacked: +1 per hit taken,
    * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
    * heal (Q nerf 2026-10-15).
    * Q buff 2026-10-16: every 20 Max HP grown this way = +1 dmg on every card you strike with (Max HP lost later doesn't undo it).

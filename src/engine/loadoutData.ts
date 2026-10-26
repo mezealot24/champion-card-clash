@@ -89,13 +89,13 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
  * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage, Tank, Assassin: A1..D3); take them top-down in a branch, the last node = capstone.
  * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank / Assassin v2: named asc keys).
  */
-/** Shown under the Lifeline Style text (Q 2026-10-25): what one Endurance does; numbers filled from TK:1 */
-export const ENDURANCE_TEXT = '⛨ Endurance (Lifeline Ascendancy): one shared pool, max {ascEnduranceMax}; every node that gives Endurance (Second Wind too) adds to the same pool. Hits that reach you deal {ascEnduranceCut} less dmg, on (Endurance − 1) hits a turn (1 Endurance: none, 6: 5 hits). Each Endurance: Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). Fades after {ascEnduranceTurns} turns without a new one.'
+/** Shown under the Second Wind Style text (Q 2026-10-25): what one Endurance does; numbers filled from TK:1 */
+export const ENDURANCE_TEXT = '⛨ Endurance (Second Wind Ascendancy): one shared pool, max {ascEnduranceMax}; every node that gives Endurance (Rekindle too) adds to the same pool. Hits that reach you deal {ascEnduranceCut} less dmg, on (Endurance − 1) hits a turn (1 Endurance: none, 6: 5 hits). Each Endurance: Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). Fades after {ascEnduranceTurns} turns without a new one.'
 
 export const TREES: Record<string, TreeData> = {
   /**
    * Tank v2 (Q 2026-10-25, design/tank-ascendancy-v2-2026-10-25.md): same shape as Mage v2, from PoE Juggernaut
-   * (Lifeline) and Guardian (Titan Bloom). Everything that stacks has a cap (Hoarfrost lesson).
+   * (Second Wind) and Guardian (Titan Bloom). Everything that stacks has a cap (Hoarfrost lesson).
    */
   'TK:1': {
     branches: ['Endurance', 'Untiring', 'Unbroken', 'Undeniable'],
@@ -121,14 +121,14 @@ export const TREES: Record<string, TreeData> = {
         ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
         ['ascUnrelentingPct', '% of hit dmg delayed', 50, 0, 100],
       ]),
-      // Q 2026-10-25 14:58: Untiring = Endurance from HP lost / Blocks / Second Wind (uses Unflinching's Endurance numbers)
-      multi('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn). Endurance max +{ascEarlyRallyMax}.', [
+      // Q 2026-10-25 14:58: Untiring = Endurance from HP lost / Blocks / Rekindle (uses Unflinching's Endurance numbers)
+      multi('B1', 'Early Rally', 'Second Wind HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn). Endurance max +{ascEarlyRallyMax}.', [
         ['ascEarlyRally', 'HP line % +', 5],
         ['ascEarlyRallyLoss', '% Max HP lost per Endurance', 15, 1],
         ['ascEarlyRallyMax', 'max Endurance +', 1],
       ]),
       node('B2', 'Untiring', 'A turn your Block stops a hit, gain 1 Endurance.', 'ascUntiring', 'unused', 0),
-      capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off. Gain 1 Endurance at the end of every turn.', 'Every heal and regen you get is {ascSecondWindHealCut}% smaller.', [
+      capstone('B3', 'Rekindle', 'Second Wind can switch on one more time after it goes off. Gain 1 Endurance at the end of every turn.', 'Every heal and regen you get is {ascSecondWindHealCut}% smaller.', [
         ['ascSecondWindHealCut', 'Cost: heal cut %', 25, 0, 100],
       ]),
       // Q 2026-10-25 15:06: Unstoppable + Unbroken merged into C; D = Undeniable (spend Endurance on offence)
@@ -352,7 +352,7 @@ export const TREES: Record<string, TreeData> = {
       node('A1', 'Blood Scent', 'Low HP line +{ascBloodScent}%.', 'ascBloodScent', 'HP line % +', 5),
       node('A2', 'Merciless', 'Critical vs low HP ×{ascMerciless} more.', 'ascMerciless', 'multiplier +', 1),
       capstone('A3', 'Executioner', 'A Critical that leaves the enemy at {ascExecutioner}% Max HP or less finishes them.', '−{ascExecutionerCost} Max HP.', [
-        ['ascExecutioner', 'finish at % Max HP', 20, 0, 50],
+        ['ascExecutioner', 'finish at % Max HP', 15, 0, 50],
         ['ascExecutionerCost', 'Cost: Max HP −', 15],
       ]),
       node('B1', 'Primed', 'The Critical counter starts at {ascPrimed}.', 'ascPrimed', 'counter at start', 2),

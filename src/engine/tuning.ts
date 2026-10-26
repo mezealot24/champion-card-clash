@@ -26,7 +26,7 @@ export const TUNING_FIELDS = {
     { key: 'comboHealPct', label: 'P+K+P combo heal %', def: 10, min: 0, max: 100, help: '% of current HP healed when the enemy Blocks one of the combo cards' },
   ],
   'TK:1': [
-    { key: 'hpPct', label: 'Lifeline HP line %', def: 30, min: 1, max: 100, help: 'Heals only while HP is below this % of Max HP' },
+    { key: 'hpPct', label: 'Second Wind HP line %', def: 30, min: 1, max: 100, help: 'Heals only while HP is below this % of Max HP' },
     { key: 'healPctPerHit', label: 'Heal % of missing HP per hit', def: 4, min: 0, max: 100 },
   ],
   'TK:2': [

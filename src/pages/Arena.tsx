@@ -741,7 +741,7 @@ function TokenView({ side, tok, playing, locked, foe }: { side: Side; tok: Token
 }
 
 type Tip = { title: string; body: string }
-/** Tank Lifeline Endurance numbers (Ascendancy keys live in the Style's group, untyped) */
+/** Tank Second Wind Endurance numbers (Ascendancy keys live in the Style's group, untyped) */
 const enduranceNum = (game: GameState, side: Side) => tuningOf(game, side)['TK:1'] as unknown as Record<string, number>
 type Chip = { label: string; tone: 'buff' | 'debuff'; tip: string }
 
@@ -813,7 +813,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
     ...(p.comboData?.conqueror
       ? [{ label: conqMax(game, side) ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: t('Juggernaut stacks: +1 dmg per stack on every chain card. At {max}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.', { max: conqMaxN }) }]
       : []),
-    // Tank Lifeline: Endurance stacks (perkData), with their cut / regen
+    // Tank Second Wind: Endurance stacks (perkData), with their cut / regen
     ...(p.perkData?.endurance
       ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${enduranceNum(game, side).ascEnduranceMax}`, tone: 'buff' as const, tip: t('{n} Endurance: {hits} hits that reach you deal {cut} less dmg, Ignite burns and Critical hits {guard}% less, and you regain {regen} HP at the end of every turn. Fades after {turns} turns without a new one.', { n: p.perkData.endurance, cut: enduranceNum(game, side).ascEnduranceCut, hits: Math.max(0, p.perkData.endurance - 1), guard: Math.min(100, p.perkData.endurance * enduranceNum(game, side).ascEnduranceGuard), regen: Math.floor(((p.maxHp - p.hp) * p.perkData.endurance * enduranceNum(game, side).ascEnduranceRegen) / 100), turns: enduranceNum(game, side).ascEnduranceTurns }) }]
       : []),
