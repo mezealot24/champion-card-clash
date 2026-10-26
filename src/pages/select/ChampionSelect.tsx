@@ -3,6 +3,8 @@
 // Loadout pieces: design/customization-options-2026-10-18.md. Picks are saved per Champion on every change.
 import { useState } from 'react'
 import { STYLES, TREES, type Side } from '../../engine'
+import { t, useLang } from '../../i18n'
+import { LangToggle } from '../../i18n/LangToggle'
 import type { Champ, StyleRow } from '../Battle'
 import { champColor, spriteClassOf } from '../fighters'
 import { loadoutGaps, STEPS, type SavedLoadout, type Step } from '../loadout/loadout'
@@ -16,7 +18,8 @@ import './select.css'
 
 export type FoeKind = 'ai' | 'tuktah' | 'online'
 
-const STEP_NAME: Record<Step, string> = { champion: 'Champion', path: 'Path', oath: 'Oath', deck: 'Deck', fight: 'Fight' }
+const STEP_EN: Record<Step, string> = { champion: 'Champion', path: 'Path', oath: 'Oath', deck: 'Deck', fight: 'Fight' }
+const stepName = (s: Step) => t(STEP_EN[s])
 
 export function ChampionSelect(props: {
   champions: Champ[]
@@ -53,6 +56,7 @@ export function ChampionSelect(props: {
   onStart: () => void
   onTutorial: () => void
 }) {
+  useLang()
   const { champions, picks, foe, step, setStep } = props
   const me = picks.p1
   const info = CHAMP_INFO[me]
@@ -60,7 +64,7 @@ export function ChampionSelect(props: {
   const myStyle = props.styleKey('p1')
   const [full, setFull] = useState<string | null>(null)
   const newPlayer = !tutorialDone()
-  const foeName = foe === 'tuktah' ? 'Tuktah' : 'AI'
+  const foeName = foe === 'tuktah' ? t('Tuktah') : t('AI')
   const styles = props.stylesOf(me)
   // a Style with its own art (Mage) shows it on its card; the others share the Champion's art, so skip it there
   const styleArt = styles.some((s) => spriteClassOf(me, `${s.champion_id}:${s.slot}`) !== spriteClassOf(me))
@@ -75,20 +79,23 @@ export function ChampionSelect(props: {
   const open = (s: Step) => STEPS.slice(0, STEPS.indexOf(s)).every((p) => done[p])
   const next = STEPS[at + 1]
   const blocker =
-    step === 'path' ? (gaps.style ? 'Pick a Style' : gaps.asc > 0 ? `Spend ${gaps.asc} more Ascendancy point${gaps.asc > 1 ? 's' : ''}` : '')
-    : step === 'oath' && gaps.oath ? 'Pick an Oath'
+    step === 'path' ? (gaps.style ? t('Pick a Style') : gaps.asc > 0 ? t(gaps.asc > 1 ? 'Spend {n} more Ascendancy points' : 'Spend {n} more Ascendancy point', { n: gaps.asc }) : '')
+    : step === 'oath' && gaps.oath ? t('Pick an Oath')
     : ''
 
   return (
     <div className="select" style={{ '--tint': champColor(me) } as React.CSSProperties}>
       <header className="sel-head">
         <small>Champion Card Clash</small>
-        <button type="button" className={`tut-btn${newPlayer ? ' new' : ''}`} onClick={props.onTutorial}>
-          {newPlayer ? 'New here? Play the tutorial' : 'Tutorial'}
-        </button>
+        <span className="sel-head-tools">
+          <LangToggle />
+          <button type="button" className={`tut-btn${newPlayer ? ' new' : ''}`} onClick={props.onTutorial}>
+            {newPlayer ? t('New here? Play the tutorial') : t('Tutorial')}
+          </button>
+        </span>
       </header>
 
-      <nav className="steps" aria-label="Steps before the fight">
+      <nav className="steps" aria-label={t('Steps before the fight')}>
         {STEPS.map((s, i) => (
           <button
             key={s}
@@ -99,7 +106,7 @@ export function ChampionSelect(props: {
             onClick={() => setStep(s)}
           >
             <i>{done[s] && i < at ? '✓' : i + 1}</i>
-            {STEP_NAME[s]}
+            {stepName(s)}
           </button>
         ))}
       </nav>
@@ -110,22 +117,22 @@ export function ChampionSelect(props: {
             <section className="hero">
               <Portrait champ={me} style={myStyle} className="hero-art" />
               <div className="hero-info">
-                <small>Choose your Champion</small>
+                <small>{t('Choose your Champion')}</small>
                 <h1>{champ.name}</h1>
-                {info && <p className="hero-role">{info.role}</p>}
+                {info && <p className="hero-role">{t(info.role)}</p>}
                 <ul className="chips">
                   <li>
                     <i>HP</i>
                     {champ.hp_start}
                     {champ.hp_max !== champ.hp_start ? ` / ${champ.hp_max}` : ''}
                   </li>
-                  {info && <li>{props.fill(info.resource, me)}</li>}
+                  {info && <li>{props.fill(t(info.resource), me)}</li>}
                 </ul>
               </div>
             </section>
           )}
 
-          <div className="roster" role="radiogroup" aria-label="Your Champion">
+          <div className="roster" role="radiogroup" aria-label={t('Your Champion')}>
             {champions.map((c) => (
               <button
                 key={c.id}
@@ -146,7 +153,7 @@ export function ChampionSelect(props: {
           {champ && info && (
             <details className="box how">
               <summary>
-                How {champ.name} plays
+                {t('How {name} plays', { name: champ.name })}
                 <span className="combo-line">
                   <span className="pks">
                     {comboPattern(me).map((t, i) => (
@@ -159,11 +166,11 @@ export function ChampionSelect(props: {
               </summary>
               <ul className="plays">
                 {info.plays.map((l) => (
-                  <li key={l}>{l}</li>
+                  <li key={l}>{t(l)}</li>
                 ))}
               </ul>
-              <h3>Signature combo</h3>
-              <ComboLine pattern={comboPattern(me)} text={props.fill(info.combo, me)} />
+              <h3>{t('Signature combo')}</h3>
+              <ComboLine pattern={comboPattern(me)} text={props.fill(t(info.combo), me)} />
             </details>
           )}
         </>
@@ -173,7 +180,7 @@ export function ChampionSelect(props: {
         <>
           <section className="box styles">
             <h2>
-              Path <span>pick 1 Style · your passive</span>
+              {t('Path')} <span>{t('pick 1 Style · your passive')}</span>
             </h2>
             <div className="style-opts">
               {styles.map((s) => {
@@ -186,12 +193,12 @@ export function ChampionSelect(props: {
                       {styleArt && <Portrait champ={me} style={key} bust className="style-art" />}
                       <span className="style-txt">
                         <b>{s.name}</b>
-                        <span>{works ? (summary ? props.fill(summary, key) : props.styleText[key]) : 'Not playable yet'}</span>
+                        <span>{works ? (summary ? props.fill(t(summary), key) : props.styleText[key]) : t('Not playable yet')}</span>
                       </span>
                     </button>
                     {works && summary && (
                       <button type="button" className="more" aria-expanded={full === key} onClick={() => setFull(full === key ? null : key)}>
-                        {full === key ? 'Hide full rules' : 'Full rules'}
+                        {full === key ? t('Hide full rules') : t('Full rules')}
                       </button>
                     )}
                     {full === key && <p className="full">{props.styleText[key]}</p>}
@@ -203,7 +210,7 @@ export function ChampionSelect(props: {
           {myStyle ? (
             <AscTree champ={me} style={myStyle} points={props.points} saved={props.saved} onChange={props.setSaved} fill={props.fill} />
           ) : (
-            <p className="lo-note">Pick a Style to grow its Ascendancy tree.</p>
+            <p className="lo-note">{t('Pick a Style to grow its Ascendancy tree.')}</p>
           )}
         </>
       )}
@@ -213,17 +220,17 @@ export function ChampionSelect(props: {
       {step === 'deck' && champ && (
         <section className="box prep">
           <button type="button" className="prep-row" onClick={props.onEditDeck}>
-            <span className="prep-k">Deck</span>
+            <span className="prep-k">{t('Deck')}</span>
             <span className="prep-v">
-              <b>{props.deckSize(me)} cards</b>
+              <b>{t('{n} cards', { n: props.deckSize(me) })}</b>
               <span>
-                {props.deckCustom(me) ? 'your deck' : props.deckSaved(me) ? 'default (your deck needs fixing)' : 'default'}
-                {props.missing(me) ? ` · ⚠ ${props.missing(me)} effects not coded yet` : ''}
+                {props.deckCustom(me) ? t('your deck') : props.deckSaved(me) ? t('default (your deck needs fixing)') : t('default')}
+                {props.missing(me) ? ` · ⚠ ${t('{n} effects not coded yet', { n: props.missing(me) })}` : ''}
               </span>
             </span>
-            <span className="prep-go">Edit</span>
+            <span className="prep-go">{t('Edit')}</span>
           </button>
-          <p className="lo-note prep-note">The default deck is ready to play. Edit it any time.</p>
+          <p className="lo-note prep-note">{t('The default deck is ready to play. Edit it any time.')}</p>
         </section>
       )}
 
@@ -233,43 +240,43 @@ export function ChampionSelect(props: {
             {(
               [
                 ['champion', champ.name, STYLES[myStyle]?.name ?? myStyle],
-                ['path', TREES[myStyle] ? 'Ascendancy' : 'Style', loadoutOf('Ascendancy') ?? STYLES[myStyle]?.name ?? ''],
-                ['oath', 'Oath', loadoutOf('Oath') ?? ''],
-                ['deck', `${props.deckSize(me)} cards`, props.deckCustom(me) ? 'your deck' : 'default'],
+                ['path', TREES[myStyle] ? t('Ascendancy') : t('Style'), loadoutOf('Ascendancy') ?? STYLES[myStyle]?.name ?? ''],
+                ['oath', t('Oath'), loadoutOf('Oath') ?? ''],
+                ['deck', t('{n} cards', { n: props.deckSize(me) }), props.deckCustom(me) ? t('your deck') : t('default')],
               ] as [Step, string, string][]
             ).map(([s, k, v]) => (
               <button key={s} type="button" className="prep-row" onClick={() => setStep(s)}>
-                <span className="prep-k">{STEP_NAME[s]}</span>
+                <span className="prep-k">{stepName(s)}</span>
                 <span className="prep-v">
                   <b>{k}</b>
                   <span>{v}</span>
                 </span>
-                <span className="prep-go">Change</span>
+                <span className="prep-go">{t('Change')}</span>
               </button>
             ))}
           </section>
 
           <section className="box match">
             <h2>
-              Opponent <span>{foe === 'online' ? 'a real player' : `${foeName} · ${foeChamp} · ${STYLES[foeStyle]?.name ?? foeStyle}`}</span>
+              {t('Opponent')} <span>{foe === 'online' ? t('a real player') : `${foeName} · ${foeChamp} · ${STYLES[foeStyle]?.name ?? foeStyle}`}</span>
             </h2>
             <div className="vs-row">
               <label>
-                Play against
+                {t('Play against')}
                 <select value={foe} onChange={(e) => props.setFoe(e.target.value as FoeKind)}>
-                  <option value="ai">AI</option>
+                  <option value="ai">{t('AI')}</option>
                   <option value="tuktah" disabled={!props.canTuktah}>
-                    Tuktah (Claude){props.canTuktah ? '' : ' · open on claude.ai'}
+                    {t('Tuktah (Claude)')}{props.canTuktah ? '' : ` · ${t('open on claude.ai')}`}
                   </option>
                   <option value="online" disabled={!props.canOnline}>
-                    Online 1v1{props.canOnline ? '' : ' · open on claude.ai'}
+                    {t('Online 1v1')}{props.canOnline ? '' : ` · ${t('open on claude.ai')}`}
                   </option>
                 </select>
               </label>
               {foe !== 'online' && (
                 <>
                   <label>
-                    {foeName}'s Champion
+                    {t("{who}'s Champion", { who: foeName })}
                     <select value={picks.p2} onChange={(e) => props.setChamp('p2', e.target.value)}>
                       {champions.map((c) => (
                         <option key={c.id} value={c.id}>
@@ -279,7 +286,7 @@ export function ChampionSelect(props: {
                     </select>
                   </label>
                   <label>
-                    {foeName}'s Path
+                    {t("{who}'s Path", { who: foeName })}
                     <select value={foeStyle} onChange={(e) => props.setStyle('p2', e.target.value)}>
                       {props
                         .stylesOf(picks.p2)
@@ -297,7 +304,7 @@ export function ChampionSelect(props: {
                 </>
               )}
             </div>
-            {foe !== 'online' && <p className="lo-note">The {foeName} also gets a random Oath and a full Ascendancy tree.</p>}
+            {foe !== 'online' && <p className="lo-note">{t('The {who} also gets a random Oath and a full Ascendancy tree.', { who: foeName })}</p>}
             <TimerSetting />
           </section>
         </>
@@ -306,19 +313,19 @@ export function ChampionSelect(props: {
       <footer className="sel-foot">
         {at > 0 && (
           <button type="button" className="back" onClick={() => setStep(STEPS[at - 1])}>
-            Back
+            {t('Back')}
           </button>
         )}
         {step === 'fight' ? (
           <>
             {foe !== 'online' && <Portrait champ={picks.p2} style={foeStyle} bust className="foe-art" />}
             <button type="button" className="start" onClick={props.onStart}>
-              {foe === 'online' ? 'Find a match' : 'Fight!'}
+              {foe === 'online' ? t('Find a match') : t('Fight!')}
             </button>
           </>
         ) : (
           <button type="button" className="start" disabled={!!blocker} onClick={() => next && setStep(next)}>
-            {blocker || `Next: ${STEP_NAME[next]}`}
+            {blocker || t('Next: {step}', { step: stepName(next) })}
           </button>
         )}
       </footer>

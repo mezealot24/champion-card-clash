@@ -1,10 +1,12 @@
 // Turn timer pill shown over the battle screen. Counts down while the player has to pick; at 0 it calls onTimeout once.
 // Restart it for a new turn by changing its key.
 import { useEffect, useRef, useState } from 'react'
+import { t, useLang } from '../../i18n'
 import { useGameSettings, TIMER_CHOICES } from '../settings'
 import './timer.css'
 
 export function TurnTimer({ seconds, running, onTimeout }: { seconds: number; running: boolean; onTimeout: () => void }) {
+  useLang()
   const [left, setLeft] = useState(seconds * 1000)
   const [out, setOut] = useState(false)
   const timeout = useRef(onTimeout)
@@ -39,28 +41,29 @@ export function TurnTimer({ seconds, running, onTimeout }: { seconds: number; ru
   return (
     <div className={`turn-timer${sec <= 5 ? ' low' : ''}${out ? ' out' : ''}`} role="timer" aria-live={sec <= 5 ? 'polite' : 'off'}>
       <i style={{ width: `${pct}%` }} />
-      <span>{out ? "Time's up · Block" : `${sec}s`}</span>
+      <span>{out ? t("Time's up · Block") : `${sec}s`}</span>
     </div>
   )
 }
 
 /** On/off switch + seconds, for the Champion select screen and (later) the in-match Settings sheet. */
 export function TimerSetting() {
+  useLang()
   const [s, set] = useGameSettings()
   return (
     <div className="timer-setting">
       <label className="inline">
         <input type="checkbox" checked={s.timer} onChange={(e) => set({ timer: e.target.checked })} />
-        Turn timer
+        {t('Turn timer')}
       </label>
-      <select value={s.timerSec} disabled={!s.timer} onChange={(e) => set({ timerSec: Number(e.target.value) })} aria-label="Seconds per turn">
+      <select value={s.timerSec} disabled={!s.timer} onChange={(e) => set({ timerSec: Number(e.target.value) })} aria-label={t('Seconds per turn')}>
         {TIMER_CHOICES.map((n) => (
           <option key={n} value={n}>
             {n} s
           </option>
         ))}
       </select>
-      <span className="muted">Out of time = Block</span>
+      <span className="muted">{t('Out of time = Block')}</span>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { CardInst, GameState, Side } from '../engine'
 import { tuningOf } from '../engine/tuning'
 import type { EffectSpec } from '../engine/effects/spec'
+import { t, useLang } from '../i18n'
 import { comboInfo, comboSteps, compactRules } from './learnText'
 import './learnbits.css'
 
@@ -12,6 +13,7 @@ import './learnbits.css'
  * (any order). Tap it for what the combo needs and gives.
  */
 export function ComboTracker({ game, side, cards }: { game: GameState; side: Side; cards: CardInst[] }) {
+  useLang()
   const [open, setOpen] = useState(false)
   const p = game.players[side]
   const combos = comboInfo(p.championId, p.style, tuningOf(game, side))
@@ -27,7 +29,7 @@ export function ComboTracker({ game, side, cards }: { game: GameState; side: Sid
             key={c.name}
             type="button"
             className={`ct-row${ready ? ' ready' : ''}`}
-            aria-label={`${side === 'p1' ? 'Your' : 'Foe'} combo ${c.name}: ${c.pattern.join(' ')}, ${lit.filter(Boolean).length} of 3 on Field. ${c.need}. ${c.reward}`}
+            aria-label={`${t(side === 'p1' ? 'Your combo' : 'Foe combo')} ${c.name}: ${c.pattern.join(' ')}, ${t('{n} of 3 on Field.', { n: lit.filter(Boolean).length })} ${c.need}. ${c.reward}`}
             onClick={(e) => (e.stopPropagation(), setOpen(!open))}
           >
             <span className="ct-pips">
@@ -37,7 +39,7 @@ export function ComboTracker({ game, side, cards }: { game: GameState; side: Sid
                 </i>
               ))}
             </span>
-            <span className="ct-name">{ready ? 'READY' : c.name}</span>
+            <span className="ct-name">{ready ? t('READY') : c.name}</span>
           </button>
         )
       })}
@@ -45,11 +47,11 @@ export function ComboTracker({ game, side, cards }: { game: GameState; side: Sid
         <div className="ct-pop" onClick={(e) => (e.stopPropagation(), setOpen(false))}>
           {combos.map((c) => (
             <p key={c.name}>
-              <b>{c.name}</b> · {c.pattern.join(' ')} in one Strike, any order
+              <b>{c.name}</b> · {t('{pattern} in one Strike, any order', { pattern: c.pattern.join(' ') })}
               <br />
-              Needs: {c.need}
+              {t('Needs:')} {c.need}
               <br />
-              Gives: {c.reward}
+              {t('Gives:')} {c.reward}
             </p>
           ))}
         </div>

@@ -1,6 +1,7 @@
 // Online 1v1 inside the claude.ai Artifact: rooms and picks live in the Artifact's shared db (see online/match.ts).
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Action, ChampionSetup, Side } from '../engine'
+import { t as tr, useLang } from '../i18n'
 import { capability, type Db } from '../online/claude'
 import { moveId, newCode, newSecret, replay, sha256, type GameOpts, type MatchDoc, type MoveDoc, type Seat } from '../online/match'
 import { view } from '../online/mirror'
@@ -35,6 +36,7 @@ const store = {
 }
 
 export function Online(props: Props) {
+  useLang()
   const [db, setDb] = useState<Db | null | undefined>(undefined)
   const [uid, setUid] = useState<string>('')
   const [code, setCode] = useState<string | null>(null)
@@ -54,13 +56,13 @@ export function Online(props: Props) {
     }
   }, [])
 
-  if (db === undefined) return <div className="panel narrow-wide">Connecting…</div>
+  if (db === undefined) return <div className="panel narrow-wide">{tr('Connecting…')}</div>
   if (!db)
     return (
       <div className="panel narrow-wide">
-        <h2>Online</h2>
-        <p>Online play needs the game opened on claude.ai, signed in, with edit access to it.</p>
-        <button onClick={props.onQuit}>Back</button>
+        <h2>{tr('Online')}</h2>
+        <p>{tr('Online play needs the game opened on claude.ai, signed in, with edit access to it.')}</p>
+        <button onClick={props.onQuit}>{tr('Back')}</button>
       </div>
     )
   if (!code) return <Lobby db={db} uid={uid} {...props} onJoin={setCode} />
@@ -95,7 +97,7 @@ function Lobby({ db, uid, mine, champName, styleName, onJoin, onQuit }: Props & 
       store.set(`ccc-seat-${c}`, 'p1')
       onJoin(c)
     } catch {
-      setErr("Couldn't create a room (no edit access to this game?)")
+      setErr(tr("Couldn't create a room (no edit access to this game?)"))
     }
   }
 
@@ -103,48 +105,47 @@ function Lobby({ db, uid, mine, champName, styleName, onJoin, onQuit }: Props & 
     c = c.trim().toUpperCase()
     const snap = await db.doc(`matches/${c}`).get().catch(() => null)
     const m = snap?.exists ? (snap.data() as MatchDoc) : null
-    if (!m) return setErr(`No room ${c}`)
+    if (!m) return setErr(tr('No room {code}', { code: c }))
     const mySeat = store.get(`ccc-seat-${c}`)
     if (mySeat || m.p1.uid === uid || m.p2?.uid === uid) return onJoin(c) // back into my own room
-    if (m.p2) return setErr(`Room ${c} is full`)
+    if (m.p2) return setErr(tr('Room {code} is full', { code: c }))
     try {
       await db.doc(`matches/${c}`).update({ p2: seat, status: 'playing' })
       store.set(`ccc-seat-${c}`, 'p2')
       onJoin(c)
     } catch {
-      setErr("Couldn't join (no edit access to this game?)")
+      setErr(tr("Couldn't join (no edit access to this game?)"))
     }
   }
 
   return (
     <div className="panel narrow-wide">
-      <h2>Online 1v1</h2>
+      <h2>{tr('Online 1v1')}</h2>
       <p className="muted">
-        You play {champName(mine.champ)}
-        {mine.style ? ` · ${styleName(mine.style)}` : ''}. Change it on the select screen.
+        {tr('You play {champ}. Change it on the select screen.', { champ: `${champName(mine.champ)}${mine.style ? ` · ${styleName(mine.style)}` : ''}` })}
       </p>
-      <button onClick={create}>Create room</button>
+      <button onClick={create}>{tr('Create room')}</button>
       <label>
-        Room code
+        {tr('Room code')}
         <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="ABCDE" maxLength={5} />
       </label>
       <button onClick={() => join(input)} disabled={input.trim().length < 5}>
-        Join
+        {tr('Join')}
       </button>
       {err && <p className="muted">{err}</p>}
       {open.length > 0 && (
         <>
-          <h3>Open rooms</h3>
+          <h3>{tr('Open rooms')}</h3>
           {open.map((m) => (
             <button key={m.code} className="alt" onClick={() => join(m.code)}>
               {m.code} · {champName(m.p1.champ)}
-              {m.p1.uid === uid ? ' (yours)' : ''}
+              {m.p1.uid === uid ? ` (${tr('yours')})` : ''}
             </button>
           ))}
         </>
       )}
       <button className="alt" onClick={onQuit}>
-        Back
+        {tr('Back')}
       </button>
     </div>
   )
@@ -208,21 +209,21 @@ function Match({ db, uid, code, setupOf, gameOpts, champName, styleName, onQuit 
     await db.doc(`matches/${code}/moves/${moveId(t, seat)}`).set({ t, side: seat, hash: sha256(secret) })
   }
 
-  if (!match) return <div className="panel narrow-wide">Loading room {code}…</div>
+  if (!match) return <div className="panel narrow-wide">{tr('Loading room {code}…', { code })}</div>
   if (!seat)
     return (
       <div className="panel narrow-wide">
-        <p>You are watching room {code}; both seats are taken.</p>
-        <button onClick={onQuit}>Back</button>
+        <p>{tr('You are watching room {code}; both seats are taken.', { code })}</p>
+        <button onClick={onQuit}>{tr('Back')}</button>
       </div>
     )
   if (!match.p2 || !played || shown === null)
     return (
       <div className="panel narrow-wide">
-        <h2>Room {code}</h2>
-        <p>Waiting for an opponent. Send them this code; they open the game, pick Online and join {code}.</p>
+        <h2>{tr('Room {code}', { code })}</h2>
+        <p>{tr('Waiting for an opponent. Send them this code; they open the game, pick Online and join {code}.', { code })}</p>
         <button className="alt" onClick={onQuit}>
-          Leave
+          {tr('Leave')}
         </button>
       </div>
     )
@@ -238,9 +239,9 @@ function Match({ db, uid, code, setupOf, gameOpts, champName, styleName, onQuit 
       turn={turn}
       names={{ p1: champName(meSeat.champ), p2: champName(foeSeat.champ) }}
       styleNames={{ p1: styleName(meSeat.style), p2: styleName(foeSeat.style) }}
-      foe={foeSeat.uid === 'tuktah' ? 'Tuktah' : 'Rival'}
+      foe={foeSeat.uid === 'tuktah' ? tr('Tuktah') : tr('Rival')}
       busy={!!mine}
-      banner={waiting ? (theirs ? 'Revealing…' : 'Waiting for opponent…') : undefined}
+      banner={waiting ? (theirs ? tr('Revealing…') : tr('Waiting for opponent…')) : undefined}
       onAction={pick}
       onDone={() => {
         setShown((n) => (n ?? 0) + 1)

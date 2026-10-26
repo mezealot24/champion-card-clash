@@ -3,6 +3,7 @@
 // Style cards (cards.style_only) stay as Admin set them and fill their own slots, so the player picks the rest.
 import { isEffectMissing, type CardDef, type CardRowLike } from '../../engine'
 import { inStyleDeck } from '../../engine/state'
+import { t } from '../../i18n'
 
 export type DeckRow = CardRowLike & { champion_id: string; name?: string }
 /** card id → copies */
@@ -50,12 +51,12 @@ export function deckProblems(list: DeckList, rows: DeckRow[], style: string | un
   const pool = new Set(deckPool(rows).map((r) => r.id))
   const out: string[] = []
   const gone = Object.keys(list).filter((id) => list[id] > 0 && !pool.has(id))
-  if (gone.length) out.push(`No longer in the pool: ${gone.join(', ')}`)
+  if (gone.length) out.push(t('No longer in the pool: {ids}', { ids: gone.join(', ') }))
   const over = Object.keys(list).filter((id) => list[id] > rules.maxCopies)
-  if (over.length) out.push(`More than ${rules.maxCopies} copies: ${over.join(', ')}`)
+  if (over.length) out.push(t('More than {max} copies: {ids}', { max: rules.maxCopies, ids: over.join(', ') }))
   const target = pickTarget(rows, style, rules)
   const n = countOf(list)
-  if (n !== target) out.push(n < target ? `Add ${target - n} more card${target - n > 1 ? 's' : ''}` : `Remove ${n - target} card${n - target > 1 ? 's' : ''}`)
+  if (n !== target) out.push(n < target ? t(target - n > 1 ? 'Add {n} more cards' : 'Add {n} more card', { n: target - n }) : t(n - target > 1 ? 'Remove {n} cards' : 'Remove {n} card', { n: n - target }))
   return out
 }
 

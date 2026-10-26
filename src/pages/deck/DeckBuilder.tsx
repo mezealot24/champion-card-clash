@@ -1,6 +1,7 @@
 // Player deck builder: pick cards from your Champion's pool, exactly the deck size, max copies each (rules in deck.ts).
 import { useState } from 'react'
 import type { CardType } from '../../engine'
+import { t, useLang } from '../../i18n'
 import { champColor } from '../fighters'
 import { Portrait } from '../select/Portrait'
 import { countOf, deckPool, deckProblems, defaultList, loadDeck, pickTarget, saveDeck, styleCards, type DeckList, type DeckRow, type DeckRules } from './deck'
@@ -19,6 +20,7 @@ export function DeckBuilder(props: {
   rules: DeckRules
   onClose: () => void
 }) {
+  useLang()
   const { champ, rows, style, rules } = props
   const [list, setList] = useState<DeckList>(() => loadDeck(champ) ?? defaultList(rows))
   const [type, setType] = useState<CardType | ''>('')
@@ -31,7 +33,7 @@ export function DeckBuilder(props: {
   const problems = deckProblems(list, rows, style, rules)
   const fixed = styleCards(rows, style)
   const shown = pool.filter((r) => (!type || r.type === type) && (!onlyPicked || (list[r.id] ?? 0) > 0))
-  const byType = TYPES.map((t) => `${t} ${pool.filter((r) => r.type === t).reduce((s, r) => s + (list[r.id] ?? 0), 0)}`).join(' · ')
+  const byType = TYPES.map((ty) => `${ty} ${pool.filter((r) => r.type === ty).reduce((s, r) => s + (list[r.id] ?? 0), 0)}`).join(' · ')
 
   const set = (id: string, copies: number) => setList({ ...list, [id]: Math.max(0, Math.min(rules.maxCopies, copies)) })
 
@@ -40,7 +42,7 @@ export function DeckBuilder(props: {
       <header className="deckb-head">
         <Portrait champ={champ} style={style} bust className="head-art" />
         <h1>
-          <small>Deck builder</small>
+          <small>{t('Deck builder')}</small>
           {props.champName}
           {props.styleName && <span className="head-style">{props.styleName}</span>}
         </h1>
@@ -53,20 +55,20 @@ export function DeckBuilder(props: {
       </header>
 
       <p className="deckb-rules">
-        Pick exactly {target} cards, up to {rules.maxCopies} copies of each.
-        {fixed.length > 0 && ` Your Style${props.styleName ? ` (${props.styleName})` : ''} adds ${fixed.length} more, for ${rules.size} in all.`}
+        {t('Pick exactly {n} cards, up to {max} copies of each.', { n: target, max: rules.maxCopies })}
+        {fixed.length > 0 && ` ${t('Your Style{name} adds {n} more, for {size} in all.', { name: props.styleName ? ` (${props.styleName})` : '', n: fixed.length, size: rules.size })}`}
       </p>
 
       <div className="deckb-tools">
-        <div className="deckb-types" role="radiogroup" aria-label="Card type">
-          {(['', ...TYPES] as const).map((t) => (
-            <button key={t || 'all'} type="button" role="radio" aria-checked={type === t} onClick={() => setType(t)}>
-              {t ? TYPE_NAME[t] : 'All'}
+        <div className="deckb-types" role="radiogroup" aria-label={t('Card type')}>
+          {(['', ...TYPES] as const).map((ty) => (
+            <button key={ty || 'all'} type="button" role="radio" aria-checked={type === ty} onClick={() => setType(ty)}>
+              {ty ? t(TYPE_NAME[ty]) : t('All')}
             </button>
           ))}
         </div>
         <label className="inline deckb-only">
-          <input type="checkbox" checked={onlyPicked} onChange={(e) => setOnlyPicked(e.target.checked)} /> In deck only
+          <input type="checkbox" checked={onlyPicked} onChange={(e) => setOnlyPicked(e.target.checked)} /> {t('In deck only')}
         </label>
       </div>
 
@@ -81,29 +83,29 @@ export function DeckBuilder(props: {
                   {r.name ?? r.id}
                   <span className="deckb-stats">
                     <i>{r.dmg} dmg</i>
-                    {r.cost != null && <i>cost {r.cost}</i>}
+                    {r.cost != null && <i>{t('cost {n}', { n: r.cost })}</i>}
                   </span>
                 </b>
                 {r.effect && <span className="deckb-text">{r.effect}</span>}
               </button>
               <div className="deckb-step">
-                <button type="button" aria-label={`Remove ${r.name ?? r.id}`} disabled={c === 0} onClick={() => set(r.id, c - 1)}>
+                <button type="button" aria-label={t('Remove {card}', { card: r.name ?? r.id })} disabled={c === 0} onClick={() => set(r.id, c - 1)}>
                   −
                 </button>
                 <output>{c}</output>
-                <button type="button" aria-label={`Add ${r.name ?? r.id}`} disabled={c >= rules.maxCopies} onClick={() => set(r.id, c + 1)}>
+                <button type="button" aria-label={t('Add {card}', { card: r.name ?? r.id })} disabled={c >= rules.maxCopies} onClick={() => set(r.id, c + 1)}>
                   +
                 </button>
               </div>
             </li>
           )
         })}
-        {shown.length === 0 && <li className="deckb-empty">No cards here.</li>}
+        {shown.length === 0 && <li className="deckb-empty">{t('No cards here.')}</li>}
       </ul>
 
       {fixed.length > 0 && (
         <details className="box deckb-fixed">
-          <summary>Style cards, always in ({fixed.length})</summary>
+          <summary>{t('Style cards, always in ({n})', { n: fixed.length })}</summary>
           <ul>
             {fixed.map((r) => (
               <li key={r.id}>
@@ -118,10 +120,10 @@ export function DeckBuilder(props: {
         {problems.length > 0 && <p className="deckb-warn">{problems.join(' · ')}</p>}
         <div>
           <button type="button" className="deckb-ghost" onClick={() => setList(defaultList(rows))}>
-            Reset to default
+            {t('Reset to default')}
           </button>
           <button type="button" className="deckb-ghost" onClick={props.onClose}>
-            Cancel
+            {t('Cancel')}
           </button>
           <button
             type="button"
@@ -132,7 +134,7 @@ export function DeckBuilder(props: {
               props.onClose()
             }}
           >
-            Save deck
+            {t('Save deck')}
           </button>
         </div>
       </footer>

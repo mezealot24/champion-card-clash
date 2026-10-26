@@ -3,6 +3,7 @@
 // offers them); a Style and a full tree are required. Mockup: Game Designer thread (claude.ai/artifact/QWLfQ4bSXFxz6BMXUwQAB6).
 // All open in Beta, saved per Champion on every change.
 import { fillAsc, OATHS, TREES, treePoints, treeShape, validAsc } from '../../engine'
+import { t, useLang } from '../../i18n'
 import type { SavedLoadout } from './loadout'
 import './loadout.css'
 
@@ -16,12 +17,13 @@ type Props = {
 
 /** The picked Style's tree. Every point must be spent before the next step. */
 export function AscTree({ champ, style, points: base, saved, onChange, fill }: Props & { style: string; points: number }) {
+  useLang()
   const points = treePoints(style, base)
   const { letters, depth, maxCapstones } = treeShape(style)
   const tree = TREES[style]
   const taken = saved.asc?.[style] ?? []
   const setAsc = (ids: string[]) => onChange({ ...saved, asc: { ...saved.asc, [style]: ids } })
-  if (!tree) return <p className="lo-note">This Style has no Ascendancy tree yet.</p>
+  if (!tree) return <p className="lo-note">{t('This Style has no Ascendancy tree yet.')}</p>
 
   function toggleNode(id: string) {
     const b = id[0]
@@ -37,14 +39,14 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
   return (
     <section className="box" aria-label={`${champ} Ascendancy`}>
       <h2>
-        Ascendancy <span>{left ? `${left} of ${points} points left` : `all ${points} points spent`}</span>
+        {t('Ascendancy')} <span>{left ? t('{left} of {n} points left', { left, n: points }) : t('all {n} points spent', { n: points })}</span>
         <span className="lo-pips" aria-hidden="true">
           {Array.from({ length: points }, (_, i) => (
             <i key={i} className={i < taken.length ? 'on' : undefined} />
           ))}
         </span>
       </h2>
-      <p className="lo-note">Spend every point. Take nodes from the top of a branch down. The last node (★) is the capstone: optional, with a Cost{maxCapstones === 1 ? ', one per tree' : ''}. Respec is free.</p>
+      <p className="lo-note">{t(maxCapstones === 1 ? 'Spend every point. Take nodes from the top of a branch down. The last node (★) is the capstone: optional, with a Cost, one per tree. Respec is free.' : 'Spend every point. Take nodes from the top of a branch down. The last node (★) is the capstone: optional, with a Cost. Respec is free.')}</p>
       <div className="lo-tree">
         {tree.branches.map((name, bi) => {
           const b = letters[bi]
@@ -68,12 +70,12 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
                       <b>
                         <em className="lo-tier">{cap ? '★' : n.id[1]}</em>
                         {n.name}
-                        <i>{cap ? 'Capstone' : `T${n.id[1]}`}</i>
+                        <i>{cap ? t('Capstone') : `T${n.id[1]}`}</i>
                       </b>
                       <span>{fill(n.text, style)}</span>
                       {n.cost && (
                         <span className="lo-cost">
-                          <i>Cost</i>
+                          <i>{t('Cost')}</i>
                           {fill(n.cost, style)}
                         </span>
                       )}
@@ -86,10 +88,10 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
       </div>
       <div className="lo-row">
         <button type="button" className="lo-ghost" onClick={() => setAsc(fillAsc(style, points, taken))} disabled={!left}>
-          {taken.length ? 'Fill the rest' : 'Quick build'}
+          {taken.length ? t('Fill the rest') : t('Quick build')}
         </button>
         <button type="button" className="lo-ghost" onClick={() => setAsc([])} disabled={!taken.length}>
-          Respec (free)
+          {t('Respec (free)')}
         </button>
       </div>
     </section>
@@ -98,10 +100,11 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
 
 /** Sigil · Oath: pick one of the Champion's Oaths. */
 export function OathPicker({ champ, champName, saved, onChange, fill }: Props & { champName: string }) {
+  useLang()
   return (
     <section className="box">
       <h2>
-        Sigil · Oath <span>{champName} only · pick one</span>
+        {t('Sigil · Oath')} <span>{t('{name} only · pick one', { name: champName })}</span>
       </h2>
       <div className="lo-opts">
         {(OATHS[champ] ?? []).map((o) => {
@@ -113,12 +116,12 @@ export function OathPicker({ champ, champName, saved, onChange, fill }: Props & 
                 {on && <i className="lo-check">✓</i>}
               </b>
               <span className="lo-line up">
-                <i>Boon</i>
+                <i>{t('Boon')}</i>
                 {fill(o.text, champ)}
               </span>
               {o.cost && (
                 <span className="lo-line down">
-                  <i>Cost</i>
+                  <i>{t('Cost')}</i>
                   {fill(o.cost, champ)}
                 </span>
               )}

@@ -6,6 +6,7 @@ import { COMBOS } from '../engine/combos'
 import { describeAct, describeCond } from '../engine/effects/describe'
 import { isDrawback, normalizeSpec, type ActSpec, type CondSpec, type EffectSpec, type Hook } from '../engine/effects/spec'
 import type { Tuning } from '../engine/tuning'
+import { t as tr } from '../i18n'
 
 export type CompactRule = { tag: string; when: string; gain: string[]; cost: string[] }
 
@@ -158,13 +159,13 @@ export function comboInfo(championId: string, style: string | undefined, t: Tuni
   return (COMBOS[championId] ?? []).map((c) => {
     const base = { name: c.name, pattern: [...c.pattern] }
     switch (championId) {
-      case 'TK': return { ...base, name: 'Second Helping', need: 'Foe Blocks one of them', reward: `Heal ${t.TK.comboHealPct}% of your HP` }
-      case 'AS': return { ...base, name: 'Death Mark', need: 'All 3 hit clean', reward: `Mark: later Strikes burst +${t.AS.markBurstPct}%` }
+      case 'TK': return { ...base, name: 'Second Helping', need: tr('Foe Blocks one of them'), reward: tr('Heal {n}% of your HP', { n: t.TK.comboHealPct }) }
+      case 'AS': return { ...base, name: 'Death Mark', need: tr('All 3 hit clean'), reward: tr('Mark: later Strikes burst +{n}%', { n: t.AS.markBurstPct }) }
       case 'MG':
         return style === 'MG:2'
-          ? { ...base, name: 'Absolute Zero', need: 'All 3 hit clean', reward: `Foe Frozen + can't Block ${t.MG.comboNoBlockTurns}t` }
-          : { ...base, name: 'Sealed', need: 'All 3 hit clean', reward: `Foe can't Block ${t.MG.comboNoBlockTurns}t` }
-      case 'BR': return { ...base, name: 'Guard Crush', need: 'Nothing more, just Strike with them', reward: `Next Strike: ${t.BR.guardCrushBlockedPct}% through Block (${t.BR.guardCrushTurns}t)` }
+          ? { ...base, name: 'Absolute Zero', need: tr('All 3 hit clean'), reward: tr("Foe Frozen + can't Block {n}t", { n: t.MG.comboNoBlockTurns }) }
+          : { ...base, name: 'Sealed', need: tr('All 3 hit clean'), reward: tr("Foe can't Block {n}t", { n: t.MG.comboNoBlockTurns }) }
+      case 'BR': return { ...base, name: 'Guard Crush', need: tr('Nothing more, just Strike with them'), reward: tr('Next Strike: {pct}% through Block ({n}t)', { pct: t.BR.guardCrushBlockedPct, n: t.BR.guardCrushTurns }) }
       default: return { ...base, need: '', reward: '' }
     }
   })
