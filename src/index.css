@@ -218,3 +218,23 @@ td input[type="number"], .tuning input { font-variant-numeric: tabular-nums; }
   .tuning-input input.num { width: 100%; flex: 1 1 100%; }
 }
 @media (max-width: 760px) { .filters > span.muted { flex-basis: 100%; } }
+
+/* Admin: Ascendancy / Oath numbers as node cards, like the tree players pick from (Q 2026-10-26) */
+.tune-title { margin: 14px 0 6px; }
+.tune-tree { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.tune-branch { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tune-branch h5 { margin: 0; text-align: center; text-transform: uppercase; letter-spacing: 1px; color: var(--accent); }
+.tune-node { color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; background: var(--panel); }
+.tune-node.cap { border-color: var(--warn); }
+.tune-node.tuned { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.tune-node b { display: flex; align-items: center; gap: 6px; }
+.tune-node b em { font-style: normal; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; background: var(--border); }
+.tune-node.cap b em { background: var(--warn); color: var(--on-accent); }
+.tune-node p { margin: 4px 0; font-size: 0.88em; color: var(--muted); }
+.tune-cost i { font-style: normal; font-size: 0.75em; font-weight: 700; text-transform: uppercase; color: var(--danger); margin-right: 4px; }
+.tune-node-fields { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; }
+.tune-node-fields label { font-size: 0.82em; }
+.tune-node-fields .tuning-input input.num { width: 64px; flex: none; }
+.tune-tree.asc { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1000px) { .tune-tree.asc { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .tune-tree.asc { grid-template-columns: 1fr; } }
