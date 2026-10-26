@@ -45,7 +45,7 @@ export const CHAMP_INFO: Record<string, ChampInfo> = {
 export const STYLE_SUMMARY: Record<string, string> = {
   'TK:1': 'Below {hpPct}% HP, every clean hit you take heals you.',
   'TK:2': 'Hits you take grow your Max HP. More Max HP = more damage.',
-  'BR:1': 'Below {hpPct}% HP, your first {slots} chain cards deal +{bonusDmg}.',
+  'BR:1': 'Warm-up at {warmUpRage}+ Rage: first {slots} chain cards deal +{warmUpDmg}. Below {hpPct}% HP, True Fury gives +{bonusDmg}; stopped hits chip {chipDmg} and give +{chipRage} Rage.',
   'BR:2': 'Each chain card adds a stack (+{dmgPerStack} dmg). Full stacks: lifesteal.',
   'AS:1': 'Start with {startDraw} cards. Strike vs Strike refills Energy and draws {dualDraw}.',
   'AS:2': 'Every {every|ord} attack is a x{critMult} Critical.',

@@ -46,7 +46,7 @@ describe('Style one-liners', () => {
   it('fill every number from the tuning', () => {
     const t = resolveTuning({ 'BR:1': { bonusDmg: 12 } })
     const line = (key: string) => fillText(STYLE_SUMMARY[key], key, t)
-    expect(line('BR:1')).toBe('Below 50% HP, your first 2 chain cards deal +12.')
+    expect(line('BR:1')).toBe('Warm-up at 5+ Rage: first 2 chain cards deal +4. Below 50% HP, True Fury gives +12; stopped hits chip 5 and give +2 Rage.')
     expect(line('AS:2')).toContain('Every 4th attack')
     for (const key of ['TK:1', 'TK:2', 'BR:1', 'BR:2', 'AS:1', 'AS:2', 'MG:1', 'MG:2']) expect(line(key)).not.toMatch(/\{/)
     expect(line('MG:1')).toContain('⟡ Infuses 1 Ignite')

@@ -92,7 +92,7 @@ export const TH: Record<string, string> = {
   // ---- Style one-liners (select/info.ts) ----
   'Below {hpPct}% HP, every clean hit you take heals you.': 'เมื่อ HP ต่ำกว่า {hpPct}% ทุกครั้งที่โดนตีเต็มๆ จะได้ฮีล',
   'Hits you take grow your Max HP. More Max HP = more damage.': 'ยิ่งโดนตี Max HP ยิ่งเพิ่ม Max HP มาก = ดาเมจแรง',
-  'Below {hpPct}% HP, your first {slots} chain cards deal +{bonusDmg}.': 'เมื่อ HP ต่ำกว่า {hpPct}% การ์ด {slots} ใบแรกใน chain ตีแรงขึ้น +{bonusDmg}',
+  'Warm-up at {warmUpRage}+ Rage: first {slots} chain cards deal +{warmUpDmg}. Below {hpPct}% HP, True Fury gives +{bonusDmg}; stopped hits chip {chipDmg} and give +{chipRage} Rage.': 'Warm-up เมื่อมี Rage {warmUpRage}+ การ์ด {slots} ใบแรกใน chain แรงขึ้น +{warmUpDmg}; เมื่อ HP ต่ำกว่า {hpPct}% เข้า True Fury ได้ +{bonusDmg} และ hit ที่ถูกหยุด chip {chipDmg} พร้อมได้ Rage +{chipRage}',
   'Each chain card adds a stack (+{dmgPerStack} dmg). Full stacks: lifesteal.': 'การ์ดแต่ละใบใน chain เพิ่ม 1 stack (+{dmgPerStack} dmg) stack เต็มแล้วได้ lifesteal',
   'Start with {startDraw} cards. Strike vs Strike refills Energy and draws {dualDraw}.': 'เริ่มด้วยการ์ด {startDraw} ใบ Strike ชน Strike จะเติม Energy และจั่ว {dualDraw} ใบ',
   'Every {every|ord} attack is a x{critMult} Critical.': 'การโจมตีครั้งที่ {every|ord} จะเป็น Critical x{critMult} เสมอ',
