@@ -151,8 +151,8 @@ describe('randomLoadout', () => {
     })
     it('Hoarfrost: Frost Armor regrows faster and to a higher cap', () => {
       const s = mg('MG:2', ['C1'])
-      expect(tuningOf(s, 'p1')['MG:2'].frostArmorRegen).toBe(12)
-      expect(tuningOf(s, 'p1')['MG:2'].frostArmorCap).toBe(56)
+      expect(tuningOf(s, 'p1')['MG:2'].frostArmorRegen).toBe(10)
+      expect(tuningOf(s, 'p1')['MG:2'].frostArmorCap).toBe(50)
     })
   })
 

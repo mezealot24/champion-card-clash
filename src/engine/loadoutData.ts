@@ -428,15 +428,16 @@ export const TREES: Record<string, TreeData> = {
         ['ascEternalWinter', 'max Chill', 6, 1],
       ]),
       // Frost Armor regrows on Block in the base Style now (Q 2026-10-25); Hoarfrost makes it grow faster and higher
+      // Glacier nerf (Q 2026-10-26): Hoarfrost 4/16 → 2/10, Ice Lance 6 → 4, Avalanche 10 → 15 Shield per +1
       {
         id: 'C1',
         name: 'Hoarfrost',
         text: 'Frost Armor regrows {ascHoarfrost} more Shield per Block vs a Strike, and its cap is {ascHoarfrostCap} higher.',
-        fields: [f('ascHoarfrost', 'Asc C1 Hoarfrost: regrow per Block +', 4), f('ascHoarfrostCap', 'Asc C1 Hoarfrost: Shield cap +', 16)],
+        fields: [f('ascHoarfrost', 'Asc C1 Hoarfrost: regrow per Block +', 2), f('ascHoarfrostCap', 'Asc C1 Hoarfrost: Shield cap +', 10)],
       },
-      node('C2', 'Ice Lance', 'While you have Shield, chain slot 1 deals +{ascIceLance} dmg.', 'ascIceLance', 'slot 1 dmg +', 6),
+      node('C2', 'Ice Lance', 'While you have Shield, chain slot 1 deals +{ascIceLance} dmg.', 'ascIceLance', 'slot 1 dmg +', 4),
       capstone('C3', 'Avalanche', 'When you Strike, all your Shield breaks into the chain: every card +1 dmg per {ascAvalanche} Shield.', 'Your Shield is gone for that turn\'s hits.', [
-        ['ascAvalanche', 'Shield per +1 dmg', 10, 1],
+        ['ascAvalanche', 'Shield per +1 dmg', 15, 1],
       ]),
       node('D1', 'Cold Hands', 'When you Freeze the enemy, their {ascColdHands} oldest Field cards go to the bottom of their deck.', 'ascColdHands', 'cards', 1),
       node('D2', 'Frost Lock', 'When the enemy has {ascFrostLock}+ Chill after your chain, they can\'t Charge next turn.', 'ascFrostLock', 'Chill needed', 3, 1),
