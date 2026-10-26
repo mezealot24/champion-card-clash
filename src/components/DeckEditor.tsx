@@ -84,7 +84,11 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
   }
 
   async function save() {
-    const rows = cards.filter((c) => dirty.has(c.id))
+    // drop updated_at (loaded rows carry it, new ones don't): a bulk upsert would send null for the new card
+    const rows = cards.filter((c) => dirty.has(c.id)).map((c) => {
+      const { updated_at: _, ...row } = c as CardRow
+      return row
+    })
     if (rows.length) must(await supabase.from('cards').upsert(rows))
     onSaved()
   }
