@@ -1342,7 +1342,9 @@ PIECES['asc:TK:1:END'] = {
   group: 'TK:1',
   hooks: {
     // Q 2026-10-26: full strength again (the 25% power is gone)
-    hitCut: (state, side) => endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut'),
+    // Q 2026-10-26 12:54: a flat cut on (Endurance − 1) hits a turn (1 Endurance = none, 6 = 5 hits)
+    hitCut: (state, side) => num(state, side, 'TK:1', 'ascEnduranceCut'),
+    hitCutHits: (state, side) => Math.max(0, endurance(state.players[side]) - 1),
     // each Endurance: Ignite burns and Critical hits you take deal ascEnduranceGuard% less
     burnCutPct: (state, side) => Math.min(100, endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceGuard')),
     critCutPct: (state, side) => Math.min(100, endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceGuard')),

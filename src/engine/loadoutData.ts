@@ -90,7 +90,7 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
  * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank / Assassin v2: named asc keys).
  */
 /** Shown under the Lifeline Style text (Q 2026-10-25): what one Endurance does; numbers filled from TK:1 */
-export const ENDURANCE_TEXT = '⛨ Endurance (Lifeline Ascendancy): one shared pool, max {ascEnduranceMax}; every node that gives Endurance (Second Wind too) adds to the same pool. Each Endurance: hits that reach you deal {ascEnduranceCut} less dmg, Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). Fades after {ascEnduranceTurns} turns without a new one.'
+export const ENDURANCE_TEXT = '⛨ Endurance (Lifeline Ascendancy): one shared pool, max {ascEnduranceMax}; every node that gives Endurance (Second Wind too) adds to the same pool. Hits that reach you deal {ascEnduranceCut} less dmg, on (Endurance − 1) hits a turn (1 Endurance: none, 6: 5 hits). Each Endurance: Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). Fades after {ascEnduranceTurns} turns without a new one.'
 
 export const TREES: Record<string, TreeData> = {
   /**
@@ -103,10 +103,10 @@ export const TREES: Record<string, TreeData> = {
     bonusPoints: 1,
     nodes: [
       // Q 2026-10-25 (after sim): Endurance = −dmg per hit + HP regen per charge; gained by Charge or by taking 2+ hits
-      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Each Endurance: hits that reach you deal {ascEnduranceCut} less dmg, Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). Endurance fades after {ascEnduranceTurns} turns without a new one.', [
+      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Hits that reach you deal {ascEnduranceCut} less dmg, on (Endurance − 1) hits a turn (1 Endurance: none, 6: 5 hits). Each Endurance: Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). Endurance fades after {ascEnduranceTurns} turns without a new one.', [
         ['ascEnduranceMax', 'max Endurance', 3, 1],
         ['ascEnduranceTurns', 'turns before it fades', 3, 1],
-        ['ascEnduranceCut', 'dmg cut per hit, per Endurance', 1],
+        ['ascEnduranceCut', 'dmg cut per hit (on Endurance − 1 hits a turn)', 1],
         ['ascEnduranceRegen', 'regen % missing HP per Endurance', 1],
         ['ascEnduranceGuard', '% less Ignite burn / Critical dmg, per Endurance', 10, 0, 100],
       ]),

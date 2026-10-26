@@ -346,6 +346,8 @@ function resolveStrikes(
   // loadout pieces that soften every hit getting past a side's Block (Iron Hide)
   const hitCut = { p1: 0, p2: 0 }
   for (const side of SIDES) hitCut[side] = hooksOf(state.players[side]).reduce((t, h) => t + (h.hitCut?.(state, side) ?? 0), 0)
+  const cutLeft = { p1: Infinity, p2: Infinity }
+  for (const side of SIDES) for (const h of hooksOf(state.players[side])) if (h.hitCutHits) cutLeft[side] = Math.min(cutLeft[side], h.hitCutHits(state, side))
   const critCut = { p1: 0, p2: 0 }
   for (const side of SIDES) critCut[side] = Math.min(100, hooksOf(state.players[side]).reduce((t, h) => t + (h.critCutPct?.(state, side) ?? 0), 0))
 
@@ -364,7 +366,10 @@ function resolveStrikes(
       if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, 1)
       if (env.shroud[enemy]) dealt = Math.floor(dealt / 2)
       if (critCut[enemy] && crit[side].has(i)) dealt = Math.floor((dealt * (100 - critCut[enemy])) / 100)
-      if (hitCut[enemy] && !isBlocked(side, i)) dealt = Math.max(0, dealt - hitCut[enemy])
+      if (hitCut[enemy] && !isBlocked(side, i) && dealt > 0 && cutLeft[enemy] > 0) {
+        dealt = Math.max(0, dealt - hitCut[enemy])
+        cutLeft[enemy]--
+      }
       const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
       if (parry) parry.n = (parry.n ?? 1) - 1
       let absorbed = 0

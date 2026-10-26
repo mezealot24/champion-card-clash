@@ -132,6 +132,8 @@ export type StyleDef = {
   lifesteal?: (state: GameState, side: Side) => number
   /** dmg taken off every hit that gets past this side's Block */
   hitCut?: (state: GameState, side: Side) => number
+  /** How many hits a turn hitCut applies to (Endurance: stacks − 1); unset = every hit */
+  hitCutHits?: (state: GameState, side: Side) => number
   /** % less HP lost to Ignite burns (Endurance) */
   burnCutPct?: (state: GameState, side: Side) => number
   /** % less dmg from Critical hits taken (Endurance) */
