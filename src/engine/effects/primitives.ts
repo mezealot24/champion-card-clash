@@ -87,7 +87,8 @@ export const loseHp =
   (ctx) => {
     const n = Math.floor(base * perCount(ctx, per))
     if (n <= 0) return
-    for (const s of sides(ctx, who)) loseHpRaw(ctx.state, s, n, s === ctx.self ? 'self' : 'foe')
+    // Q 2026-10-26: a card's own self-damage never kills you, it stops at 1 HP
+    for (const s of sides(ctx, who)) loseHpRaw(ctx.state, s, s === ctx.self ? Math.min(n, Math.max(0, ctx.state.players[s].hp - 1)) : n, s === ctx.self ? 'self' : 'foe')
     log(ctx.state, `${ctx.card.def.id}: ${who} loses ${n} HP`)
   }
 

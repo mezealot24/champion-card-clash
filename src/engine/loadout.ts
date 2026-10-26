@@ -87,16 +87,22 @@ function gainEndurance(state: GameState, side: Side, why: string, src = 'flinch'
   p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, [at]: state.turn }
   say(state, side, `Endurance (${why}): ${n}/${max}`)
 }
-/** Unrelenting: dmg still to drain, one entry per coming turn (perkData only holds numbers: drain0, drain1, …) */
-const drainQueue = (p: PlayerState) => {
+/** Unrelenting drain / Unyielding mend: amounts per coming turn (perkData only holds numbers: drain0, drain1, …) */
+const drainQueue = (p: PlayerState, key = 'drain') => {
   const out: number[] = []
-  for (let i = 0; i < (p.perkData?.drain ?? 0); i++) out.push(p.perkData?.[`drain${i}`] ?? 0)
+  for (let i = 0; i < (p.perkData?.[key] ?? 0); i++) out.push(p.perkData?.[`${key}${i}`] ?? 0)
   return out
 }
-const setDrain = (p: PlayerState, due: number[]) => {
-  const d: Record<string, number> = { drain: due.length }
-  due.forEach((n, i) => (d[`drain${i}`] = n))
+const setDrain = (p: PlayerState, due: number[], key = 'drain') => {
+  const d: Record<string, number> = { [key]: due.length }
+  due.forEach((n, i) => (d[`${key}${i}`] = n))
   p.perkData = { ...p.perkData, ...d }
+}
+/** Spread n over the next turns (rounded down, remainder on the first turns), added to what's already queued */
+const queueOver = (p: PlayerState, key: string, n: number, turns: number) => {
+  const due = drainQueue(p, key)
+  for (let i = 0; i < turns; i++) due[i] = (due[i] ?? 0) + Math.floor(n / turns) + (i < n % turns ? 1 : 0)
+  setDrain(p, due, key)
 }
 /** Fatal Rhythm nodes: remember this turn's Critical count (Style beforeHits runs first, so crit is filled) */
 const critSeen: NonNullable<StyleDef['beforeHits']> = (state, side, _b, _m, crit) => {
@@ -241,23 +247,44 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
+  // Q 2026-10-26: Unyielding = a Charge break costs all Endurance, but heals back amt% of that chain's dmg per Endurance lost over the next turns
   'TK:1:A2': (amt) => ({
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnyieldingMax')),
     hooks: {
-      beforeHits: (state, side, bonus) => {
-        // Q 18:55: Unyielding also runs at Endurance power (25%)
-        const n = Math.floor((endurance(state.players[side]) * amt(state, side) * num(state, side, 'TK:1', 'ascEndurancePower')) / 100)
+      actionStart: (state, side) => {
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, yieldHp: p.hp }
+      },
+      onChargeBreak: (state, side) => {
+        const p = state.players[side]
+        const n = endurance(p)
         if (!n) return
-        for (let i = 0; i < bonus.length; i++) bonus[i] += n
-        say(state, side, `Unyielding: every chain card +${n} dmg`)
+        const lost = Math.max(0, (p.perkData?.yieldHp ?? p.hp) - p.hp)
+        const heal = Math.floor((lost * amt(state, side) * n) / 100)
+        p.perkData = { ...p.perkData, endurance: 0 }
+        const turns = Math.max(1, num(state, side, 'TK:1', 'ascUnyieldingTurns'))
+        if (heal > 0) queueOver(p, 'mend', heal, turns)
+        say(state, side, `Unyielding: Charge break spends ${n} Endurance, heals ${heal} over ${turns} turns`)
+      },
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        const due = drainQueue(p, 'mend')
+        if (!due.length) return
+        const [now, ...rest] = due
+        setDrain(p, rest, 'mend')
+        const got = now > 0 && p.hp > 0 ? styleHeal(state, side, now) : 0
+        if (got) say(state, side, `Unyielding: heals ${got}`)
       },
     },
   }),
   // Unrelenting (Q 2026-10-25, like Death's Dance): hit dmg taken this turn comes back and drains over the next turns
   'TK:1:A3': () => ({
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnrelenting')),
+    // Q 2026-10-26: Cost = your Field holds at most ascUnrelentingField cards (was: Block leaks)
+    setup: (p, v) => {
+      p.fieldMax = Math.min(p.fieldMax ?? Infinity, v('ascUnrelentingField'))
+    },
     hooks: {
-      blockLeakPct: (state, side) => num(state, side, 'TK:1', 'ascUnrelentingLeak'),
       actionStart: (state, side) => {
         const p = state.players[side]
         p.perkData = { ...p.perkData, preHitHp: p.hp }
@@ -269,9 +296,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         if (lost <= 0) return
         p.hp += lost
         const turns = Math.max(1, num(state, side, 'TK:1', 'ascUnrelentingTurns'))
-        const due = [...(p.perkData?.drain !== undefined ? drainQueue(p) : [])]
-        for (let i = 0; i < turns; i++) due[i] = (due[i] ?? 0) + Math.floor(lost / turns) + (i < lost % turns ? 1 : 0)
-        setDrain(p, due)
+        queueOver(p, 'drain', lost, turns)
         say(state, side, `Unrelenting: ${lost} hit dmg will drain over ${turns} turns`)
       },
       endTurn: (state, side) => {
@@ -289,7 +314,11 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
   // Lifeline · Untiring (Q 2026-10-25 14:58): Endurance from HP lost / Blocks / every turn
   'TK:1:B1': (_, k) => ({
-    tune: (t, v) => add(t, 'TK:1', 'hpPct', v(k)),
+    // Q 2026-10-26: Untiring also raises Endurance max
+    tune: (t, v) => {
+      add(t, 'TK:1', 'hpPct', v(k))
+      add(t, 'TK:1', 'ascEnduranceMax', v('ascEarlyRallyMax'))
+    },
     hooks: {
       // HP seen at the start of the turn, so heals in between aren't counted as loss
       actionStart: (state, side) => {
@@ -329,6 +358,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
   // Lifeline · Unbroken (Q 2026-10-25 15:06: Unstoppable + Unbroken merged)
   'TK:1:C1': (amt) => ({
+    // Q 2026-10-26: Unbroken also raises Endurance max
+    tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnstoppableMax')),
     hooks: {
       chargeBreakSafe: (state, side) => amt(state, side),
       onChargeBreak: (state, side) => {
@@ -427,11 +458,13 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         const p = state.players[side]
         const n = endurance(p)
         if (!n || !bonus.length) return
-        for (let i = 0; i < bonus.length; i++) bonus[i] += n * amt(state, side)
+        // Q 2026-10-26: per Endurance spent, every card +ascUnleashed + ascUnleashedHpPct% of your Max HP (rounded down)
+        const per = amt(state, side) + Math.floor((p.maxHp * num(state, side, 'TK:1', 'ascUnleashedHpPct')) / 100)
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n * per
         p.perkData = { ...p.perkData, endurance: 0 }
         const v = num(state, side, 'TK:1', 'ascUnleashedVuln')
         if (v > 0) p.statuses.push({ kind: 'vulnerable', turns: 1, n: v })
-        say(state, side, `Unleashed: spends ${n} Endurance, every card +${n * amt(state, side)} dmg`)
+        say(state, side, `Unleashed: spends ${n} Endurance, every card +${n * per} dmg`)
       },
     },
   }),
@@ -1340,8 +1373,13 @@ for (const [style, tree] of Object.entries(TREES))
 PIECES['asc:TK:1:END'] = {
   group: 'TK:1',
   hooks: {
-    // Q 2026-10-25 18:47: Endurance effects at ascEndurancePower% (25) of their full size
-    hitCut: (state, side) => Math.floor((endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut') * num(state, side, 'TK:1', 'ascEndurancePower')) / 100),
+    // Q 2026-10-26: full strength again (the 25% power is gone)
+    // Q 2026-10-26 12:54: a flat cut on (Endurance − 1) hits a turn (1 Endurance = none, 6 = 5 hits)
+    hitCut: (state, side) => num(state, side, 'TK:1', 'ascEnduranceCut'),
+    hitCutHits: (state, side) => Math.max(0, endurance(state.players[side]) - 1),
+    // each Endurance: Ignite burns and Critical hits you take deal ascEnduranceGuard% less
+    burnCutPct: (state, side) => Math.min(100, endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceGuard')),
+    critCutPct: (state, side) => Math.min(100, endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceGuard')),
     endTurn: (state, side) => {
       const p = state.players[side]
       const n = endurance(p)
@@ -1351,7 +1389,7 @@ PIECES['asc:TK:1:END'] = {
         say(state, side, 'Endurance fades')
         return
       }
-      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen') * num(state, side, 'TK:1', 'ascEndurancePower')) / 10000))
+      const got = styleHeal(state, side, Math.floor(((p.maxHp - p.hp) * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
       if (got) say(state, side, `Endurance: ${n} regen ${got}`)
     },
   },

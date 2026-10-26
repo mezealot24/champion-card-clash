@@ -132,6 +132,12 @@ export type StyleDef = {
   lifesteal?: (state: GameState, side: Side) => number
   /** dmg taken off every hit that gets past this side's Block */
   hitCut?: (state: GameState, side: Side) => number
+  /** How many hits a turn hitCut applies to (Endurance: stacks − 1); unset = every hit */
+  hitCutHits?: (state: GameState, side: Side) => number
+  /** % less HP lost to Ignite burns (Endurance) */
+  burnCutPct?: (state: GameState, side: Side) => number
+  /** % less dmg from Critical hits taken (Endurance) */
+  critCutPct?: (state: GameState, side: Side) => number
   /** Cost: every hit this side's Block stops after the first still deals this % of its dmg */
   blockLeakPct?: (state: GameState, side: Side) => number
   /** cards drawn at the end of the turn, after Dual Strike draws (Cryomancer Flash Freeze) */

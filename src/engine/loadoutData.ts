@@ -90,7 +90,7 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
  * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank / Assassin v2: named asc keys).
  */
 /** Shown under the Lifeline Style text (Q 2026-10-25): what one Endurance does; numbers filled from TK:1 */
-export const ENDURANCE_TEXT = '⛨ Endurance (from Lifeline Ascendancy): max {ascEnduranceMax}. Each Endurance cuts {ascEnduranceCut} dmg from every hit that reaches you and regens {ascEnduranceRegen}% Max HP a turn, at {ascEndurancePower}% strength (rounded down over all your Endurance). Fades after {ascEnduranceTurns} turns without a new one.'
+export const ENDURANCE_TEXT = '⛨ Endurance (Lifeline Ascendancy): one shared pool, max {ascEnduranceMax}; every node that gives Endurance (Second Wind too) adds to the same pool. Hits that reach you deal {ascEnduranceCut} less dmg, on (Endurance − 1) hits a turn (1 Endurance: none, 6: 5 hits). Each Endurance: Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). Fades after {ascEnduranceTurns} turns without a new one.'
 
 export const TREES: Record<string, TreeData> = {
   /**
@@ -103,36 +103,39 @@ export const TREES: Record<string, TreeData> = {
     bonusPoints: 1,
     nodes: [
       // Q 2026-10-25 (after sim): Endurance = −dmg per hit + HP regen per charge; gained by Charge or by taking 2+ hits
-      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Each Endurance: hits that reach you deal {ascEnduranceCut} less dmg, and you regain {ascEnduranceRegen}% Max HP at the end of every turn, at {ascEndurancePower}% strength (rounded down over all your Endurance). Endurance fades after {ascEnduranceTurns} turns without a new one.', [
+      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Hits that reach you deal {ascEnduranceCut} less dmg, on (Endurance − 1) hits a turn (1 Endurance: none, 6: 5 hits). Each Endurance: Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). Endurance fades after {ascEnduranceTurns} turns without a new one.', [
         ['ascEnduranceMax', 'max Endurance', 3, 1],
         ['ascEnduranceTurns', 'turns before it fades', 3, 1],
-        ['ascEnduranceCut', 'dmg cut per hit, per Endurance', 2],
-        ['ascEnduranceRegen', 'regen % Max HP per Endurance', 1],
-        ['ascEndurancePower', 'Endurance effect % (cut + regen)', 25, 0, 100],
+        ['ascEnduranceCut', 'dmg cut per hit (on Endurance − 1 hits a turn)', 1],
+        ['ascEnduranceRegen', 'regen % missing HP per Endurance', 1],
+        ['ascEnduranceGuard', '% less Ignite burn / Critical dmg, per Endurance', 10, 0, 100],
       ]),
-      multi('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance, at {ascEndurancePower}% strength (rounded down). Endurance max +{ascUnyieldingMax}.', [
-        ['ascUnyielding', 'dmg per Endurance', 2],
+      multi('A2', 'Unyielding', 'When a Charge break hits you, you lose all your Endurance, but heal {ascUnyielding}% of that chain\'s dmg per Endurance lost, spread over the next {ascUnyieldingTurns} turns (rounded down). Endurance max +{ascUnyieldingMax}.', [
+        ['ascUnyielding', 'heal % of chain dmg, per Endurance lost', 3],
+        ['ascUnyieldingTurns', 'turns the heal is spread over', 5, 1],
         ['ascUnyieldingMax', 'max Endurance +', 1],
       ]),
-      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. {ascUnrelentingPct}% of the hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'When you Block, only the first hit is fully stopped: each later blocked hit still deals {ascUnrelentingLeak}% dmg.', [
+      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. {ascUnrelentingPct}% of the hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'Your Field holds at most {ascUnrelentingField} cards.', [
         ['ascUnrelenting', 'max Endurance +', 2],
-        ['ascUnrelentingLeak', '% dmg of blocked hits after the first', 50, 0],
+        ['ascUnrelentingField', 'Cost: Field max cards', 4, 1, 5],
         ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
         ['ascUnrelentingPct', '% of hit dmg delayed', 50, 0, 100],
       ]),
       // Q 2026-10-25 14:58: Untiring = Endurance from HP lost / Blocks / Second Wind (uses Unflinching's Endurance numbers)
-      multi('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn).', [
+      multi('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn). Endurance max +{ascEarlyRallyMax}.', [
         ['ascEarlyRally', 'HP line % +', 5],
         ['ascEarlyRallyLoss', '% Max HP lost per Endurance', 15, 1],
+        ['ascEarlyRallyMax', 'max Endurance +', 1],
       ]),
       node('B2', 'Untiring', 'A turn your Block stops a hit, gain 1 Endurance.', 'ascUntiring', 'unused', 0),
       capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off. Gain 1 Endurance at the end of every turn.', 'Every heal and regen you get is {ascSecondWindHealCut}% smaller.', [
-        ['ascSecondWindHealCut', 'Cost: heal cut %', 50, 0, 100],
+        ['ascSecondWindHealCut', 'Cost: heal cut %', 25, 0, 100],
       ]),
       // Q 2026-10-25 15:06: Unstoppable + Unbroken merged into C; D = Undeniable (spend Endurance on offence)
-      multi('C1', 'Unstoppable', 'When a Charge break hits you, gain {ascUnstoppableEnd} Endurance, and it can\'t throw away your first {ascUnstoppable} Field cards.', [
+      multi('C1', 'Unstoppable', 'When a Charge break hits you, gain {ascUnstoppableEnd} Endurance, and it can\'t throw away your first {ascUnstoppable} Field cards. Endurance max +{ascUnstoppableMax}.', [
         ['ascUnstoppable', 'safe slots', 2, 0, 5],
         ['ascUnstoppableEnd', 'Endurance per Charge break', 2],
+        ['ascUnstoppableMax', 'max Endurance +', 1],
       ]),
       multi('C2', 'Last Bastion', 'The first time your HP drops into the red, gain Shield {ascLastBastion} + {ascLastBastionPct}% of your missing HP. While your HP is in the red, hits that reach you deal {ascDefiance} less dmg.', [
         ['ascLastBastion', 'Shield', 10],
@@ -155,9 +158,10 @@ export const TREES: Record<string, TreeData> = {
         ['ascUndeniable', 'slots that ignore Block', 1, 0, 5],
         ['ascUndeniableHalf', 'slot 1 dmg cut % with no Endurance', 50, 0, 100],
       ]),
-      capstone('D3', 'Unleashed', 'When you Strike, spend all Endurance: every chain card +{ascUnleashed} dmg per Endurance spent.', 'The spent Endurance is gone, and you are Vulnerable (+{ascUnleashedVuln}% dmg taken) next turn.', [
-        ['ascUnleashed', 'dmg per Endurance', 3],
-        ['ascUnleashedVuln', 'Cost: Vulnerable %', 25, 0, 100],
+      capstone('D3', 'Unleashed', 'When you Strike, spend all Endurance: every chain card +{ascUnleashed} dmg + {ascUnleashedHpPct}% of your Max HP (rounded down) per Endurance spent.', 'The spent Endurance is gone, and you are Vulnerable (+{ascUnleashedVuln}% dmg taken) next turn.', [
+        ['ascUnleashed', 'dmg per Endurance', 1],
+        ['ascUnleashedHpPct', '% Max HP dmg per Endurance', 1, 0, 100],
+        ['ascUnleashedVuln', 'Cost: Vulnerable %', 50, 0, 100],
       ]),
     ],
   },
