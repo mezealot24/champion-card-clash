@@ -288,7 +288,11 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
   // Lifeline · Untiring (Q 2026-10-25 14:58): Endurance from HP lost / Blocks / every turn
   'TK:1:B1': (_, k) => ({
-    tune: (t, v) => add(t, 'TK:1', 'hpPct', v(k)),
+    // Q 2026-10-26: Untiring also raises Endurance max
+    tune: (t, v) => {
+      add(t, 'TK:1', 'hpPct', v(k))
+      add(t, 'TK:1', 'ascEnduranceMax', v('ascEarlyRallyMax'))
+    },
     hooks: {
       // HP seen at the start of the turn, so heals in between aren't counted as loss
       actionStart: (state, side) => {
@@ -328,6 +332,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
   // Lifeline · Unbroken (Q 2026-10-25 15:06: Unstoppable + Unbroken merged)
   'TK:1:C1': (amt) => ({
+    // Q 2026-10-26: Unbroken also raises Endurance max
+    tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnstoppableMax')),
     hooks: {
       chargeBreakSafe: (state, side) => amt(state, side),
       onChargeBreak: (state, side) => {

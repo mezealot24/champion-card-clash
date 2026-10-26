@@ -241,9 +241,10 @@ describe('randomLoadout', () => {
       expect(s.log.some((l) => l.includes('Unrelenting: 5 hit dmg'))).toBe(true)
       expect(s.players.p1.hp).toBeLessThanOrEqual(hp)
     })
-    it('Untiring: Block, HP lost and Second Wind give Endurance; Second Wind halves heals', () => {
+    it('Untiring: Block, HP lost and Second Wind give Endurance; Second Wind cuts heals 25%, Early Rally raises Endurance max', () => {
       let s = tk('TK:1', ['B1', 'B2', 'B3'])
-      expect(s.players.p1.perkData?.healPct).toBe(50)
+      expect(s.players.p1.perkData?.healPct).toBe(75)
+      expect((tuningOf(s, 'p1')['TK:1'] as unknown as Record<string, number>).ascEnduranceMax).toBe(4)
       s.players.p2.hand = [hit(10), hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
       expect(s.log.some((l) => l.includes('Endurance (Block)'))).toBe(true)
