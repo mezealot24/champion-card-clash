@@ -15,6 +15,7 @@ const SIDES: Side[] = ['p1', 'p2']
 type TurnEnv = {
   handAtStart: Record<Side, CardInst[]>
   hitsBlocked: Record<Side, number>
+  hitsParried: Record<Side, number>
   hitDmgTaken: Record<Side, number>
   blockNow: Record<Side, number>
   /** Hits each side took that Block didn't stop. */
@@ -61,6 +62,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
 
   const handAtStart = { p1: [...state.players.p1.hand], p2: [...state.players.p2.hand] }
   const hitsBlocked: Record<Side, number> = { p1: 0, p2: 0 }
+  const hitsParried: Record<Side, number> = { p1: 0, p2: 0 }
   const hitDmgTaken: Record<Side, number> = { p1: 0, p2: 0 }
   const blockNow: Record<Side, number> = { p1: 0, p2: 0 }
   const hitsTaken: Record<Side, number> = { p1: 0, p2: 0 }
@@ -82,7 +84,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     log(state, `${side} Energy Surge: spends all ${surge[side]} Energy → ${what}`)
   }
   const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
-  const env = { handAtStart, hitsBlocked, hitDmgTaken, blockNow, hitsTaken, shieldHits, vulnPct, chillPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 }, hitsIn }
+  const env = { handAtStart, hitsBlocked, hitsParried, hitDmgTaken, blockNow, hitsTaken, shieldHits, vulnPct, chillPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 }, hitsIn }
 
   // Styles that act on the action picked (Molten Shield), before statuses are read
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.actionStart?.(state, side, actions[side], actions[other(side)])
@@ -122,6 +124,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       attacked,
       hitsTaken: hitsTaken[side],
       hitsBlocked: hitsBlocked[side],
+      hitsParried: hitsParried[side],
       shieldHits: shieldHits[side],
       facing: attacked ? Math.min(handAtStart[enemy].length, handAtStart[side].length) : 0,
     }
@@ -258,6 +261,7 @@ function resolveStrikes(
   const bonus: Partial<Record<Side, number[]>> = {}
   const mult: Partial<Record<Side, number[]>> = {}
   const pierce: Partial<Record<Side, number[]>> = {}
+  const piercePct: Partial<Record<Side, number[]>> = {}
   for (const side of strikers) {
     chains[side] = state.players[side].hand
     state.players[side].hand = [] // Strike uses the whole hand
@@ -267,6 +271,7 @@ function resolveStrikes(
     bonus[side] = chains[side].map(() => 0)
     mult[side] = chains[side].map(() => 1)
     pierce[side] = chains[side].map(() => 0)
+    piercePct[side] = chains[side].map(() => 0)
   }
 
   // held = a card in the hand of a side that didn't Strike (it has no chain of its own)
@@ -326,8 +331,17 @@ function resolveStrikes(
   // a blocked hit deals half under Guard Crush, or when a Style marked it Critical (Fatal Rhythm, Q 2026-10-16)
   // numbers of the striking side (its loadout may change them)
   const ts = (side: Side) => tuningOf(state, side)
+  const blockDmgPct = { p1: 0, p2: 0 }
+  for (const side of SIDES) {
+    if (actions[side] !== 'block') continue
+    blockDmgPct[side] = hooksOf(state.players[side]).reduce((n, h) => Math.max(n, h.blockDmgPct?.(state, side) ?? 0), 0)
+  }
   const throughPct = (side: Side, i: number) =>
-    Math.min(100, Math.max(guardBreak[side] ? ts(side).BR.guardCrushBlockedPct : 0, crit[side].has(i) ? ts(side)['AS:2'].blockedCritPct : 0))
+    Math.min(100, Math.max(
+      guardBreak[side] ? ts(side).BR.guardCrushBlockedPct : 0,
+      crit[side].has(i) ? ts(side)['AS:2'].blockedCritPct : 0,
+      blockDmgPct[other(side)],
+    ))
   // loadout Costs that make a side's Block leak: every blocked hit after its first still deals N% (Unrelenting)
   const blockLeak = { p1: 0, p2: 0 }
   for (const side of SIDES) blockLeak[side] = hooksOf(state.players[side]).reduce((t, h) => Math.max(t, h.blockLeakPct?.(state, side) ?? 0), 0)
@@ -337,12 +351,27 @@ function resolveStrikes(
     for (let j = 0; j < i; j++) if (isBlocked(side, j)) earlier++
     return earlier >= 1 ? blockLeak[other(side)] : 0
   }
-  const dealtOf = (side: Side, i: number) =>
-    !isBlocked(side, i) ? dmgOf(side, i) : Math.floor((dmgOf(side, i) * Math.min(100, Math.max(throughPct(side, i), leakPct(side, i)))) / 100)
+  const dealtOf = (side: Side, i: number) => {
+    const dmg = dmgOf(side, i)
+    if (!isBlocked(side, i)) return dmg
+    const stoppedThrough = Math.min(100, Math.max(throughPct(side, i), leakPct(side, i)))
+    const pierced = Math.min(100, Math.max(0, piercePct[side]![i] ?? 0))
+    return Math.min(dmg, Math.floor((dmg * stoppedThrough) / 100) + Math.floor((dmg * pierced) / 100))
+  }
 
   // Styles that boost the chain (e.g. Fury); crit = slots a Style marked as Critical (shown in the log)
   const crit: Record<Side, Set<number>> = { p1: new Set(), p2: new Set() }
-  for (const side of strikers) for (const h of hooksOf(state.players[side])) h.beforeHits?.(state, side, bonus[side]!, mult[side]!, crit[side], chains[side]!, pierce[side]!)
+  for (const side of strikers) for (const h of hooksOf(state.players[side])) h.beforeHits?.(
+    state,
+    side,
+    bonus[side]!,
+    mult[side]!,
+    crit[side],
+    chains[side]!,
+    pierce[side]!,
+    piercePct[side]!,
+    chains[other(side)] ?? handAtStart[other(side)],
+  )
   // loadout pieces that soften every hit getting past a side's Block (Iron Hide)
   const hitCut = { p1: 0, p2: 0 }
   for (const side of SIDES) hitCut[side] = hooksOf(state.players[side]).reduce((t, h) => t + (h.hitCut?.(state, side) ?? 0), 0)
@@ -371,7 +400,10 @@ function resolveStrikes(
         cutLeft[enemy]--
       }
       const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
-      if (parry) parry.n = (parry.n ?? 1) - 1
+      if (parry) {
+        parry.n = (parry.n ?? 1) - 1
+        env.hitsParried[enemy]++
+      }
       let absorbed = 0
       if (!parry) {
         for (const sh of sized(enemy, 'shield')) {
@@ -464,6 +496,10 @@ function resolveStrikes(
       enemyField: handAtStart[other(side)].length,
       skills: chains[side]!.filter((c) => c.def.type === 'S').length,
       paidSkills: chains[side]!.filter((c) => c.def.type === 'S' && !state.players[side].unpaid?.includes(c.uid)).length,
+      criticalHits: crit[side].size,
+      criticalBlocked: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && hitResults.get(c.uid)?.blocked ? 1 : 0), 0),
+      criticalClean: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && hitResults.get(c.uid)?.clean ? 1 : 0), 0),
+      criticalParried: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && outcome.get(c.uid)?.parried ? 1 : 0), 0),
     }
     const extra = hooksOf(state.players[side]).reduce((t, h) => t + (h.afterChain?.(state, side, report) ?? 0), 0)
     if (extra) env.hitsTaken[other(side)] += extra

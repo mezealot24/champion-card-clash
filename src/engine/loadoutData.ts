@@ -348,32 +348,56 @@ export const TREES: Record<string, TreeData> = {
     branches: ['Execution', 'Crescendo', 'Pursuit', 'Shadow'],
     depth: 3,
     bonusPoints: 1,
+    rev: 1,
     nodes: [
-      node('A1', 'Blood Scent', 'Low HP line +{ascBloodScent}%.', 'ascBloodScent', 'HP line % +', 5),
-      node('A2', 'Merciless', 'Critical vs low HP ×{ascMerciless} more.', 'ascMerciless', 'multiplier +', 1),
-      capstone('A3', 'Executioner', 'A Critical that leaves the enemy at {ascExecutioner}% Max HP or less finishes them.', '−{ascExecutionerCost} Max HP.', [
-        ['ascExecutioner', 'finish at % Max HP', 20, 0, 50],
-        ['ascExecutionerCost', 'Cost: Max HP −', 15],
+      multi('A1', 'Blood Scent', 'Low HP line +{ascBloodScent}%. Attacks into a Low HP enemy deal +{ascBloodScentDmg} dmg.', [
+        ['ascBloodScent', 'HP line % +', 5],
+        ['ascBloodScentDmg', 'dmg vs Low HP', 2],
       ]),
-      node('B1', 'Primed', 'The Critical counter starts at {ascPrimed}.', 'ascPrimed', 'counter at start', 2),
-      node('B2', 'Off-Beat', 'Each hit your Block stops adds 1 to the Critical counter, up to {ascOffBeat} a turn.', 'ascOffBeat', 'counter + per turn (cap)', 2),
-      capstone('B3', 'Build-up', 'Each Critical gives your next Critical ×{ascBuildUp} more (max ×{ascBuildUpMax} more). A hit that reaches you resets it.', 'A Critical into a Block resets it too.', [
+      multi('A2', 'Merciless', 'Low HP line +{ascMercilessLine}%. Critical vs low HP ×{ascMerciless} more.', [
+        ['ascMercilessLine', 'HP line % +', 5],
+        ['ascMerciless', 'multiplier +', 1],
+      ]),
+      capstone('A3', 'Executioner', 'A Critical that leaves the enemy at {ascExecutioner}% Max HP or less finishes them.', 'Non-Critical attacks deal −{ascExecutionerNonCrit}% dmg.', [
+        ['ascExecutioner', 'finish at % Max HP', 20, 0, 50],
+        ['ascExecutionerNonCrit', 'Cost: non-Critical dmg −%', 20, 0, 100],
+      ]),
+      multi('B1', 'Primed', 'The Critical counter starts at {ascPrimed}. Each Charge adds {ascPrimedCharge} to it, once per turn.', [
+        ['ascPrimed', 'counter at start', 2],
+        ['ascPrimedCharge', 'counter + per Charge', 1, 0, 5],
+      ]),
+      multi('B2', 'Off-Beat', 'Each hit your Block or Parry stops adds 1 to the Critical counter, up to {ascOffBeat} a turn. After a Critical, the next cycle starts at {ascOffBeatReset}.', [
+        ['ascOffBeat', 'counter + per turn (cap)', 2, 0, 5],
+        ['ascOffBeatReset', 'counter after Critical', 1, 0, 5],
+      ]),
+      capstone('B3', 'Build-up', 'Each successful Critical gives your next Critical ×{ascBuildUp} more (max ×{ascBuildUpMax} more). A clean hit that reaches you resets it.', 'A Critical into a Block loses {ascBuildUpBlockedLoss} Build-up step and skips the next Critical counter.', [
         ['ascBuildUp', 'multiplier + per Critical', 1],
         ['ascBuildUpMax', 'max multiplier +', 3, 1],
+        ['ascBuildUpBlockedLoss', 'Cost: Build-up lost per Blocked Critical', 1, 0],
       ]),
-      multi('C1', 'Run Down', 'When your Strike with a Critical meets their Charge and they have {ascRunDownField}+ Field cards, Cut their {ascRunDown} newest Field card.', [
-        ['ascRunDown', 'cards Cut', 1, 0, 2],
-        ['ascRunDownField', 'enemy Field cards needed', 4, 1, 5],
+      multi('C1', 'Run Down', 'When your Strike meets their Charge, the Critical counter +{ascRunDownCounter} before the clash. Your first card deals +{ascRunDownDmg} dmg.', [
+        ['ascRunDownCounter', 'counter +', 1, 0, 5],
+        ['ascRunDownDmg', 'first card dmg +', 3],
       ]),
-      node('C2', 'Chase', 'When you Strike into their Charge, the Critical counter +{ascChase} first.', 'ascChase', 'counter +', 1, 0, 3),
-      capstone('C3', 'Hunt', 'Criticals into a Charge ×{ascHunt} more.', 'Blocked Criticals deal 0.', [
+      multi('C2', 'Chase', 'A Strike with a Critical into their Charge, or into an enemy with {ascChaseField}+ Field cards, Cuts {ascChase} newest Field card.', [
+        ['ascChase', 'cards Cut', 1, 0, 2],
+        ['ascChaseField', 'enemy Field cards needed', 3, 1, 5],
+      ]),
+      capstone('C3', 'Hunt', 'Criticals into a Charge, or into an empty facing slot, ×{ascHunt} more.', 'Blocked Criticals deal only {ascHuntBlockedPct}% of dmg.', [
         ['ascHunt', 'multiplier +', 1],
+        ['ascHuntBlockedPct', 'Cost: blocked Critical dmg %', 50, 0, 100],
       ]),
-      node('D1', 'Feint', 'Blocked Criticals deal +{ascFeint}% dmg.', 'ascFeint', 'blocked dmg % +', 25),
-      node('D2', 'Ghost Dance', "After a Strike with a Critical, gain Parry {ascGhostDance} for the next turn (doesn't stack).", 'ascGhostDance', 'Parry', 1),
-      capstone('D3', 'Shadow Mark', "A Critical Marks the enemy until the end of your next Strike. Your Strike into a Marked enemy: its first {ascShadowMark} card can't be Blocked, and their Parry and Shield break first.", '−{ascShadowMarkCost} Max HP.', [
+      multi('D1', 'Feint', 'Blocked Criticals deal +{ascFeint}% dmg and Pierce {ascFeintPierce}% of total dmg.', [
+        ['ascFeint', 'blocked dmg % +', 25],
+        ['ascFeintPierce', 'Pierce % of total dmg', 15, 0, 100],
+      ]),
+      multi('D2', 'Ghost Dance', "After a Strike with a Critical, gain Parry {ascGhostDance} for the next turn (doesn't stack). Each successful Parry adds {ascGhostDanceCounter} to the Critical counter.", [
+        ['ascGhostDance', 'Parry', 1],
+        ['ascGhostDanceCounter', 'counter + per Parry', 1, 0, 5],
+      ]),
+      capstone('D3', 'Shadow Mark', "A Critical Marks the enemy until the end of your next Strike. Your Strike into a Marked enemy: its first {ascShadowMark} card can't be Blocked, and their Parry and Shield break first.", 'Your Block effectiveness is −{ascShadowMarkBlockCut}%.', [
         ['ascShadowMark', 'cards that ignore Block', 1, 0, 3],
-        ['ascShadowMarkCost', 'Cost: Max HP −', 15],
+        ['ascShadowMarkBlockCut', 'Cost: Block effectiveness −%', 25, 0, 100],
       ]),
     ],
   },

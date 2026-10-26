@@ -109,6 +109,17 @@ const critSeen: NonNullable<StyleDef['beforeHits']> = (state, side, _b, _m, crit
   const p = state.players[side]
   p.perkData = { ...p.perkData, critTurn: crit.size ? state.turn : 0, critN: crit.size }
 }
+const addCritCounter = (p: PlayerState, n: number) => {
+  if (n <= 0) return
+  p.styleData = { ...p.styleData, attacks: (p.styleData?.attacks ?? 0) + n }
+}
+const addCritCounterOnce = (state: GameState, side: Side, key: string, n: number) => {
+  const p = state.players[side]
+  if (n <= 0 || p.perkData?.[key] === state.turn) return false
+  p.perkData = { ...p.perkData, [key]: state.turn }
+  addCritCounter(p, n)
+  return true
+}
 /** what the enemy played this turn, for pieces whose hooks don't get it (actionStart runs first) */
 const foeActSeen: NonNullable<StyleDef['actionStart']> = (state, side, _a, enemyAction) => {
   const p = state.players[side]
@@ -1003,100 +1014,184 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
 
   // Fatal Rhythm · Execution
-  'AS:2:A1': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'redHpPct', v(k)) }),
-  'AS:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'redCritMult', v(k)) }),
-  'AS:2:A3': (amt) => ({
-    setup: (p, v) => addMaxHp(p, -v('ascExecutionerCost')),
+  'AS:2:A1': (_, k) => ({
+    tune: (t, v) => add(t, 'AS:2', 'redHpPct', v(k)),
     hooks: {
-      beforeHits: critSeen,
+      beforeHits: (state, side, bonus) => {
+        const foe = state.players[other(side)]
+        const f = tuningOf(state, side)['AS:2']
+        if (foe.hp * 100 >= foe.maxHp * f.redHpPct) return
+        const n = num(state, side, 'AS:2', 'ascBloodScentDmg')
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        if (n > 0) say(state, side, `Blood Scent: Low HP enemy → every card +${n} dmg`)
+      },
+    },
+  }),
+  'AS:2:A2': (_, k) => ({
+    tune: (t, v) => {
+      add(t, 'AS:2', 'redHpPct', v(k))
+      add(t, 'AS:2', 'redCritMult', v('ascMerciless'))
+    },
+  }),
+  'AS:2:A3': (amt) => ({
+    hooks: {
+      beforeHits: (state, side, bonus, mult, crit) => {
+        critSeen(state, side, bonus, mult, crit)
+        const cut = num(state, side, 'AS:2', 'ascExecutionerNonCrit')
+        if (cut >= 100) {
+          for (let i = 0; i < mult.length; i++) if (!crit.has(i)) mult[i] = 0
+          return
+        }
+        if (cut <= 0) return
+        for (let i = 0; i < mult.length; i++) if (!crit.has(i)) mult[i] *= (100 - cut) / 100
+      },
       afterChain: (state, side) => {
         const foe = state.players[other(side)]
         if (!critThisTurn(state, side) || foe.hp <= 0 || foe.hp * 100 > foe.maxHp * amt(state, side)) return 0
         hurt(state, other(side), foe.hp)
-        say(state, side, `Executioner: the Critical finishes the enemy`)
+        say(state, side, 'Executioner: the Critical finishes the enemy')
         return 0
       },
     },
   }),
   // Fatal Rhythm · Crescendo
-  'AS:2:B1': (_, k) => ({ setup: (p, v) => (p.styleData = { ...p.styleData, attacks: v(k) }) }),
+  'AS:2:B1': (_, k) => ({
+    setup: (p, v) => (p.styleData = { ...p.styleData, attacks: v(k) }),
+    hooks: {
+      actionStart: (state, side, action) => {
+        if (action !== 'charge') return
+        const n = num(state, side, 'AS:2', 'ascPrimedCharge')
+        if (addCritCounterOnce(state, side, 'primedChargeTurn', n)) say(state, side, `Primed: Charge Critical counter +${n}`)
+      },
+    },
+  }),
   'AS:2:B2': (amt) => ({
     hooks: {
+      beforeHits: critSeen,
       afterHits: (state, side, r) => {
-        const n = Math.min(amt(state, side), r.hitsBlocked)
-        if (n <= 0) return
-        const p = state.players[side]
-        p.styleData = { ...p.styleData, attacks: (p.styleData?.attacks ?? 0) + n }
-        say(state, side, `Off-Beat: Critical counter +${n}`)
+        const stopped = Math.min(amt(state, side), r.hitsBlocked + r.hitsParried)
+        if (stopped > 0) {
+          addCritCounter(state.players[side], stopped)
+          say(state, side, `Off-Beat: Critical counter +${stopped}`)
+        }
+        if (!critThisTurn(state, side)) return
+        const reset = num(state, side, 'AS:2', 'ascOffBeatReset')
+        state.players[side].styleData = { ...state.players[side].styleData, attacks: reset }
+        say(state, side, `Off-Beat: next Critical cycle starts at ${reset}`)
       },
     },
   }),
   'AS:2:B3': (amt) => ({
     hooks: {
-      actionStart: foeActSeen,
       beforeHits: (state, side, _b, mult, crit) => {
+        const had = state.players[side].perkData?.buildUp ?? 0
+        if (had <= 0) return
+        for (const i of crit) if (i < mult.length) mult[i] += had
+      },
+      afterChain: (state, side, r) => {
         const p = state.players[side]
         const had = p.perkData?.buildUp ?? 0
-        if (!crit.size) return
-        if (had > 0) for (const i of crit) if (i < mult.length) mult[i] += had
-        const n = foeDid(state, side, 'block') ? 0 : Math.min(num(state, side, 'AS:2', 'ascBuildUpMax'), had + amt(state, side) * crit.size)
-        p.perkData = { ...p.perkData, buildUp: n }
-        say(state, side, had > 0 ? `Build-up: Criticals ×${had} more, now ${n}` : `Build-up: ${n}`)
+        let next = had
+        const lost = r.criticalBlocked * num(state, side, 'AS:2', 'ascBuildUpBlockedLoss')
+        if (lost > 0) {
+          next = Math.max(0, next - lost)
+          p.perkData = { ...p.perkData, skipCritCounter: Math.max(p.perkData?.skipCritCounter ?? 0, 1) }
+          say(state, side, `Build-up: Blocked Critical loses ${lost} stack${lost === 1 ? '' : 's'} and skips the next counter`)
+        }
+        if (r.criticalClean > 0) next = Math.min(num(state, side, 'AS:2', 'ascBuildUpMax'), next + amt(state, side) * r.criticalClean)
+        if (r.criticalClean > 0) say(state, side, `Build-up: ${r.criticalClean} successful Critical → ${next}`)
+        p.perkData = { ...p.perkData, buildUp: next }
+        return 0
       },
       afterHits: (state, side, r) => {
         const p = state.players[side]
         if (r.hitsTaken <= 0 || !p.perkData?.buildUp) return
         p.perkData = { ...p.perkData, buildUp: 0 }
-        say(state, side, 'Build-up: reset (hit)')
+        say(state, side, 'Build-up: reset (clean hit received)')
       },
     },
   }),
-  // Fatal Rhythm · Pursuit: punish the enemy's Charge
+  // Fatal Rhythm · Pursuit
   'AS:2:C1': (amt) => ({
     hooks: {
-      beforeHits: critSeen,
-      endTurn: (state, side, action, enemyAction) => {
-        if (action === 'strike' && enemyAction === 'charge' && critThisTurn(state, side) && foeField(state, side) >= num(state, side, 'AS:2', 'ascRunDownField')) cutNewest(state, side, amt(state, side), 'Run Down')
+      actionStart: (state, side, action, enemyAction) => {
+        if (action !== 'strike' || enemyAction !== 'charge') return
+        state.players[side].perkData = { ...state.players[side].perkData, runDownTurn: state.turn }
+        if (addCritCounterOnce(state, side, 'runDownCounterTurn', amt(state, side))) say(state, side, `Run Down: Critical counter +${amt(state, side)}`)
+      },
+      beforeHits: (state, side, bonus) => {
+        if (state.players[side].perkData?.runDownTurn !== state.turn || !bonus.length) return
+        const n = num(state, side, 'AS:2', 'ascRunDownDmg')
+        bonus[0] += n
+        if (n > 0) say(state, side, `Run Down: first card +${n} dmg`)
       },
     },
   }),
   'AS:2:C2': (amt) => ({
     hooks: {
-      actionStart: (state, side, action, enemyAction) => {
-        if (action !== 'strike' || enemyAction !== 'charge' || amt(state, side) <= 0) return
-        const p = state.players[side]
-        p.styleData = { ...p.styleData, attacks: (p.styleData?.attacks ?? 0) + amt(state, side) }
-        say(state, side, `Chase: Critical counter +${amt(state, side)}`)
+      beforeHits: critSeen,
+      endTurn: (state, side, action, enemyAction) => {
+        if (action !== 'strike' || !critThisTurn(state, side) || amt(state, side) <= 0) return
+        if (enemyAction === 'charge' || foeField(state, side) >= num(state, side, 'AS:2', 'ascChaseField')) cutNewest(state, side, amt(state, side), 'Chase')
       },
     },
   }),
   'AS:2:C3': (amt) => ({
-    lastTune: (t) => add(t, 'AS:2', 'blockedCritPct', -1_000_000), // Cost after every node (Feint too)
+    lastTune: (t, v) => {
+      t['AS:2'].blockedCritPct = Math.min(t['AS:2'].blockedCritPct, v('ascHuntBlockedPct'))
+    },
     hooks: {
       actionStart: foeActSeen,
-      beforeHits: (state, side, _b, mult, crit) => {
-        if (!crit.size || !foeDid(state, side, 'charge') || amt(state, side) <= 0) return
-        for (const i of crit) if (i < mult.length) mult[i] += amt(state, side)
-        say(state, side, `Hunt: Criticals into a Charge ×${amt(state, side)} more`)
+      beforeHits: (state, side, _b, mult, crit, _chain, _pierce, _piercePct, enemyChain) => {
+        if (!crit.size || amt(state, side) <= 0) return
+        const charge = foeDid(state, side, 'charge')
+        let n = 0
+        for (const i of crit) {
+          if (charge || i >= (enemyChain?.length ?? 0)) {
+            if (i < mult.length) mult[i] += amt(state, side)
+            n++
+          }
+        }
+        if (n > 0) say(state, side, `Hunt: ${n} Critical${n === 1 ? '' : 's'} ×${amt(state, side)} more`)
       },
     },
   }),
-  // Fatal Rhythm · Shadow (PoE Trickster)
-  'AS:2:D1': (_, k) => ({ tune: (t, v) => add(t, 'AS:2', 'blockedCritPct', v(k)) }),
+  // Fatal Rhythm · Shadow
+  'AS:2:D1': (_, k) => ({
+    tune: (t, v) => add(t, 'AS:2', 'blockedCritPct', v(k)),
+    hooks: {
+      actionStart: foeActSeen,
+      beforeHits: (state, side, _b, _m, crit, _chain, _pierce, piercePct) => {
+        if (!foeDid(state, side, 'block') || !piercePct?.length || !crit.size) return
+        const n = num(state, side, 'AS:2', 'ascFeintPierce')
+        for (const i of crit) if (i < piercePct.length) piercePct[i] = Math.max(piercePct[i], n)
+        if (n > 0) say(state, side, `Feint: Blocked Criticals Pierce ${n}% of total dmg`)
+      },
+    },
+  }),
   'AS:2:D2': (amt) => ({
     hooks: {
       beforeHits: critSeen,
       afterChain: (state, side) => {
         if (!critThisTurn(state, side) || amt(state, side) <= 0) return 0
-        // statuses tick at the start of a turn: 2 = it guards next turn's hits only, so it never piles up
-        state.players[side].statuses.push({ kind: 'parry', turns: 2, n: amt(state, side) })
+        const p = state.players[side]
+        const parry = p.statuses.find((s) => s.kind === 'parry')
+        if (parry) {
+          parry.n = Math.max(parry.n ?? 0, amt(state, side))
+          parry.turns = Math.max(parry.turns, 2)
+        } else p.statuses.push({ kind: 'parry', turns: 2, n: amt(state, side) })
         say(state, side, `Ghost Dance: Parry ${amt(state, side)} next turn`)
         return 0
       },
+      afterHits: (state, side, r) => {
+        const n = r.hitsParried * num(state, side, 'AS:2', 'ascGhostDanceCounter')
+        if (n <= 0) return
+        addCritCounter(state.players[side], n)
+        say(state, side, `Ghost Dance: Parry adds ${n} to the Critical counter`)
+      },
     },
   }),
-  'AS:2:D3': (amt, k) => ({
-    setup: (p, v) => addMaxHp(p, -v(`${k}Cost`)),
+  'AS:2:D3': (amt) => ({
     hooks: {
       beforeHits: (state, side, _b, _m, crit, _chain, pierce) => {
         const p = state.players[side]
@@ -1110,6 +1205,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         p.perkData = { ...p.perkData, markAt: crit.size ? state.turn : 0 }
         if (crit.size) say(state, side, 'Shadow Mark: the enemy is Marked')
       },
+      blockDmgPct: (state, side) => num(state, side, 'AS:2', 'ascShadowMarkBlockCut'),
     },
   }),
 

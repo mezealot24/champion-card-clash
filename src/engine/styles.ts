@@ -78,6 +78,7 @@ export type HitReport = {
   attacked: boolean // the opponent Struck
   hitsTaken: number // hits that landed (not stopped by Block)
   hitsBlocked: number // hits this side's Block stopped
+  hitsParried: number // hits this side's Parry deflected
   shieldHits: number // hits a Shield on this side soaked dmg from
   facing: number // card pairs face to face (opponent's chain vs this side's Field)
 }
@@ -89,6 +90,10 @@ export type ChainReport = {
   enemyField: number // cards on the opponent's Field when actions were revealed
   paidSkills: number // Skill cards in the chain whose cost was paid, hit clean or Blocked (⟡ Infuse)
   skills: number // Skill cards in the chain
+  criticalHits: number // Critical cards in this chain
+  criticalBlocked: number // Critical cards stopped by Block
+  criticalClean: number // Critical cards that dealt HP damage
+  criticalParried: number // Critical cards deflected by Parry
 }
 
 export type StyleDef = {
@@ -104,7 +109,7 @@ export type StyleDef = {
    * bonus = dmg added per slot of this side's chain, mult = dmg multiplier per slot (applied after bonus),
    * crit = add a slot index to show that hit as Critical in the log
    */
-  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[], pierce?: number[]) => void
+  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[], pierce?: number[], piercePct?: number[], enemyChain?: CardInst[]) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
   /** Strike chains only: right after Before action combos, before Momentum and any hit (e.g. Juggernaut stacks) */
@@ -140,6 +145,8 @@ export type StyleDef = {
   critCutPct?: (state: GameState, side: Side) => number
   /** Cost: every hit this side's Block stops after the first still deals this % of its dmg */
   blockLeakPct?: (state: GameState, side: Side) => number
+  /** Cost: every hit this side's Block stops deals this % of its dmg */
+  blockDmgPct?: (state: GameState, side: Side) => number
   /** cards drawn at the end of the turn, after Dual Strike draws (Cryomancer Flash Freeze) */
   endDraw?: (state: GameState, side: Side) => number
   /** extra cards a Charge that isn't broken draws, decided per turn */
@@ -358,15 +365,21 @@ Object.assign(STYLES, {
       const enemy = state.players[side === 'p1' ? 'p2' : 'p1']
       const f = tuningOf(state, side)['AS:2']
       const x = enemy.hp * 100 < enemy.maxHp * f.redHpPct ? f.redCritMult : f.critMult
-      const before = p.styleData?.attacks ?? 0
-      mult.forEach((_, i) => {
-        if ((before + i + 1) % f.every === 0) {
-          mult[i] *= x
-          crit.add(i)
-          say(state, side, `Fatal Rhythm Critical: slot ${i + 1} (attack #${before + i + 1}) dmg x${x}`)
+      let counter = p.styleData?.attacks ?? 0
+      let skip = p.perkData?.skipCritCounter ?? 0
+      for (let i = 0; i < mult.length; i++) {
+        if (skip > 0) {
+          skip--
+          continue
         }
-      })
-      p.styleData = { ...p.styleData, attacks: before + mult.length }
+        counter++
+        if (counter % f.every !== 0) continue
+        mult[i] *= x
+        crit.add(i)
+        say(state, side, `Fatal Rhythm Critical: slot ${i + 1} (attack #${counter}) dmg x${x}`)
+      }
+      p.perkData = { ...p.perkData, skipCritCounter: skip }
+      p.styleData = { ...p.styleData, attacks: counter }
     },
   },
 } satisfies Record<string, StyleDef>)

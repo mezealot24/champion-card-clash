@@ -10,7 +10,7 @@ const hit = (dmg: number, type: 'P' | 'K' | 'S' = 'P', effectSpec: EffectSpec | 
 const deck = Array.from({ length: 12 }, (_, i): CardDef => ({ id: `DK-${i}`, type: 'P', dmg: 1, effectText: '' }))
 const as = (style: string, asc: string[]): GameState =>
   createGame({ championId: 'AS', hpStart: 160, hpMax: 160, deck, style, loadout: { asc, points: 6 } }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 3 })
-const t = (s: GameState, style: string) => tuningOf(s, 'p1')[style as 'AS:1'] as Record<string, number>
+const t = (s: GameState, style: string) => (tuningOf(s, 'p1') as Record<string, Record<string, number>>)[style]
 const said = (s: GameState, text: string) => s.log.some((l) => l.includes(text))
 
 describe('Assassin v2 Ascendancy', () => {
@@ -119,55 +119,131 @@ describe('Assassin v2 Ascendancy', () => {
   })
 
   describe('Fatal Rhythm', () => {
-    it('Executioner: a Critical that leaves the enemy at 20% or less finishes them; −15 Max HP', () => {
+    it('Execution: Blood Scent and Merciless expand the red line and add low-HP damage', () => {
+      let s = as('AS:2', ['A1', 'A2'])
+      expect(t(s, 'AS:2').redHpPct).toBe(40)
+      expect(t(s, 'AS:2').redCritMult).toBe(5)
+      s.players.p2.hp = 39
+      s.players.p1.hand = [hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.players.p2.hp).toBe(36)
+      expect(said(s, 'Blood Scent')).toBe(true)
+    })
+
+    it('Executioner: a Critical that leaves the enemy at 20% or less finishes them; normal attacks lose 20%', () => {
       let s = as('AS:2', ['A1', 'A2', 'A3'])
-      expect(s.players.p1.maxHp).toBe(145)
+      expect(s.players.p1.maxHp).toBe(160)
       s.players.p1.styleData = { attacks: 3 }
       s.players.p2.hp = 40
       s.players.p1.hand = [hit(7)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(s.players.p2.hp).toBe(0)
       expect(said(s, 'Executioner')).toBe(true)
+
+      s = as('AS:2', ['A1', 'A2', 'A3'])
+      s.players.p1.hand = [hit(10)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.players.p2.hp).toBe(92)
     })
 
-    it('Build-up: each Critical makes the next one bigger; a hit or a Blocked Critical resets it', () => {
+    it('Crescendo: Primed starts at 2, Charge adds 1, and Off-Beat resets after a Critical', () => {
+      let s = as('AS:2', ['B1', 'B2'])
+      expect(s.players.p1.styleData?.attacks).toBe(2)
+      s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
+      expect(s.players.p1.styleData?.attacks).toBe(3)
+
+      s.players.p1.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.players.p2.hp).toBe(85)
+      expect(s.players.p1.styleData?.attacks).toBe(1)
+
+      s.players.p2.hand = [hit(1), hit(1)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      expect(s.players.p1.styleData?.attacks).toBe(3)
+    })
+
+    it('Build-up: successful Criticals stack, a Blocked Critical loses one stack and skips the next counter', () => {
       let s = as('AS:2', ['B1', 'B2', 'B3'])
       s.players.p1.styleData = { attacks: 3 }
       s.players.p1.hand = [hit(5)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(s.players.p1.perkData?.buildUp).toBe(1)
-      const hp = s.players.p2.hp
+
       s.players.p1.styleData = { attacks: 3 }
       s.players.p1.hand = [hit(5)]
+      const hp = s.players.p2.hp
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(hp - s.players.p2.hp).toBe(20) // ×(3+1)
+      expect(hp - s.players.p2.hp).toBe(20)
+      expect(s.players.p1.perkData?.buildUp).toBe(2)
+
       s.players.p1.styleData = { attacks: 3 }
       s.players.p1.hand = [hit(5)]
       s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-      expect(s.players.p1.perkData?.buildUp).toBe(0)
+      expect(s.players.p1.perkData?.buildUp).toBe(1)
+      expect(s.players.p1.perkData?.skipCritCounter).toBe(1)
+
+      s.players.p1.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.players.p1.styleData?.attacks).toBe(1)
+      expect(s.players.p1.perkData?.skipCritCounter).toBe(0)
     })
 
-    it('Pursuit: Chase adds to the counter, Run Down Cuts, Hunt multiplies Criticals into a Charge; blocked Criticals deal 0', () => {
-      let s = as('AS:2', ['C1', 'C2', 'C3'])
-      expect(t(s, 'AS:2').blockedCritPct).toBe(0)
+    it('Pursuit: Run Down accelerates and buffs the first card; Chase cuts on Critical; Hunt works on Charge and empty facing', () => {
+      let s = as('AS:2', ['C1'])
       s.players.p1.styleData = { attacks: 2 }
       s.players.p1.hand = [hit(5)]
-      s.players.p2.hand = [hit(1), hit(1), hit(1), hit(1)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(said(s, 'Chase')).toBe(true)
-      expect(said(s, 'Hunt')).toBe(true)
+      expect(100 - s.players.p2.hp).toBe(24)
       expect(said(s, 'Run Down')).toBe(true)
-      expect(100 - s.players.p2.hp).toBe(20) // ×(3+1)
+
+      s = as('AS:2', ['C1', 'C2'])
+      s.players.p1.styleData = { attacks: 3 }
+      s.players.p1.hand = [hit(5)]
+      s.players.p2.hand = [hit(1), hit(1), hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      expect(said(s, 'Chase')).toBe(true)
+      expect(s.players.p2.discarded?.some((d) => d.reason === 'Cut')).toBe(true)
+
+      s = as('AS:2', ['C1', 'C2', 'C3'])
+      expect(t(s, 'AS:2').blockedCritPct).toBe(50)
+      s.players.p1.styleData = { attacks: 2 }
+      s.players.p1.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(100 - s.players.p2.hp).toBe(8 * 4)
+
+      s = as('AS:2', ['C1', 'C2', 'C3'])
+      s.players.p1.styleData = { attacks: 2 }
+      s.players.p1.hand = [hit(1), hit(5)]
+      s.players.p2.hand = [hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'strike' })
+      expect(100 - s.players.p2.hp).toBe(21)
     })
 
-    it('Ghost Dance gives Parry after a Critical; Shadow Mark: next Strike breaks Parry/Shield, first card ignores Block, −15 Max HP', () => {
-      let s = as('AS:2', ['D1', 'D2', 'D3'])
-      expect(s.players.p1.maxHp).toBe(145)
+    it('Shadow: Feint adds blocked Critical damage and Pierce; Ghost Dance converts Parry to counter', () => {
+      let s = as('AS:2', ['D1'])
+      s.players.p1.styleData = { attacks: 3 }
+      s.players.p1.hand = [hit(10)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      expect(s.players.p2.hp).toBe(74)
+
+      s = as('AS:2', ['D1', 'D2'])
       s.players.p1.styleData = { attacks: 3 }
       s.players.p1.hand = [hit(5)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(s.players.p1.statuses.some((x) => x.kind === 'parry')).toBe(true)
+      s.players.p2.hand = [hit(5), hit(5), hit(5)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      expect(s.players.p1.styleData?.attacks).toBe(5)
+    })
+
+    it('Shadow Mark: no Max HP cost, marked Strike breaks defense, and Block leaks 25%', () => {
+      let s = as('AS:2', ['D1', 'D2', 'D3'])
+      expect(s.players.p1.maxHp).toBe(160)
+      s.players.p1.styleData = { attacks: 3 }
+      s.players.p1.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(said(s, 'Shadow Mark: the enemy is Marked')).toBe(true)
+
       s.players.p2.statuses.push({ kind: 'shield', turns: 9999, n: 10 })
       const hp = s.players.p2.hp
       s.players.p1.styleData = { attacks: 0 }
@@ -175,6 +251,11 @@ describe('Assassin v2 Ascendancy', () => {
       s = resolveTurn(s, { p1: 'strike', p2: 'block' })
       expect(hp - s.players.p2.hp).toBe(6)
       expect(s.players.p2.statuses.some((x) => x.kind === 'shield')).toBe(false)
+
+      s = as('AS:2', ['D1', 'D2', 'D3'])
+      s.players.p2.hand = [hit(10), hit(10)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      expect(s.players.p1.hp).toBe(156)
     })
   })
 })
