@@ -115,6 +115,8 @@ const foeDid = (state: GameState, side: Side, a: 'strike' | 'charge' | 'block') 
 const critThisTurn = (state: GameState, side: Side) => state.players[side].perkData?.critTurn === state.turn
 /** a card whose effect has a Cut in it (Assassin Cut cards) */
 const isCutCard = (spec: unknown) => !!spec && JSON.stringify(spec).includes('"a":"cut"')
+/** cards on the enemy's Field now (Cut nodes need a full-ish Field, Q 2026-10-26) */
+const foeField = (state: GameState, side: Side) => state.players[other(side)].hand.length
 /** Sabotage: Cut the enemy's newest Field cards, within the per-turn Cut cap (like the Cut primitive, no draw) */
 function cutNewest(state: GameState, side: Side, n: number, who: string) {
   const foe = state.players[other(side)]
@@ -944,20 +946,20 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   'AS:1:D1': (amt) => ({
     hooks: {
       endTurn: (state, side, action, enemyAction) => {
-        if (action === 'charge' && enemyAction === 'block') cutNewest(state, side, amt(state, side), 'Snare')
+        if (action === 'charge' && enemyAction === 'block' && foeField(state, side) >= num(state, side, 'AS:1', 'ascSnareField')) cutNewest(state, side, amt(state, side), 'Snare')
       },
     },
   }),
   'AS:1:D2': (amt) => ({
     hooks: {
       endTurn: (state, side, action, enemyAction) => {
-        if (action === 'block' && enemyAction === 'charge') cutNewest(state, side, amt(state, side), 'Tripwire')
+        if (action === 'block' && enemyAction === 'charge' && foeField(state, side) >= num(state, side, 'AS:1', 'ascTripwireField')) cutNewest(state, side, amt(state, side), 'Tripwire')
       },
     },
   }),
   'AS:1:D3': (amt) => ({
     hooks: {
-      cutMore: (state, side) => amt(state, side),
+      cutMore: (state, side) => (foeField(state, side) >= num(state, side, 'AS:1', 'ascDemolitionField') ? amt(state, side) : 0),
       beforeHits: (state, side, bonus, _m, _c, chain) => {
         const n = num(state, side, 'AS:1', 'ascDemolitionCost')
         chain?.forEach((c, i) => {
@@ -1021,7 +1023,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     hooks: {
       beforeHits: critSeen,
       endTurn: (state, side, action, enemyAction) => {
-        if (action === 'strike' && enemyAction === 'charge' && critThisTurn(state, side)) cutNewest(state, side, amt(state, side), 'Run Down')
+        if (action === 'strike' && enemyAction === 'charge' && critThisTurn(state, side) && foeField(state, side) >= num(state, side, 'AS:2', 'ascRunDownField')) cutNewest(state, side, amt(state, side), 'Run Down')
       },
     },
   }),

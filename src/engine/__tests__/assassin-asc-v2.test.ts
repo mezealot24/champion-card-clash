@@ -89,10 +89,13 @@ describe('Assassin v2 Ascendancy', () => {
       expect(s.players.p1.perkData?.phantom).toBe(0)
     })
 
-    it('Snare and Tripwire Cut the newest card on Charge vs Block', () => {
+    it('Snare and Tripwire Cut the newest card on Charge vs Block, only vs a full-ish Field', () => {
       let s = as('AS:1', ['D1', 'D2'])
       s.players.p2.hand = [hit(1), hit(1), hit(1)]
-      const newest = s.players.p2.hand[2].uid
+      s = resolveTurn(s, { p1: 'charge', p2: 'block' })
+      expect(said(s, 'Snare')).toBe(false) // 3 cards: below Snare's 4
+      s.players.p2.hand = [hit(1), hit(1), hit(1), hit(1)]
+      const newest = s.players.p2.hand[3].uid
       s = resolveTurn(s, { p1: 'charge', p2: 'block' })
       expect(s.players.p2.hand.map((c) => c.uid)).not.toContain(newest)
       expect(said(s, 'Snare')).toBe(true)
@@ -108,7 +111,7 @@ describe('Assassin v2 Ascendancy', () => {
       let s = as('AS:1', ['D1', 'D2', 'D3'])
       const rule: EffectSpec = [{ hook: 'onResolve', if: [{ c: 'selfAction', a: 'strike' }], do: [{ a: 'cut', which: 'oldest', n: 1 }] }]
       s.players.p1.hand = [hit(5, 'P', rule)]
-      s.players.p2.hand = [hit(1), hit(1), hit(1)]
+      s.players.p2.hand = [hit(1), hit(1), hit(1), hit(1)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(100 - s.players.p2.hp).toBe(3)
       expect(s.players.p2.discarded?.filter((d) => d.reason === 'Cut')).toHaveLength(2)
@@ -149,7 +152,7 @@ describe('Assassin v2 Ascendancy', () => {
       expect(t(s, 'AS:2').blockedCritPct).toBe(0)
       s.players.p1.styleData = { attacks: 2 }
       s.players.p1.hand = [hit(5)]
-      s.players.p2.hand = [hit(1), hit(1)]
+      s.players.p2.hand = [hit(1), hit(1), hit(1), hit(1)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(said(s, 'Chase')).toBe(true)
       expect(said(s, 'Hunt')).toBe(true)
