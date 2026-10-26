@@ -7,7 +7,7 @@ import { addRes, resourceOf } from './resources'
 import { addIgnite, chillStacks, debuffStacks, hooksOf, igniteStacks, isDebuff, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
 import { fieldsOf, tuningOf, type Tuning, type TuningGroup } from './tuning'
 import type { GameState, PlayerState, Side } from './types'
-import { CUT_CAP, other } from './types'
+import { CUT_CAP, cutGuarded, guardAfterCut, other } from './types'
 
 /** What a player brings: Oath id, Minor id, Ascendancy node ids of the Style they play ("A1".."B4"), points they may spend. */
 export type Loadout = { oath?: string; minor?: string; asc?: string[]; points?: number }
@@ -119,10 +119,11 @@ const isCutCard = (spec: unknown) => !!spec && JSON.stringify(spec).includes('"a
 function cutNewest(state: GameState, side: Side, n: number, who: string) {
   const foe = state.players[other(side)]
   for (let k = 0; k < n; k++) {
-    if ((foe.cutTaken ?? 0) >= CUT_CAP || !foe.hand.length) return
+    if ((foe.cutTaken ?? 0) >= CUT_CAP || !foe.hand.length || cutGuarded(state, other(side))) return
     const i = foe.hand.length - 1
     const lost = foe.hand.splice(i, 1)[0]
     foe.cutTaken = (foe.cutTaken ?? 0) + 1
+    guardAfterCut(state, other(side), tuningOf(state, side).AS.cutCooldown)
     ;(foe.discarded ??= []).push({ card: lost, slot: i + 1, reason: 'Cut' })
     ;(state.events ??= []).push({ k: 'discard', side: other(side), uid: lost.uid, reason: 'Cut' })
     const to = lost.owner ?? other(side)

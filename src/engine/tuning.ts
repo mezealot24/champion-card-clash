@@ -71,6 +71,7 @@ export const TUNING_FIELDS = {
     { key: 'start', label: 'Energy at start', def: 3, min: 0 },
     { key: 'sCost', label: 'S card Energy cost', def: 1, min: 0, help: 'When cards.cost is empty' },
     { key: 'perTurn', label: 'Energy per turn', def: 1, min: 0 },
+    { key: 'cutCooldown', label: 'Cut guard turns', def: 1, min: 0, max: 5, help: 'after a side loses cards to Cut, its Field can\'t be Cut for this many turns' },
     { key: 'markBurstPct', label: 'Mark of Assassin burst %', def: 50, min: 0, help: '% of the chain\'s total dmg' },
   ],
   'AS:1': [

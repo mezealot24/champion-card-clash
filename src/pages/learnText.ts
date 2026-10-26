@@ -16,7 +16,7 @@ const OP = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' }
 const STATUS_SHORT: Partial<Record<string, string>> = {
   noStrike: 'no Strike', noBlock: 'no Block', noCharge: 'no Charge', silence: 'Silenced', skillSilence: 'S effects off',
   trueDmg: 'True Dmg', guardBreak: 'Guard Crush', vulnerable: 'Vulnerable', deathMark: 'Marked', shield: 'Shield',
-  parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up',
+  parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: 'Cut guard',
 }
 const who = (w: 'self' | 'enemy') => (w === 'self' ? 'You' : 'Foe')
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)

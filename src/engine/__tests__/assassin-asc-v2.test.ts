@@ -96,6 +96,10 @@ describe('Assassin v2 Ascendancy', () => {
       s = resolveTurn(s, { p1: 'charge', p2: 'block' })
       expect(s.players.p2.hand.map((c) => c.uid)).not.toContain(newest)
       expect(said(s, 'Snare')).toBe(true)
+      expect(s.players.p2.statuses.some((x) => x.kind === 'cutGuard')).toBe(true)
+      // Cut guard: the next turn their Field can't be Cut
+      s = resolveTurn(s, { p1: 'block', p2: 'charge' })
+      expect(said(s, 'Tripwire')).toBe(false)
       s = resolveTurn(s, { p1: 'block', p2: 'charge' })
       expect(said(s, 'Tripwire')).toBe(true)
     })
