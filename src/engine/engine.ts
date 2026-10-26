@@ -207,7 +207,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.endTurn?.(state, side, actions[side], actions[other(side)])
   // Ignite burns at the end of every turn it's on (Pyromancer)
   for (const side of SIDES) {
-    const burn = igniteBurn(state.players[side], tuningOf(state, other(side)))
+    const cut = Math.min(100, hooksOf(state.players[side]).reduce((t, h) => t + (h.burnCutPct?.(state, side) ?? 0), 0))
+    const burn = Math.floor((igniteBurn(state.players[side], tuningOf(state, other(side))) * (100 - cut)) / 100)
     if (!burn) continue
     loseHp(state, side, burn)
     log(state, `${side} 🔥 Ignite ${igniteStacks(state.players[side])} stacks burn ${burn}`)
@@ -345,6 +346,8 @@ function resolveStrikes(
   // loadout pieces that soften every hit getting past a side's Block (Iron Hide)
   const hitCut = { p1: 0, p2: 0 }
   for (const side of SIDES) hitCut[side] = hooksOf(state.players[side]).reduce((t, h) => t + (h.hitCut?.(state, side) ?? 0), 0)
+  const critCut = { p1: 0, p2: 0 }
+  for (const side of SIDES) critCut[side] = Math.min(100, hooksOf(state.players[side]).reduce((t, h) => t + (h.critCutPct?.(state, side) ?? 0), 0))
 
   // Every hit's outcome is worked out now, in hit order: Block, then Parry, then Shield, then HP.
   // So dmg each side will take from hits this turn is known before any hit lands.
@@ -360,6 +363,7 @@ function resolveStrikes(
       // Energy Surge: Wraith Step caps hits past Block at 1, Shroud halves them
       if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, 1)
       if (env.shroud[enemy]) dealt = Math.floor(dealt / 2)
+      if (critCut[enemy] && crit[side].has(i)) dealt = Math.floor((dealt * (100 - critCut[enemy])) / 100)
       if (hitCut[enemy] && !isBlocked(side, i)) dealt = Math.max(0, dealt - hitCut[enemy])
       const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
       if (parry) parry.n = (parry.n ?? 1) - 1

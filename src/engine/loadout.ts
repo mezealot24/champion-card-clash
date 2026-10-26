@@ -245,8 +245,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnyieldingMax')),
     hooks: {
       beforeHits: (state, side, bonus) => {
-        // Q 18:55: Unyielding also runs at Endurance power (25%)
-        const n = Math.floor((endurance(state.players[side]) * amt(state, side) * num(state, side, 'TK:1', 'ascEndurancePower')) / 100)
+        const n = endurance(state.players[side]) * amt(state, side)
         if (!n) return
         for (let i = 0; i < bonus.length; i++) bonus[i] += n
         say(state, side, `Unyielding: every chain card +${n} dmg`)
@@ -427,11 +426,13 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         const p = state.players[side]
         const n = endurance(p)
         if (!n || !bonus.length) return
-        for (let i = 0; i < bonus.length; i++) bonus[i] += n * amt(state, side)
+        // Q 2026-10-26: per Endurance spent, every card +ascUnleashed + ascUnleashedHpPct% of your Max HP (rounded down)
+        const per = amt(state, side) + Math.floor((p.maxHp * num(state, side, 'TK:1', 'ascUnleashedHpPct')) / 100)
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n * per
         p.perkData = { ...p.perkData, endurance: 0 }
         const v = num(state, side, 'TK:1', 'ascUnleashedVuln')
         if (v > 0) p.statuses.push({ kind: 'vulnerable', turns: 1, n: v })
-        say(state, side, `Unleashed: spends ${n} Endurance, every card +${n * amt(state, side)} dmg`)
+        say(state, side, `Unleashed: spends ${n} Endurance, every card +${n * per} dmg`)
       },
     },
   }),
@@ -1340,8 +1341,11 @@ for (const [style, tree] of Object.entries(TREES))
 PIECES['asc:TK:1:END'] = {
   group: 'TK:1',
   hooks: {
-    // Q 2026-10-25 18:47: Endurance effects at ascEndurancePower% (25) of their full size
-    hitCut: (state, side) => Math.floor((endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut') * num(state, side, 'TK:1', 'ascEndurancePower')) / 100),
+    // Q 2026-10-26: full strength again (the 25% power is gone)
+    hitCut: (state, side) => endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceCut'),
+    // each Endurance: Ignite burns and Critical hits you take deal ascEnduranceGuard% less
+    burnCutPct: (state, side) => Math.min(100, endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceGuard')),
+    critCutPct: (state, side) => Math.min(100, endurance(state.players[side]) * num(state, side, 'TK:1', 'ascEnduranceGuard')),
     endTurn: (state, side) => {
       const p = state.players[side]
       const n = endurance(p)
@@ -1351,7 +1355,7 @@ PIECES['asc:TK:1:END'] = {
         say(state, side, 'Endurance fades')
         return
       }
-      const got = styleHeal(state, side, Math.floor((p.maxHp * n * num(state, side, 'TK:1', 'ascEnduranceRegen') * num(state, side, 'TK:1', 'ascEndurancePower')) / 10000))
+      const got = styleHeal(state, side, Math.floor(((p.maxHp - p.hp) * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
       if (got) say(state, side, `Endurance: ${n} regen ${got}`)
     },
   },
