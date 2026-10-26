@@ -110,13 +110,14 @@ export const TREES: Record<string, TreeData> = {
         ['ascEnduranceRegen', 'regen % missing HP per Endurance', 1],
         ['ascEnduranceGuard', '% less Ignite burn / Critical dmg, per Endurance', 10, 0, 100],
       ]),
-      multi('A2', 'Unyielding', 'Your cards deal +{ascUnyielding} dmg per Endurance. Endurance max +{ascUnyieldingMax}.', [
-        ['ascUnyielding', 'dmg per Endurance', 2],
+      multi('A2', 'Unyielding', 'When a Charge break hits you, you lose all your Endurance, but heal {ascUnyielding}% of that chain\'s dmg per Endurance lost, spread over the next {ascUnyieldingTurns} turns (rounded down). Endurance max +{ascUnyieldingMax}.', [
+        ['ascUnyielding', 'heal % of chain dmg, per Endurance lost', 3],
+        ['ascUnyieldingTurns', 'turns the heal is spread over', 5, 1],
         ['ascUnyieldingMax', 'max Endurance +', 1],
       ]),
-      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. {ascUnrelentingPct}% of the hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'When you Block, only the first hit is fully stopped: each later blocked hit still deals {ascUnrelentingLeak}% dmg.', [
+      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. {ascUnrelentingPct}% of the hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'Your Field holds at most {ascUnrelentingField} cards.', [
         ['ascUnrelenting', 'max Endurance +', 2],
-        ['ascUnrelentingLeak', '% dmg of blocked hits after the first', 50, 0],
+        ['ascUnrelentingField', 'Cost: Field max cards', 4, 1, 5],
         ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
         ['ascUnrelentingPct', '% of hit dmg delayed', 50, 0, 100],
       ]),

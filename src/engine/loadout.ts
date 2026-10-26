@@ -87,16 +87,22 @@ function gainEndurance(state: GameState, side: Side, why: string, src = 'flinch'
   p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, [at]: state.turn }
   say(state, side, `Endurance (${why}): ${n}/${max}`)
 }
-/** Unrelenting: dmg still to drain, one entry per coming turn (perkData only holds numbers: drain0, drain1, …) */
-const drainQueue = (p: PlayerState) => {
+/** Unrelenting drain / Unyielding mend: amounts per coming turn (perkData only holds numbers: drain0, drain1, …) */
+const drainQueue = (p: PlayerState, key = 'drain') => {
   const out: number[] = []
-  for (let i = 0; i < (p.perkData?.drain ?? 0); i++) out.push(p.perkData?.[`drain${i}`] ?? 0)
+  for (let i = 0; i < (p.perkData?.[key] ?? 0); i++) out.push(p.perkData?.[`${key}${i}`] ?? 0)
   return out
 }
-const setDrain = (p: PlayerState, due: number[]) => {
-  const d: Record<string, number> = { drain: due.length }
-  due.forEach((n, i) => (d[`drain${i}`] = n))
+const setDrain = (p: PlayerState, due: number[], key = 'drain') => {
+  const d: Record<string, number> = { [key]: due.length }
+  due.forEach((n, i) => (d[`${key}${i}`] = n))
   p.perkData = { ...p.perkData, ...d }
+}
+/** Spread n over the next turns (rounded down, remainder on the first turns), added to what's already queued */
+const queueOver = (p: PlayerState, key: string, n: number, turns: number) => {
+  const due = drainQueue(p, key)
+  for (let i = 0; i < turns; i++) due[i] = (due[i] ?? 0) + Math.floor(n / turns) + (i < n % turns ? 1 : 0)
+  setDrain(p, due, key)
 }
 /** Fatal Rhythm nodes: remember this turn's Critical count (Style beforeHits runs first, so crit is filled) */
 const critSeen: NonNullable<StyleDef['beforeHits']> = (state, side, _b, _m, crit) => {
@@ -241,22 +247,44 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
+  // Q 2026-10-26: Unyielding = a Charge break costs all Endurance, but heals back amt% of that chain's dmg per Endurance lost over the next turns
   'TK:1:A2': (amt) => ({
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnyieldingMax')),
     hooks: {
-      beforeHits: (state, side, bonus) => {
-        const n = endurance(state.players[side]) * amt(state, side)
+      actionStart: (state, side) => {
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, yieldHp: p.hp }
+      },
+      onChargeBreak: (state, side) => {
+        const p = state.players[side]
+        const n = endurance(p)
         if (!n) return
-        for (let i = 0; i < bonus.length; i++) bonus[i] += n
-        say(state, side, `Unyielding: every chain card +${n} dmg`)
+        const lost = Math.max(0, (p.perkData?.yieldHp ?? p.hp) - p.hp)
+        const heal = Math.floor((lost * amt(state, side) * n) / 100)
+        p.perkData = { ...p.perkData, endurance: 0 }
+        const turns = Math.max(1, num(state, side, 'TK:1', 'ascUnyieldingTurns'))
+        if (heal > 0) queueOver(p, 'mend', heal, turns)
+        say(state, side, `Unyielding: Charge break spends ${n} Endurance, heals ${heal} over ${turns} turns`)
+      },
+      endTurn: (state, side) => {
+        const p = state.players[side]
+        const due = drainQueue(p, 'mend')
+        if (!due.length) return
+        const [now, ...rest] = due
+        setDrain(p, rest, 'mend')
+        const got = now > 0 && p.hp > 0 ? styleHeal(state, side, now) : 0
+        if (got) say(state, side, `Unyielding: heals ${got}`)
       },
     },
   }),
   // Unrelenting (Q 2026-10-25, like Death's Dance): hit dmg taken this turn comes back and drains over the next turns
   'TK:1:A3': () => ({
     tune: (t, v) => add(t, 'TK:1', 'ascEnduranceMax', v('ascUnrelenting')),
+    // Q 2026-10-26: Cost = your Field holds at most ascUnrelentingField cards (was: Block leaks)
+    setup: (p, v) => {
+      p.fieldMax = Math.min(p.fieldMax ?? Infinity, v('ascUnrelentingField'))
+    },
     hooks: {
-      blockLeakPct: (state, side) => num(state, side, 'TK:1', 'ascUnrelentingLeak'),
       actionStart: (state, side) => {
         const p = state.players[side]
         p.perkData = { ...p.perkData, preHitHp: p.hp }
@@ -268,9 +296,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         if (lost <= 0) return
         p.hp += lost
         const turns = Math.max(1, num(state, side, 'TK:1', 'ascUnrelentingTurns'))
-        const due = [...(p.perkData?.drain !== undefined ? drainQueue(p) : [])]
-        for (let i = 0; i < turns; i++) due[i] = (due[i] ?? 0) + Math.floor(lost / turns) + (i < lost % turns ? 1 : 0)
-        setDrain(p, due)
+        queueOver(p, 'drain', lost, turns)
         say(state, side, `Unrelenting: ${lost} hit dmg will drain over ${turns} turns`)
       },
       endTurn: (state, side) => {

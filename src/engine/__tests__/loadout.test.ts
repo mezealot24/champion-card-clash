@@ -233,13 +233,18 @@ describe('randomLoadout', () => {
       expect(s.players.p1.hp).toBeGreaterThan(100)
       expect(s.log.some((l) => l.includes('Ancient'))).toBe(true)
     })
-    it('Unrelenting Cost: the 2nd blocked hit still deals 50%', () => {
-      let s = tk('TK:1', ['A1', 'A2', 'A3'])
-      const hp = s.players.p1.hp
-      s.players.p2.hand = [hit(20), hit(20)]
-      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.log.some((l) => l.includes('Unrelenting: 5 hit dmg'))).toBe(true)
-      expect(s.players.p1.hp).toBeLessThanOrEqual(hp)
+    it('Unrelenting Cost: Field holds at most 4 cards', () => {
+      const s = tk('TK:1', ['A1', 'A2', 'A3'])
+      expect(s.players.p1.fieldMax).toBe(4)
+    })
+    it('Unyielding: a Charge break spends all Endurance and heals chain dmg back over 5 turns', () => {
+      let s = tk('TK:1', ['A1', 'A2'])
+      s.players.p1.perkData = { ...s.players.p1.perkData, endurance: 3, enduranceAt: 1 }
+      s.players.p1.hand = [hit(1), hit(1)]
+      s.players.p2.hand = [hit(50), hit(50)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.players.p1.perkData?.endurance).toBe(0)
+      expect(s.log.some((l) => /Unyielding: Charge break spends 4 Endurance, heals \d+ over 5 turns/.test(l))).toBe(true)
     })
     it('Untiring: Block, HP lost and Second Wind give Endurance; Second Wind cuts heals 25%, Early Rally raises Endurance max', () => {
       let s = tk('TK:1', ['B1', 'B2', 'B3'])
