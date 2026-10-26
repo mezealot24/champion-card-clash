@@ -281,14 +281,53 @@ export const STYLES: Record<string, StyleDef> = {
 
 
 Object.assign(STYLES, {
-  /** Bruiser · Fury: while HP < 50%, cards in slot 1 and 2 of your Strike chain deal +10 dmg. */
+  /**
+   * Bruiser · Fury (Hybrid rework):
+   * – Warm-up (HP > line, Rage ≥ warmUpRage): Fury slots get +warmUpDmg dmg.
+   * – True Fury (HP < line): Fury slots get +bonusDmg dmg; blocked Fury hits
+   *   deal chipDmg to the enemy and gain chipRage Rage (Chip Damage).
+   */
   'BR:1': {
     name: 'Fury',
     beforeHits: (state, side, bonus) => {
       const f = tuningOf(state, side)['BR:1']
-      if (pctHp(state.players[side]) >= f.hpPct) return
-      for (let i = 0; i < Math.min(f.slots, bonus.length); i++) bonus[i] += f.bonusDmg
-      say(state, side, `Fury: slots 1–${f.slots} +${f.bonusDmg} dmg`)
+      const hp = pctHp(state.players[side])
+      const trueFury = hp < f.hpPct
+      const warmUp = !trueFury && (state.players[side].res ?? 0) >= f.warmUpRage
+      if (!trueFury && !warmUp) return
+      const dmg = trueFury ? f.bonusDmg : f.warmUpDmg
+      for (let i = 0; i < Math.min(f.slots, bonus.length); i++) bonus[i] += dmg
+      say(state, side, trueFury
+        ? `True Fury: slots 1–${f.slots} +${dmg} dmg (Chip active)`
+        : `Fury Warm-up: slots 1–${f.slots} +${dmg} dmg`)
+    },
+    afterChain: (state, side, r) => {
+      const f = tuningOf(state, side)['BR:1']
+      if (pctHp(state.players[side]) >= f.hpPct) return 0 // Chip only in True Fury
+      if (!f.chipDmg && !f.chipRage) return 0
+      // non-clean hits ≈ blocked hits (also counts Parry/Shield-absorbed-to-0, rare edge case)
+      const blocked = r.chainLength - r.cleanHits
+      const chipSlots = Math.min(f.slots, blocked)
+      if (chipSlots <= 0) return 0
+      const chip = chipSlots * f.chipDmg
+      const rage = chipSlots * f.chipRage
+      if (chip > 0) {
+        const enemy = other(side)
+        const p = state.players[enemy]
+        const before = p.hp
+        p.hp = Math.max(0, p.hp - chip)
+        if (p.hp < before) {
+          for (const h of hooksOf(p)) h.onHpLoss?.(state, enemy)
+          ;(state.events ??= []).push({ k: 'hp', side: enemy, delta: p.hp - before })
+        }
+      }
+      if (rage > 0) {
+        const p = state.players[side]
+        const cap = tuningOf(state, side).BR?.cap ?? 20
+        p.res = Math.min(cap, (p.res ?? 0) + rage)
+      }
+      say(state, side, `Fury Chip: ${chipSlots} blocked → ${chip} dmg + ${rage} Rage`)
+      return 0
     },
   },
   /**

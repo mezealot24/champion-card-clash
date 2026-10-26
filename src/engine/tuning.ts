@@ -53,9 +53,13 @@ export const TUNING_FIELDS = {
     { key: 'guardCrushDiscard', label: 'Guard Crush Field cards discarded', def: 2, min: 0, max: 5 },
   ],
   'BR:1': [
-    { key: 'hpPct', label: 'Fury HP line %', def: 50, min: 1, max: 100, help: 'Active while HP is below this % at the start of the Strike' },
+    { key: 'hpPct', label: 'Fury HP line %', def: 50, min: 1, max: 100, help: 'True Fury activates below this % at the start of the Strike' },
     { key: 'bonusDmg', label: 'Fury bonus dmg', def: 10 },
     { key: 'slots', label: 'Fury slots (from slot 1)', def: 2, min: 0, max: 5 },
+    { key: 'warmUpDmg', label: 'Fury Warm-up bonus dmg', def: 4, min: 0, help: 'Dmg bonus per Fury slot while HP is above the Fury line and Rage >= warmUpRage' },
+    { key: 'warmUpRage', label: 'Rage needed for Warm-up', def: 5, min: 0, help: 'Minimum Rage to activate the Warm-up phase of Fury (above the HP line)' },
+    { key: 'chipDmg', label: 'Chip dmg per blocked Fury hit', def: 5, min: 0, help: 'True Fury: each Fury-slot hit stopped by Block still deals this much HP to the enemy' },
+    { key: 'chipRage', label: 'Rage per blocked Fury hit', def: 2, min: 0, help: 'True Fury: Rage gained each time a Fury-slot hit is Blocked' },
   ],
   'BR:2': [
     { key: 'conquerorMax', label: 'Momentum max stacks', def: 6, min: 1 },

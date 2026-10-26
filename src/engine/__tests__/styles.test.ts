@@ -92,6 +92,26 @@ describe('Bruiser Styles', () => {
     expect(resolveTurn(ok, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(97)
   })
 
+  it('Fury: Warm-up +4 dmg to slots 1-2 when HP >= 50% and Rage >= 5', () => {
+    const s = br('BR:1', 60)
+    s.players.p1.res = 5
+    s.players.p1.hand = [hit(1), hit(1), hit(1)]
+    // slots 1 and 2 get +4 dmg: (1+4) + (1+4) + 1 = 11 dmg
+    expect(resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 11)
+  })
+
+  it('Fury: Chip damage and Rage gain on blocked hits during True Fury', () => {
+    const s = br('BR:1', 40)
+    s.players.p1.res = 0
+    s.players.p1.hand = [hit(1), hit(1)]
+    s.players.p2.hand = [hit(1), hit(1)]
+    // p2 blocks -> 2 hits blocked. Chip slots = 2 -> 2 * 5 = 10 chip dmg, +4 Rage
+    const after = resolveTurn(s, { p1: 'strike', p2: 'block' })
+    expect(after.players.p2.hp).toBe(90) // 10 chip damage
+    expect(after.players.p1.res).toBeGreaterThanOrEqual(4) // gained chip rage
+  })
+
+
   it('Juggernaut: +1 Momentum per chain card before it hits; +1 dmg per stack', () => {
     const s = br('BR:2', 90)
     s.players.p1.hand = [hit(10), hit(10)]
