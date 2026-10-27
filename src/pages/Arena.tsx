@@ -10,6 +10,8 @@ import {
   resourceOf,
   tuningOf,
   STYLES,
+  SURGE_CHAMPION,
+  SURGE_MODES,
   type Action,
   type CardInst,
   type GameState,
@@ -37,6 +39,15 @@ const ACTIONS: { action: Action; label: string; beats: string }[] = [
   { action: 'block', label: 'Block', beats: 'beats Strike' },
   { action: 'charge', label: 'Charge', beats: 'beats Block' },
 ]
+// Assassin Energy Surge (engine.ts): with a full bar, Block / Charge spend it all, so the button says so first
+const SURGE_LABEL: Partial<Record<Action, { mode: string; name: string }>> = { block: { mode: 'A', name: 'Wraith Step' }, charge: { mode: 'B', name: 'Shroud' } }
+const surgeOf = (g: GameState, side: Side, action: Action) => {
+  const p = g.players[side]
+  const res = g.rules.resources ? resourceOf(p.championId, tuningOf(g, side)) : undefined
+  const s = SURGE_LABEL[action]
+  if (!s || !res || p.championId !== SURGE_CHAMPION || !SURGE_MODES.includes(s.mode) || (p.res ?? 0) < res.cap) return undefined
+  return s.name
+}
 const SPEEDS = [1, 1.5, 2]
 /** Signature combo banner time at 1x speed (was 1.3 s, players couldn't read it) */
 const BANNER_MS = 3200
@@ -175,8 +186,8 @@ export function Arena(props: {
     fxRef.current!.appendChild(el)
     return el
   }
-  const pop = (x: number, y: number, text: string, cls = '') => {
-    const el = add(`<div class="pop ${cls}" style="left:${x}px;top:${Math.max(y, 60)}px">${text}</div>`)
+  const pop = (x: number, y: number, text: string, cls = '', size = 1) => {
+    const el = add(`<div class="pop ${cls}" style="left:${x}px;top:${Math.max(y, 60)}px${size !== 1 ? `;font-size:${Math.round(38 * size)}px` : ''}">${text}</div>`)
     anim(el, [
       { transform: 'translate(-50%,-50%) scale(.3)', opacity: 0 },
       { transform: 'translate(-50%,-50%) scale(1.35)', opacity: 1, offset: 0.2 },
@@ -205,6 +216,35 @@ export function Arena(props: {
   const shake = (el: Element | null, px = 6) =>
     anim(el, [{ transform: 'translate(0,0)' }, { transform: `translate(${-px}px,${px / 2}px)` }, { transform: `translate(${px}px,${-px / 2}px)` }, { transform: `translate(${-px / 2}px,0)` }, { transform: 'translate(0,0)' }], 260)
 
+  // ---------- camera and impact (the stage's own transform fits it to the window, so these use `translate` / `scale`) ----------
+  const camShake = (px: number) => {
+    if (reduceMotion()) return
+    const st = stageRef.current
+    st?.animate([{ translate: '0 0' }, { translate: `${-px}px ${px * 0.6}px` }, { translate: `${px * 0.8}px ${-px * 0.5}px` }, { translate: `${-px * 0.4}px ${px * 0.3}px` }, { translate: '0 0' }], { duration: 280 / k(), easing: 'ease-out' })
+  }
+  // zoom toward a stage point for a moment (signature combos, K.O.)
+  const camZoom = (x: number, y: number, z: number, ms: number) => {
+    const st = stageRef.current
+    if (!st || reduceMotion()) return Promise.resolve()
+    const fit = st.getBoundingClientRect().width / W
+    const tx = x * fit * (1 - z)
+    const ty = y * fit * (1 - z)
+    return st
+      .animate([{ scale: '1', translate: '0 0' }, { scale: `${z}`, translate: `${tx}px ${ty}px`, offset: 0.25 }, { scale: `${z}`, translate: `${tx}px ${ty}px`, offset: 0.75 }, { scale: '1', translate: '0 0' }], { duration: ms / k(), easing: 'cubic-bezier(.3,0,.2,1)' })
+      .finished.catch(() => undefined)
+  }
+  // freeze everything in the hit for a beat so the blow lands
+  const hitStop = async (els: (Element | null | undefined)[], ms: number) => {
+    const running = els.flatMap((e) => (e ? (e as HTMLElement).getAnimations({ subtree: true }) : []))
+    running.forEach((a) => a.pause())
+    await wait(ms)
+    running.forEach((a) => a.play())
+  }
+  const flash = (color = '#fff', peak = 0.5) => {
+    const el = add(`<div class="flash" style="background:${color}"></div>`)
+    anim(el, [{ opacity: peak }, { opacity: 0 }], 220, { easing: 'ease-out' }).then(() => el.remove())
+  }
+
   // ---------- Champion poses (AI stands left facing right, you stand right facing left) ----------
   const facing = (side: Side) => (side === 'p2' ? 1 : -1)
   // Sprite Champions swap to a pose frame (.pose-P etc, see arena.css) for a moment; SVG dolls ignore it
@@ -214,6 +254,55 @@ export function Arena(props: {
     clearTimeout(poseTimers.current.get(f))
     poseTimers.current.set(f, window.setTimeout(() => f.classList.remove(`pose-${pose}`), ms / k()))
   }
+  // Strike chains are fought up close: run across with afterimages, then hop back home after the chain
+  const ghosts = (f: HTMLElement, side: Side, n: number, gap: number) => {
+    const p = pos(f)
+    const body = f.querySelector('svg, .sprite') as HTMLElement | null
+    if (!body) return
+    const frame = getComputedStyle(body).backgroundPosition
+    for (let i = 0; i < n; i++) {
+      const g = add(`<div class="ghostimg" style="left:${p.x}px;top:${p.y}px">${body.outerHTML}</div>`)
+      const inner = g.firstChild as HTMLElement
+      inner.style.backgroundPosition = frame
+      if (side === 'p1') inner.style.transform = 'scaleX(-1)'
+      anim(g, [{ opacity: 0.4 }, { opacity: 0 }], 260, { delay: (i + 1) * gap }).then(() => g.remove())
+    }
+  }
+  const dust = (f: HTMLElement, side: Side) => {
+    const p = pos(f)
+    const el = add(`<div class="dust" style="left:${p.x - 18 * facing(side)}px;top:${p.y + 36}px"></div>`)
+    anim(el, [{ opacity: 0.8, transform: 'translate(-50%,-50%) scale(.4)' }, { opacity: 0, transform: `translate(calc(-50% + ${-24 * facing(side)}px),-60%) scale(1.4)` }], 420, { easing: 'ease-out' }).then(() => el.remove())
+  }
+  const travel = async (side: Side, dx: number, ms: number, hop: number) => {
+    const f = fighter(side)
+    if (!f) return
+    const from = f.style.translate || '0px 0px'
+    const to = `${dx}px 0px`
+    if (reduceMotion()) {
+      f.style.translate = dx ? to : ''
+      return
+    }
+    f.style.zIndex = dx ? '5' : ''
+    await f
+      .animate([{ translate: from }, { translate: `${dx / 2 + parseFloat(from) / 2}px ${-hop}px`, offset: 0.5 }, { translate: to }], { duration: ms / k(), easing: 'cubic-bezier(.4,0,.2,1)' })
+      .finished.catch(() => undefined)
+    f.style.translate = dx ? to : ''
+  }
+  // how far each striking side runs: up to the foe, or to meet in the middle when both Strike
+  const closeIn = (strikers: Side[]) =>
+    Promise.all(
+      strikers.map((side) => {
+        const f = fighter(side)
+        const foe = fighter(other(side))
+        if (!f || !foe) return undefined
+        const gap = pos(foe).x - pos(f).x
+        const dx = strikers.length > 1 ? gap / 2 - Math.sign(gap) * 48 : gap - Math.sign(gap) * 96
+        showPose(f, 'dash', 300)
+        dust(f, side)
+        ghosts(f, side, 3, 60)
+        return travel(side, dx, 300, 6)
+      }),
+    )
   const charAttack = (side: Side, type: string, pose: Pose) => {
     const f = fighter(side)
     if (!f) return
@@ -230,15 +319,17 @@ export function Arena(props: {
       anim(aura, [{ opacity: 0 }, { opacity: 1, offset: 0.5 }, { opacity: 0 }], 600).then(() => (aura.style.background = ''))
     }
   }
-  const charHit = (side: Side) => {
+  const charHit = (side: Side, dmg = 10) => {
     const d = facing(side)
     const hitF = fighter(side)
     if (hitF) showPose(hitF, 'hit', 420)
+    const knock = Math.min(34, 10 + dmg * 0.8)
     return anim(fighter(side), [
+      { transform: 'none', filter: 'brightness(3) saturate(0)' },
+      { transform: `translateX(${-knock * d}px) rotate(${-10 * d}deg)`, filter: 'brightness(1.6) sepia(1) saturate(6) hue-rotate(-40deg)', offset: 0.25 },
+      { transform: `translateX(${-knock * 0.4 * d}px)`, filter: 'none', offset: 0.6 },
       { transform: 'none', filter: 'none' },
-      { transform: `translateX(${-12 * d}px) rotate(${-10 * d}deg)`, filter: 'brightness(1.6) sepia(1) saturate(6) hue-rotate(-40deg)', offset: 0.25 },
-      { transform: 'none', filter: 'none' },
-    ], 340)
+    ], 420, { easing: 'cubic-bezier(.2,.9,.3,1)' })
   }
   const charBlocked = (side: Side) => anim(fighter(side), [{ transform: 'none' }, { transform: `translateX(${-6 * facing(side)}px)`, offset: 0.3 }, { transform: 'none' }], 240)
   const guard = (side: Side, on: boolean) => fighter(side)?.classList.toggle('guarding', on)
@@ -294,17 +385,40 @@ export function Arena(props: {
     let tail: Promise<unknown> = Promise.resolve()
     const count: Record<Side, number> = { p1: 0, p2: 0 }
     const events = next.events ?? []
-    // Strike chains: each card picks its own frame (strikePoses.ts), with a dash in before the first and a backstep after
+    // Strike chains: each card picks its own frame (strikePoses.ts), with a run up to the foe (closeIn) before the first and a hop home after
     const chainLen: Record<Side, number> = { p1: 0, p2: 0 }
     for (const ev of events) if (ev.k === 'hit') chainLen[ev.side]++
     const chain: Record<Side, ChainCount> = { p1: newChain(), p2: newChain() }
     const struck: Record<Side, number> = { p1: 0, p2: 0 }
+    const strikers = SIDES.filter((side) => chainLen[side] > 0)
+    let closed = false
+    let home: Promise<unknown> = Promise.resolve()
+    // hop back as soon as the last chain card lands, while the Field sweeps
+    const goHome = async () => {
+      const backs = SIDES.filter((side) => fighter(side)?.style.translate)
+      for (const side of backs) {
+        const f = fighter(side)
+        if (f) showPose(f, 'backstep', 420)
+      }
+      await Promise.all(backs.map((side) => travel(side, 0, 380, 22)))
+      for (const el of [q('.tok.p1'), q('.tok.p2')]) if (el) el.style.opacity = ''
+    }
     for (const [i, ev] of events.entries()) {
+      if (ev.k === 'hit' && !closed) {
+        closed = true
+        // the fighters fight over the tokens: fade them out of the way
+        for (const el of [q('.tok.p1'), q('.tok.p2')]) if (el) anim(el, [{ opacity: 1 }, { opacity: 0.2 }], 200).then(() => (el.style.opacity = '0.2'))
+        await closeIn(strikers)
+      }
       if (ev.k !== 'hp') await tail
       tail = Promise.resolve()
       if (ev.k === 'hit') {
         const n = struck[ev.side]++
-        tail = (await hit(ev, count, strikePose(chain[ev.side], ev.type, n, chainLen[ev.side], ev.crit), n === 0)).done
+        tail = (await hit(ev, count, strikePose(chain[ev.side], ev.type, n, chainLen[ev.side], ev.crit))).done
+        if (strikers.every((side) => struck[side] === chainLen[side])) {
+          const last = tail
+          home = last.then(goHome)
+        }
       }
       else if (ev.k === 'hp') hpChange(ev)
       else if (ev.k === 'sweep') await sweep(ev.side, ev.uids)
@@ -316,9 +430,8 @@ export function Arena(props: {
       else if (ev.k === 'combo') await combo(ev.side, ev.name, next)
     }
     await tail
-    const backs = SIDES.filter((side) => struck[side] > 0).map((side) => fighter(side))
-    for (const f of backs) if (f) showPose(f, 'backstep', 380)
-    if (backs.length) await wait(300)
+    await home
+    await goHome()
     for (const side of SIDES) guard(side, false)
 
     // Styles that showed up in this turn's log
@@ -334,7 +447,11 @@ export function Arena(props: {
     if (next.winner) {
       if (next.winner !== 'draw') {
         const loser = other(next.winner)
-        await charHit(loser)
+        const p = pos(fighter(loser))
+        flash('#fff', 0.7)
+        camShake(10)
+        camZoom(p.x, p.y, 1.35, 1300)
+        await charHit(loser, 40)
         setDown(loser)
       }
       await wait(600)
@@ -347,7 +464,7 @@ export function Arena(props: {
     props.onDone()
   }
 
-  async function hit(ev: Extract<TurnEvent, { k: 'hit' }>, count: Record<Side, number>, pose: Pose, first: boolean): Promise<{ done: Promise<unknown> }> {
+  async function hit(ev: Extract<TurnEvent, { k: 'hit' }>, count: Record<Side, number>, pose: Pose): Promise<{ done: Promise<unknown> }> {
     const foe = other(ev.side)
     const el = cardEl(ev.uid)
     const target = fighter(foe)
@@ -358,10 +475,6 @@ export function Arena(props: {
     const slot = el?.parentElement
     if (slot) slot.style.zIndex = '10'
     const me = fighter(ev.side)
-    if (first && me?.querySelector('.sprite')) {
-      showPose(me, 'dash', 200)
-      await wait(180)
-    }
     charAttack(ev.side, ev.type, pose)
     const dash = anim(el, [
       { transform: 'none' },
@@ -383,7 +496,12 @@ export function Arena(props: {
       spark(b.x, b.y, ev.crit ? '#ffc84a' : '#fff2b8')
       if (ev.crit) pop(b.x, b.y - 40, t('CRITICAL'), 'crit')
       if (ev.absorbed) pop(b.x - 20, b.y - 34, `${t('SHIELD')} −${ev.absorbed}`, 'soft')
-      if (ev.dealt > 0) charHit(foe)
+      if (ev.dealt > 0) {
+        if (ev.crit || ev.dealt >= 20) flash(ev.crit ? '#ffe7a3' : '#fff', ev.crit ? 0.55 : 0.3)
+        await hitStop([me, target, el], ev.crit ? 130 : Math.min(110, 40 + ev.dealt * 2))
+        charHit(foe, ev.dealt)
+        camShake(Math.min(9, 2 + ev.dealt / 4) * (ev.crit ? 1.4 : 1))
+      }
       shake(q(`.hud.${foe} .portrait`))
       setHits(t(count[ev.side] > 1 ? '{n} HITS' : '{n} HIT', { n: count[ev.side] }))
     }
@@ -397,7 +515,7 @@ export function Arena(props: {
 
   function hpChange(ev: Extract<TurnEvent, { k: 'hp' }>) {
     const p = pos(fighter(ev.side))
-    pop(p.x + (ev.delta < 0 ? 16 : 0), p.y - 6, ev.delta < 0 ? `${ev.delta}`.replace('-', '−') : `+${ev.delta}`, ev.delta < 0 ? 'dmg' : 'heal')
+    pop(p.x + (ev.delta < 0 ? 16 : 0), p.y - 6, ev.delta < 0 ? `${ev.delta}`.replace('-', '−') : `+${ev.delta}`, ev.delta < 0 ? 'dmg' : 'heal', 1 + Math.min(0.7, Math.abs(ev.delta) / 40))
     commit((v) => ({ ...v, [ev.side]: { ...v[ev.side], hp: v[ev.side].hp + ev.delta } }))
   }
 
@@ -484,6 +602,8 @@ export function Arena(props: {
     }
     flushSync(() => setGlow(lit))
     charCombo(side)
+    const fp = pos(fighter(side))
+    camZoom(fp.x, fp.y, 1.18, 1100)
     anim(q('.fxl .dim'), [{ opacity: 0 }, { opacity: 1 }, { opacity: 1 }, { opacity: 0 }], BANNER_MS)
     const b = add(`<div class="banner"><span>${t('Signature combo')} · ${name}</span><b>${title}</b><span>${sub}</span><small>${t('Tap to skip')}</small></div>`)
     // long enough to read (playtest feedback); a tap ends it without skipping the rest of the turn
@@ -629,11 +749,14 @@ export function Arena(props: {
               </div>
             </div>
             <div className="acts">
-              {ACTIONS.map(({ action, label: name, beats }) => (
+              {ACTIONS.map(({ action, label: name, beats }) => {
+                const surge = surgeOf(game, 'p1', action)
+                return (
                 <button
                   key={action}
                   type="button"
-                  className={`act ${action}${locked === action ? ' locked' : ''}`}
+                  className={`act ${action}${locked === action ? ' locked' : ''}${surge ? ' surge' : ''}`}
+                  title={surge ? t('{name}: spends all your Energy this turn ({rule})', { name: surge, rule: t(surge === 'Shroud' ? 'no Charge break, hits on you deal half' : 'hits that get past your Block deal 1 each') }) : undefined}
                   disabled={playing || !!turn || !!game.winner || !!props.busy || !legal.includes(action)}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -641,9 +764,20 @@ export function Arena(props: {
                   }}
                 >
                   {t(name)}
-                  <small>{t(beats)}</small>
+                  <small>
+                    {surge ? (
+                      <>
+                        ⚡ {surge}
+                        <br />
+                        {t('spends all Energy')}
+                      </>
+                    ) : (
+                      t(beats)
+                    )}
+                  </small>
                 </button>
-              ))}
+                )
+              })}
             </div>
           </div>
           {props.banner && !playing && (

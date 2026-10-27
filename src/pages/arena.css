@@ -166,6 +166,8 @@
 .arena .act.strike { background: var(--strike); } .arena .act.block { background: var(--block); } .arena .act.charge { background: var(--charge); }
 .arena .act:active:not(:disabled), .arena .act.locked { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
 .arena .act.locked { outline: 3px solid #fff; }
+.arena .act.surge { box-shadow: 0 5px 0 var(--ink), 0 0 0 3px #ffd84a, 0 0 14px 3px rgba(255,216,74,.55); }
+.arena .act.surge small { opacity: 1; font-size: 8px; line-height: 1.15; letter-spacing: .3px; text-transform: none; font-weight: 900; }
 .arena .act:disabled { cursor: default; }
 .arena .act:disabled:not(.locked) { filter: grayscale(.7) brightness(.6); }
 
@@ -187,6 +189,9 @@
 .arena .dim { position: absolute; inset: 0; background: rgba(12,7,24,.55); opacity: 0; }
 .arena .ghostimg { position: absolute; width: 64px; height: 84px; transform: translate(-50%, -50%); opacity: .45; }
 .arena .ghostimg svg { width: 100%; height: 100%; overflow: visible; }
+.arena .ghostimg .sprite { animation: none; }
+.arena .flash { position: absolute; inset: 0; opacity: 0; mix-blend-mode: screen; }
+.arena .dust { position: absolute; width: 46px; height: 18px; border-radius: 50%; background: radial-gradient(ellipse, rgba(225,214,255,.75), rgba(225,214,255,.25) 55%, transparent 72%); transform: translate(-50%, -50%); }
 
 /* Overlays inside the stage */
 .arena .sheet { position: absolute; inset: 0; z-index: 30; background: rgba(12,7,24,.8); display: flex; align-items: center; justify-content: center; gap: 18px; padding: 16px; }
