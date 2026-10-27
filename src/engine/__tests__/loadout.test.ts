@@ -158,13 +158,14 @@ describe('randomLoadout', () => {
 
   describe('Tank v2 Ascendancy', () => {
     const tk = (style: string, asc: string[]) => game('TK', { asc, points: 6 }, style, 'TK')
-    it('Endurance: Charge or 2+ hits give a stack, each cuts 2 dmg per hit, regens, capped, fades', () => {
+    it('Endurance: Charge or 2+ hits give a stack, old stacks decay 1 a turn', () => {
       let s = tk('TK:1', ['A1'])
       for (let i = 0; i < 4; i++) {
         s.players.p2.hand = [hit(10), hit(10)]
         s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
       }
-      expect(s.players.p1.perkData?.endurance).toBe(3)
+      // 1 new stack a turn, 1 old stack decays a turn
+      expect(s.players.p1.perkData?.endurance).toBe(1)
       const hp = s.players.p1.hp
       s.players.p2.hand = [hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'block', p2: 'strike' })
