@@ -10,6 +10,8 @@ import {
   resourceOf,
   tuningOf,
   STYLES,
+  SURGE_CHAMPION,
+  SURGE_MODES,
   type Action,
   type CardInst,
   type GameState,
@@ -37,6 +39,15 @@ const ACTIONS: { action: Action; label: string; beats: string }[] = [
   { action: 'block', label: 'Block', beats: 'beats Strike' },
   { action: 'charge', label: 'Charge', beats: 'beats Block' },
 ]
+// Assassin Energy Surge (engine.ts): with a full bar, Block / Charge spend it all, so the button says so first
+const SURGE_LABEL: Partial<Record<Action, { mode: string; name: string }>> = { block: { mode: 'A', name: 'Wraith Step' }, charge: { mode: 'B', name: 'Shroud' } }
+const surgeOf = (g: GameState, side: Side, action: Action) => {
+  const p = g.players[side]
+  const res = g.rules.resources ? resourceOf(p.championId, tuningOf(g, side)) : undefined
+  const s = SURGE_LABEL[action]
+  if (!s || !res || p.championId !== SURGE_CHAMPION || !SURGE_MODES.includes(s.mode) || (p.res ?? 0) < res.cap) return undefined
+  return s.name
+}
 const SPEEDS = [1, 1.5, 2]
 /** Signature combo banner time at 1x speed (was 1.3 s, players couldn't read it) */
 const BANNER_MS = 3200
@@ -730,11 +741,14 @@ export function Arena(props: {
               </div>
             </div>
             <div className="acts">
-              {ACTIONS.map(({ action, label: name, beats }) => (
+              {ACTIONS.map(({ action, label: name, beats }) => {
+                const surge = surgeOf(game, 'p1', action)
+                return (
                 <button
                   key={action}
                   type="button"
-                  className={`act ${action}${locked === action ? ' locked' : ''}`}
+                  className={`act ${action}${locked === action ? ' locked' : ''}${surge ? ' surge' : ''}`}
+                  title={surge ? t('{name}: spends all your Energy this turn ({rule})', { name: surge, rule: t(surge === 'Shroud' ? 'no Charge break, hits on you deal half' : 'hits that get past your Block deal 1 each') }) : undefined}
                   disabled={playing || !!turn || !!game.winner || !!props.busy || !legal.includes(action)}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -742,9 +756,20 @@ export function Arena(props: {
                   }}
                 >
                   {t(name)}
-                  <small>{t(beats)}</small>
+                  <small>
+                    {surge ? (
+                      <>
+                        ⚡ {surge}
+                        <br />
+                        {t('spends all Energy')}
+                      </>
+                    ) : (
+                      t(beats)
+                    )}
+                  </small>
                 </button>
-              ))}
+                )
+              })}
             </div>
           </div>
           {props.banner && !playing && (

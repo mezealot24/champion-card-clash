@@ -165,6 +165,8 @@
 .arena .act.strike { background: var(--strike); } .arena .act.block { background: var(--block); } .arena .act.charge { background: var(--charge); }
 .arena .act:active:not(:disabled), .arena .act.locked { transform: translateY(4px); box-shadow: 0 1px 0 var(--ink); }
 .arena .act.locked { outline: 3px solid #fff; }
+.arena .act.surge { box-shadow: 0 5px 0 var(--ink), 0 0 0 3px #ffd84a, 0 0 14px 3px rgba(255,216,74,.55); }
+.arena .act.surge small { opacity: 1; font-size: 8px; line-height: 1.15; letter-spacing: .3px; text-transform: none; font-weight: 900; }
 .arena .act:disabled { cursor: default; }
 .arena .act:disabled:not(.locked) { filter: grayscale(.7) brightness(.6); }
 
