@@ -43,6 +43,8 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
   const [typeFilter, setTypeFilter] = useState<CardType | ''>('')
   const [tagFilter, setTagFilter] = useState<CardTag | ''>('')
   const [deckFilter, setDeckFilter] = useState<'all' | 'in' | 'out'>('all')
+  const [bulkBy, setBulkBy] = useState(-3)
+  const [bulkMin, setBulkMin] = useState(5)
 
   // a Style's own cards (style_only "MG:1") replace the "!MG:1" ones, so count the deck every other Style plays
   const deckCount = cards.filter((c) => c.in_deck && !(c.style_only && !c.style_only.startsWith('!'))).reduce((n, c) => n + c.copies, 0)
@@ -59,6 +61,15 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
   const edit = (id: string, patch: Partial<EditableCard>) => {
     setCards(cards.map((c) => (c.id === id ? { ...c, ...patch } : c)))
     setDirty(new Set(dirty).add(id))
+  }
+
+  // Bulk dmg: add bulkBy (can be negative) to every target card with dmg >= bulkMin; never below 0. Saved with Save like any edit.
+  const bulkDmg = (targets: EditableCard[]) => {
+    const ids = new Set(targets.filter((c) => c.dmg >= bulkMin).map((c) => c.id))
+    if (!ids.size || !bulkBy) return
+    if (!confirm(`${bulkBy > 0 ? '+' : ''}${bulkBy} dmg on ${ids.size} cards (dmg ${bulkMin}+)? Press Save after to keep it.`)) return
+    setCards(cards.map((c) => (ids.has(c.id) ? { ...c, dmg: Math.max(0, c.dmg + bulkBy) } : c)))
+    setDirty(new Set([...dirty, ...ids]))
   }
 
   const addCard = () => {
@@ -119,6 +130,14 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
           <option value="out">Not in deck</option>
         </select>
         <span className="muted">{visible.length} shown</span>
+        <span className="bulk">
+          dmg
+          <input className="num" type="number" inputMode="numeric" aria-label="Bulk dmg change" value={bulkBy} onChange={(e) => setBulkBy(Number(e.target.value))} />
+          on cards with dmg ≥
+          <input className="num" type="number" inputMode="numeric" aria-label="Bulk only dmg at least" min={0} value={bulkMin} onChange={(e) => setBulkMin(Number(e.target.value))} />
+          <button className="secondary" onClick={() => bulkDmg(visible)}>Apply to shown ({visible.filter((c) => c.dmg >= bulkMin).length})</button>
+          <button className="secondary" onClick={() => bulkDmg(cards)}>Apply to all ({cards.filter((c) => c.dmg >= bulkMin).length})</button>
+        </span>
         <span className="spacer" />
         <button className="secondary" onClick={() => downloadJson(`${championId}-cards.json`, cards)}>Export JSON</button>
         <button className="secondary" onClick={() => downloadCsv(`${championId}-cards.csv`, cards)}>Export CSV</button>
