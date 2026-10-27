@@ -84,7 +84,9 @@ function gainEndurance(state: GameState, side: Side, why: string, src = 'flinch'
   if (p.perkData?.[at] === state.turn) return // once a turn per source
   const max = num(state, side, 'TK:1', 'ascEnduranceMax')
   const n = Math.min(max, endurance(p) + by)
-  p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, [at]: state.turn }
+  // stacks gained this turn don't decay at this turn's end
+  const fresh = (p.perkData?.enduranceAt === state.turn ? (p.perkData?.enduranceFresh ?? 0) : 0) + n - endurance(p)
+  p.perkData = { ...p.perkData, endurance: n, enduranceAt: state.turn, enduranceFresh: fresh, [at]: state.turn }
   say(state, side, `Endurance (${why}): ${n}/${max}`)
 }
 /** Unrelenting drain / Unyielding mend: amounts per coming turn (perkData only holds numbers: drain0, drain1, …) */
@@ -244,7 +246,7 @@ const MINOR_FX: Record<string, Piece> = {
 /** Built per node: amt(state, side) reads the node's own number in play, k is its key (for tune / setup). */
 const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, key: string) => Piece> = {
   // ---- Tank v2 (design/tank-ascendancy-v2-2026-10-25.md): 4 branches × (2 nodes + capstone with a Cost) ----
-  // Lifeline · Endurance (PoE Juggernaut): stacks kept in perkData, capped, fade after ascEnduranceTurns without a new one
+  // Lifeline · Endurance (PoE Juggernaut): stacks kept in perkData, capped, lose ascEnduranceDecay a turn
   'TK:1:A1': () => ({
     hooks: {
       afterHits: (state, side, r) => {
@@ -1480,13 +1482,14 @@ PIECES['asc:TK:1:END'] = {
       const p = state.players[side]
       const n = endurance(p)
       if (!n) return
-      if (state.turn - (p.perkData?.enduranceAt ?? 0) >= num(state, side, 'TK:1', 'ascEnduranceTurns')) {
-        p.perkData = { ...p.perkData, endurance: 0 }
-        say(state, side, 'Endurance fades')
-        return
-      }
-      const got = styleHeal(state, side, Math.floor(((p.maxHp - p.hp) * n * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
-      if (got) say(state, side, `Endurance: ${n} regen ${got}`)
+      // Q 2026-10-27: lose ascEnduranceDecay old stacks every end of turn (stacks gained this turn are kept; was: all gone after 3 turns without a new one); regen uses what's left
+      const fresh = p.perkData?.enduranceAt === state.turn ? (p.perkData?.enduranceFresh ?? 0) : 0
+      const left = Math.max(Math.min(n, fresh), n - num(state, side, 'TK:1', 'ascEnduranceDecay'))
+      p.perkData = { ...p.perkData, endurance: left }
+      if (left < n) say(state, side, `Endurance decays: ${left}`)
+      if (!left) return
+      const got = styleHeal(state, side, Math.floor(((p.maxHp - p.hp) * left * num(state, side, 'TK:1', 'ascEnduranceRegen')) / 100))
+      if (got) say(state, side, `Endurance: ${left} regen ${got}`)
     },
   },
 }
