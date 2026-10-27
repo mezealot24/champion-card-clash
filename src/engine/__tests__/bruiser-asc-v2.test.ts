@@ -79,7 +79,7 @@ describe('Bruiser v2 Ascendancy', () => {
       s.players.p1.res = 20
       s.players.p1.hand = [hit(10), hit(10)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(100 - s.players.p2.hp).toBe(26)
+      expect(100 - s.players.p2.hp).toBe(26 + 8) // + Fury Warm-up 4 on slots 1-2 (Rage 5+)
     })
 
     it('Blood Rite: Rage cap 30, no quiet-turn loss, no HP burn; Block stops 1 fewer hit', () => {
@@ -110,7 +110,7 @@ describe('Bruiser v2 Ascendancy', () => {
       s.players.p1.hand = [hit(10), hit(16, 'K'), hit(30, 'S')]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
       expect(said(s, 'Payback: 10 Rage')).toBe(true)
-      expect(100 - s.players.p2.hp).toBe(20 + 16 + 30)
+      expect(100 - s.players.p2.hp).toBe(20 + 16 + 30 + 8) // + Fury Warm-up 4 on slots 1-2
       expect(woundUp(s)).toBe(false)
     })
 
@@ -147,7 +147,7 @@ describe('Bruiser v2 Ascendancy', () => {
       s.players.p1.res = 10
       s.players.p1.hand = [hit(5)]
       s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-      expect(100 - s.players.p2.hp).toBe(15)
+      expect(100 - s.players.p2.hp).toBe(15 + 4) // + Fury Warm-up 4 on slot 1
       expect(s.players.p1.statuses.find((x) => x.kind === 'shield')?.n).toBe(5)
     })
 
