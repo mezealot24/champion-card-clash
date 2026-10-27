@@ -606,6 +606,14 @@ export function Arena(props: {
               <div className="turn">
                 {t('TURN')}<b>{game.turn}</b>
               </div>
+              {game.rules.suddenDeathTurn > 0 && game.turn > game.rules.suddenDeathTurn - 5 && (
+                <div
+                  className="sudden"
+                  title={`After turn ${game.rules.suddenDeathTurn}: both sides lose ${game.rules.suddenDeathDmg} HP more every turn, heals −${game.rules.suddenDeathHealCut}%`}
+                >
+                  {game.turn > game.rules.suddenDeathTurn ? '☠ Sudden death' : `☠ in ${game.rules.suddenDeathTurn + 1 - game.turn}`}
+                </div>
+              )}
               <div className="tools">
                 <button
                   type="button"

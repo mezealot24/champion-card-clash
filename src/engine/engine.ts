@@ -216,6 +216,7 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     loseHp(state, side, burn)
     log(state, `${side} 🔥 Ignite ${igniteStacks(state.players[side])} stacks burn ${burn}`)
   }
+  suddenDeath(state)
   for (const side of SIDES) {
     const p = state.players[side]
     p.silenced = false
@@ -233,6 +234,21 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   else if (dead.length === 1) state.winner = other(dead[0])
   state.turn++
   return state
+}
+
+/** Sudden death: from the turn after rules.suddenDeathTurn, both sides lose suddenDeathDmg × (turns past it) HP at the end of
+ *  the turn; the first such turn every heal gets suddenDeathHealCut % smaller for the rest of the match (perkData.healPct). */
+export function suddenDeath(state: GameState) {
+  const { suddenDeathTurn: at, suddenDeathDmg: dmg, suddenDeathHealCut: cut } = state.rules
+  const past = state.turn - at
+  if (!at || past <= 0) return
+  for (const side of SIDES) {
+    const p = state.players[side]
+    if (past === 1 && cut > 0) p.perkData = { ...p.perkData, healPct: Math.floor(((p.perkData?.healPct ?? 100) * (100 - Math.min(100, cut))) / 100) }
+    if (p.hp <= 0 || dmg <= 0) continue
+    loseHp(state, side, dmg * past)
+    log(state, `${side} ☠ Sudden death: lose ${dmg * past} HP`)
+  }
 }
 
 const hasStatus = (state: GameState, side: Side, kind: string) => state.players[side].statuses.some((s) => s.kind === kind)

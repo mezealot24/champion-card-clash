@@ -197,6 +197,9 @@ export const RULE_KEYS = {
   block_stops_hits: 'blockStopsHits',
   block_streak_discard: 'blockStreakDiscard',
   charge_draw: 'chargeDraw',
+  sudden_death_turn: 'suddenDeathTurn',
+  sudden_death_dmg: 'suddenDeathDmg',
+  sudden_death_heal_cut: 'suddenDeathHealCut',
 } as const
 
 /** game_config rows → the rules they override (non-numbers are ignored). */
