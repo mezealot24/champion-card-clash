@@ -113,6 +113,11 @@ export type RulesConfig = {
   chargeDraw: number
   /** Class resources + S card costs (engine/resources.ts). Off = every card is free (older card tests, A/B sims). */
   resources: boolean
+  /** Sudden death (Q 2026-10-27, Tank games ran ~80 turns): after this turn, both sides lose suddenDeathDmg × (turns past it) HP
+   *  at the end of every turn, and every heal is suddenDeathHealCut % smaller. 0 = off. */
+  suddenDeathTurn: number
+  suddenDeathDmg: number
+  suddenDeathHealCut: number
 }
 
 export const DEFAULT_RULES: RulesConfig = {
@@ -122,6 +127,9 @@ export const DEFAULT_RULES: RulesConfig = {
   blockStreakDiscard: 3,
   chargeDraw: 1,
   resources: true, // Q 2026-10-15: every S card has a cost
+  suddenDeathTurn: 30,
+  suddenDeathDmg: 2,
+  suddenDeathHealCut: 50,
 }
 
 /**

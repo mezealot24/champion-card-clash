@@ -157,6 +157,7 @@
 .arena .side { grid-area: side; display: flex; flex-direction: column; justify-content: space-between; padding: 10px 12px 12px 4px; position: relative; z-index: 5; gap: 6px; }
 .arena .turn { text-align: center; font: 13px var(--display); color: var(--muted); letter-spacing: 1px; }
 .arena .turn b { display: block; font-size: 26px; color: var(--text); line-height: 1; }
+.arena .sudden { text-align: center; font: 600 11px var(--display); color: #ff6b6b; letter-spacing: .5px; margin-top: 2px; }
 .arena .tools { display: flex; gap: 4px; justify-content: center; }
 .arena .tool { font: 800 10px var(--body); color: var(--text); background: var(--arena-2); border: 2px solid var(--ink); border-radius: 999px; padding: 3px 7px; cursor: pointer; box-shadow: 0 2px 0 var(--ink); }
 .arena .acts { display: flex; flex-direction: column; gap: 8px; }
