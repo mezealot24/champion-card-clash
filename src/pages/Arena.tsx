@@ -139,6 +139,17 @@ export function Arena(props: {
     }
   }, [game, turn])
 
+  // while the battle is up, a long press anywhere (Android Chrome) selects nothing and opens no menu or search sheet
+  useEffect(() => {
+    const stop = (e: Event) => e.preventDefault()
+    document.addEventListener('contextmenu', stop)
+    document.addEventListener('selectstart', stop)
+    return () => {
+      document.removeEventListener('contextmenu', stop)
+      document.removeEventListener('selectstart', stop)
+    }
+  }, [])
+
   useLayoutEffect(() => {
     const fit = () => {
       const w = window.innerWidth
