@@ -1,10 +1,13 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
 import { t, useLang } from '../i18n'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
+import { addClear, ARCADE_STAGES, cleared, loadRun, newRun, randomFoe, saveRun, tierOf, type ArcadeRun, type Foe as FoePick, type Tier } from './arcade/arcade'
+import { ArcadeLadder } from './arcade/ArcadeLadder'
+import { TitleMenu, type Mode } from './menu/TitleMenu'
 import { DeckBuilder } from './deck/DeckBuilder'
 import { deckRows, deckRulesFromConfig, loadDeck } from './deck/deck'
 import { ascPointsFromConfig, firstOpenStep, loadLoadout, loadoutFor, saveLoadout, savedStyle, type SavedLoadout, type Step } from './loadout/loadout'
@@ -66,6 +69,20 @@ export function Battle({ data }: { data: BattleData }) {
   // new match = new id, so the turn timer restarts even when the turn number repeats
   const [match, setMatch] = useState(0)
   const [settings] = useGameSettings()
+  // title menu first (null); then Arcade, Versus or Multiplayer
+  const [mode, setMode] = useState<Mode | null>(null)
+  // Versus: the opponent is rolled at random unless the player picks one (Q 2026-10-28)
+  const [foeRandom, setFoeRandom] = useState(true)
+  const [run, setRunState] = useState<ArcadeRun | null>(loadRun)
+  const setRun = (r: ArcadeRun | null) => {
+    setRunState(r)
+    saveRun(r)
+  }
+  const [ladder, setLadder] = useState(false)
+  // AI strength of the current match (Arcade stage); null = the normal AI
+  const [tier, setTier] = useState<Tier | null>(null)
+  // the Arcade match whose win was already counted
+  const counted = useRef(0)
 
   useEffect(() => {
     // sample is a function: wrap it, or React would call it as a state updater (and every pick would fail)
@@ -105,6 +122,9 @@ export function Battle({ data }: { data: BattleData }) {
     [data, tuning],
   )
 
+  // every (Champion, Style) the engine can play: Arcade stages and Versus' Random pick from it
+  const pool: FoePick[] = data.champions.flatMap((c) => playable(c.id).map((style) => ({ champ: c.id, style })))
+
   function start() {
     const myStyle = styleKey('p1') || undefined
     // the steps only offer Fight when all is set; an old save that slipped through goes back to the step it misses
@@ -113,21 +133,79 @@ export function Battle({ data }: { data: BattleData }) {
       setGame(null)
       return setStep(open)
     }
-    if (foe === 'online') return setOnline(true)
+    if (mode === 'multi') return setOnline(true)
+    if (mode === 'arcade') {
+      setRun(newRun(picks.p1, myStyle ?? '', pool))
+      setGame(null)
+      return setLadder(true)
+    }
+    let p2 = picks.p2
+    let p2Style = styleKey('p2') || undefined
+    const rolled = foeRandom ? randomFoe(pool) : undefined
+    if (rolled) {
+      p2 = rolled.champ
+      p2Style = rolled.style
+      setPicks((p) => ({ ...p, p2 }))
+      setFoeStyle(rolled.style)
+    }
+    launch(picks.p1, myStyle, p2, p2Style, null)
+  }
+
+  function launch(me: string, myStyle: string | undefined, them: string, theirStyle: string | undefined, aiTier: Tier | null, banner = '') {
     setTurn(null)
-    setLine('')
+    setLine(banner)
     setHistory([])
     setMatch((m) => m + 1)
-    const foeStyle = styleKey('p2') || undefined
-    const foeL = randomLoadout(picks.p2, foeStyle, ascPoints)
+    setTier(aiTier)
+    const foeL = randomLoadout(them, theirStyle, ascPoints)
     setFoeLoadout(foeL)
-    setGame(createGame({ ...setup(picks.p1), deck: buildDeck(myDeck(picks.p1, myStyle).rows), style: myStyle, loadout: loadoutFor(picks.p1, myStyle, ascPoints) }, { ...setup(picks.p2), style: foeStyle, loadout: foeL }, gameOpts))
+    setGame(createGame({ ...setup(me), deck: buildDeck(myDeck(me, myStyle).rows), style: myStyle, loadout: loadoutFor(me, myStyle, ascPoints) }, { ...setup(them), style: theirStyle, loadout: foeL }, gameOpts))
   }
+
+  /** Fight the run's next Arcade stage (again, after a Continue). */
+  function fightStage(r: ArcadeRun) {
+    const foeAt = r.stages[r.at]
+    if (!foeAt) return
+    // the loadout changed since the run began and misses a piece: finish it first (Start then begins a new run)
+    const open = firstOpenStep(r.champ, r.style, ascPoints, loadLoadout(r.champ))
+    if (open !== 'fight') {
+      setPicks((p) => ({ ...p, p1: r.champ }))
+      setLadder(false)
+      setGame(null)
+      return setStep(open)
+    }
+    setPicks({ p1: r.champ, p2: foeAt.champ })
+    setFoeStyle(foeAt.style)
+    const aiTier = tierOf(r.at)
+    launch(r.champ, r.style, foeAt.champ, foeAt.style, aiTier, t('Stage {n}/{total} · {tier}', { n: r.at + 1, total: ARCADE_STAGES, tier: t(aiTier.name) }))
+  }
+
+  function pickMode(m: Mode) {
+    setMode(m)
+    setStep('champion')
+    if (m === 'multi') setFoe('online')
+    else if (foe === 'online' || m === 'arcade') setFoe('ai')
+    if (m === 'arcade' && run && !cleared(run)) {
+      setPicks((p) => ({ ...p, p1: run.champ }))
+      setLadder(true)
+    }
+  }
+
+  // an Arcade win moves the ladder up as soon as the K.O. lands, so a closed tab keeps it
+  useEffect(() => {
+    if (mode !== 'arcade' || !tier || !run || !game?.winner || turn || counted.current === match) return
+    counted.current = match
+    if (game.winner !== 'p1') return
+    const r = { ...run, at: run.at + 1 }
+    setRun(r)
+    if (cleared(r)) addClear(r.champ)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game, turn])
 
   async function play(action: Action) {
     if (!game || turn || thinking) return
-    let p2 = pickSmartAction(game, 'p2')
-    if (foe === 'tuktah' && sample) {
+    let p2 = pickSmartAction(game, 'p2', Math.random, tier ? { depth: tier.depth, noise: tier.noise } : {})
+    if (mode === 'versus' && foe === 'tuktah' && sample) {
       // Claude picks from the board alone; the player's pick stays here until both are locked
       setThinking(true)
       const move = await askTuktah(sample, game, 'p2', history, styleText)
@@ -188,9 +266,38 @@ export function Battle({ data }: { data: BattleData }) {
     )
   }
 
-  if (!game) {
+  if (!game && !mode) {
+    return <TitleMenu champions={data.champions} run={run} canOnline={hasDb} onPick={pickMode} onTutorial={() => setTutorial(true)} />
+  }
+
+  if (!game && mode === 'arcade' && ladder && run) {
+    return (
+      <ArcadeLadder
+        run={run}
+        champName={champTitle}
+        styleName={(key) => STYLES[key]?.name ?? key}
+        onFight={() => fightStage(run)}
+        onNewRun={() => {
+          setPicks((p) => ({ ...p, p1: run.champ }))
+          setRun(null)
+          setLadder(false)
+          setStep('champion')
+        }}
+        onMenu={() => {
+          setLadder(false)
+          setMode(null)
+        }}
+      />
+    )
+  }
+
+  if (!game || !mode) {
     return (
       <ChampionSelect
+        mode={mode ?? 'versus'}
+        foeRandom={foeRandom}
+        setFoeRandom={setFoeRandom}
+        onMenu={() => setMode(null)}
         champions={data.champions}
         stylesOf={stylesOf}
         styleText={styleText}
@@ -229,6 +336,42 @@ export function Battle({ data }: { data: BattleData }) {
     return key ? (STYLES[key]?.name ?? key) : ''
   }
 
+  // Arcade result buttons: a win goes back to the ladder; a loss can Continue the same stage or give up the run
+  const arcade = mode === 'arcade' && !!tier && !!run
+  const won = game.winner === 'p1'
+  const lost = !!game.winner && !won
+  const toLadder = () => {
+    setTurn(null)
+    setGame(null)
+    setLadder(true)
+  }
+  const arcadeNext = () => {
+    if (!run) return
+    if (won) return toLadder()
+    const r = { ...run, continues: run.continues + 1 }
+    setRun(r)
+    fightStage(r)
+  }
+  const arcadeQuit = () => {
+    if (won || lost) {
+      // a win is already saved: Menu keeps the run; Give up after a loss ends it
+      if (lost) setRun(null)
+      setTurn(null)
+      setGame(null)
+      setLadder(false)
+      return setMode(null)
+    }
+    toLadder()
+  }
+  const arcadeLabels = arcade
+    ? {
+        restart: won ? (run && cleared(run) ? t('Arcade clear!') : t('Next stage')) : t('Continue'),
+        quit: won ? t('Menu') : lost ? t('Give up') : undefined,
+        quitMenu: t('Quit to the ladder (progress kept)'),
+        note: t('Stage {n}/{total} · {tier}', { n: Math.min(run!.at + (won ? 0 : 1), ARCADE_STAGES), total: ARCADE_STAGES, tier: t(tier!.name) }),
+      }
+    : undefined
+
   const legal = legalActions(game, 'p1')
   const myLoadout = loadoutFor(game.players.p1.championId, game.players.p1.style, ascPoints)
   return (
@@ -250,7 +393,8 @@ export function Battle({ data }: { data: BattleData }) {
         }}
         settingsExtra={<TimerSetting />}
         onAction={play}
-        foe={foe === 'tuktah' ? t('Tuktah') : t('AI')}
+        foe={mode === 'versus' && foe === 'tuktah' ? t('Tuktah') : t('AI')}
+        labels={arcadeLabels}
         busy={thinking}
         banner={thinking ? t('Tuktah is thinking…') : line || undefined}
         bannerFades={!thinking}
@@ -258,8 +402,8 @@ export function Battle({ data }: { data: BattleData }) {
           if (turn) setGame(turn.next)
           setTurn(null)
         }}
-        onRestart={start}
-        onQuit={() => {
+        onRestart={arcade ? arcadeNext : start}
+        onQuit={arcade ? arcadeQuit : () => {
           setTurn(null)
           setGame(null)
         }}

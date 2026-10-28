@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { t, withLang } from '.'
 import { CHAMP_INFO, STYLE_SUMMARY } from '../pages/select/info'
 import { TUTORIAL } from '../pages/tutorial/script'
+import { TIERS } from '../pages/arcade/arcade'
 import { TH } from './th'
 
 const LIT = String.raw`(?:'((?:\\.|[^'\\])*)'|"((?:\\.|[^"\\])*)")`
@@ -41,6 +42,7 @@ const dataKeys = [
   ...['Champion', 'Path', 'Oath', 'Deck', 'Fight', 'Punch', 'Kick', 'Skill', 'Charge break', 'Block streak', 'Minor', 'Ascendancy'],
   ...['SECOND HELPING', 'Heal 10% of your HP', 'DEATH MARK', 'Every later Strike bursts +50%', 'SEALED', "Enemy can't Block next turn", 'GUARD CRUSH', 'Next Strike breaks through Block'],
   ...['Tank pays for S cards with HP.'],
+  ...TIERS.map((x) => x.name),
 ]
 
 const slots = (s: string) => (s.match(/\{[\w.|]+\}/g) ?? []).sort()

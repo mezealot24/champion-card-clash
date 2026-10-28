@@ -100,6 +100,8 @@ export function Arena(props: {
   /** no Play again button when absent (online matches) */
   onRestart?: () => void
   onQuit: () => void
+  /** button labels on the result screen and the Settings sheet (Arcade: Next stage / Continue / Give up) */
+  labels?: { restart?: string; quit?: string; quitMenu?: string; note?: string }
   /** what the opponent is called on screen (default AI) */
   foe?: string
   /** a line shown over the board (opponent's taunt, "waiting for opponent"...); a taunt fades out by itself */
@@ -764,13 +766,14 @@ export function Arena(props: {
               <div className="row">
                 {props.onRestart && (
                   <button type="button" className="big-btn" onClick={props.onRestart}>
-                    {t('Play again')}
+                    {props.labels?.restart ?? t('Play again')}
                   </button>
                 )}
                 <button type="button" className="big-btn alt" onClick={props.onQuit}>
-                  {t('Change Champion')}
+                  {props.labels?.quit ?? t('Change Champion')}
                 </button>
               </div>
+              {props.labels?.note && <p className="result-note">{props.labels.note}</p>}
             </div>
           )}
           {sheet && (
@@ -787,7 +790,7 @@ export function Arena(props: {
                   </button>
                   {props.settingsExtra && <div onClick={(e) => e.stopPropagation()}>{props.settingsExtra}</div>}
                   <button type="button" className="big-btn alt" onClick={props.onQuit}>
-                    {t('Quit to Champion select')}
+                    {props.labels?.quitMenu ?? t('Quit to Champion select')}
                   </button>
                   <p>{t('Tap outside to close.')}</p>
                 </div>
