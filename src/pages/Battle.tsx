@@ -205,6 +205,8 @@ export function Battle({ data }: { data: BattleData }) {
   async function play(action: Action) {
     if (!game || turn || thinking) return
     let p2 = pickSmartAction(game, 'p2', Math.random, tier ? { depth: tier.depth, noise: tier.noise } : {})
+    // the Arcade "Stage n/5" banner is for the first turn only (the Arena shows a banner again every turn while it is set)
+    setLine('')
     if (mode === 'versus' && foe === 'tuktah' && sample) {
       // Claude picks from the board alone; the player's pick stays here until both are locked
       setThinking(true)
