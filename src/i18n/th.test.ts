@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { t, withLang } from '.'
-import { DMG_TARGET, HOOK_LABEL, PCT_OF, PER_LABEL, PIERCE_TARGET, STATUS, TYPE, WHO } from '../engine/effects/describe'
+import { DMG_TARGET, HOOK_LABEL, PCT_OF, PER_LABEL, PIERCE_TARGET, STATUS, TIMING, TYPE, WHO } from '../engine/effects/describe'
 import { ENDURANCE_TEXT, OATHS, TREES } from '../engine/loadoutData'
 import { PER, STATUS_SHORT } from '../pages/learnText'
 import { CHAMP_INFO, STYLE_SUMMARY } from '../pages/select/info'
@@ -49,7 +49,7 @@ const dataKeys = [
   // card text tables (effects/describe.ts, learnText.ts)
   ...[HOOK_LABEL, WHO, TYPE, STATUS, PER_LABEL, PCT_OF, DMG_TARGET, PIERCE_TARGET, STATUS_SHORT, PER].flatMap((m) => Object.values(m) as string[]),
   ...['oldest', 'newest', 'this turn only', 'this turn', 'next turn', 'for {n} turns', 'Mana', 'Rage', 'Energy', 'resource', ' next', ' later', ' chain'],
-  ...['HOLD·START', 'BEFORE', 'ON HIT', 'AFTER', 'HOLD', 'ON DRAW', 'Foe Strikes', 'Foe Blocks', 'Foe Charges', 'You {x}', 'Foe {x}', 'Cut {n} oldest', 'Cut {n} newest'],
+  ...[...Object.values(TIMING), 'You {x}', 'Foe {x}', 'Cut {n} oldest', 'Cut {n} newest', "You can't {a}", "Both can't {a}", "Foe can't {a}"],
   // Ascendancy and Oath pieces (loadoutData.ts), shown through t() before their {numbers} are filled
   ...Object.values(TREES).flatMap((tree) => tree.nodes.flatMap((n) => [n.text, ...(n.cost ? [n.cost] : [])])),
   ...Object.values(OATHS).flatMap((os) => os.map((o) => o.text)),

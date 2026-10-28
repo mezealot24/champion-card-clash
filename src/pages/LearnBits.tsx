@@ -60,16 +60,20 @@ export function ComboTracker({ game, side, cards }: { game: GameState; side: Sid
   )
 }
 
-/** Card face effect: timing tag + short condition, then ▲ what you gain and ▼ what it costs. Full text is in the card sheet. */
+/** Card face effect, as Q reads a card: timing, one line per condition, then what you gain (green) / pay (red). Full text is in the card sheet. */
 export function CompactFx({ spec, res }: { spec: EffectSpec; res?: string }) {
   return (
     <>
       {compactRules(spec, res).map((r, i) => (
         <span className="rule crule" key={i}>
           <span className="tim">{r.tag}</span>
-          {r.when && <span className="when"> {r.when}</span>}
-          {r.gain.length > 0 && <span className="gain">▲ {r.gain.join(', ')}</span>}
-          {r.cost.length > 0 && <span className="cost-l">▼ {r.cost.join(', ')}</span>}
+          {r.when.map((w, j) => (
+            <span className="when" key={j}>
+              {w}
+            </span>
+          ))}
+          {r.gain.length > 0 && <span className="gain">{r.gain.join(', ')}</span>}
+          {r.cost.length > 0 && <span className="cost-l">{r.cost.join(', ')}</span>}
         </span>
       ))}
     </>

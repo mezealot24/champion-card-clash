@@ -1012,12 +1012,14 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
   return <aside className={`hud ${side} ${side === 'p1' ? 'me' : 'enemy'}`}>{side === 'p2' ? [who, bar, meta] : [meta, bar, who]}</aside>
 }
 
+// older card text (no effect_json): its timings read as the 3 the card face uses (learnText.ts)
 const TIMING: [string, string][] = [
-  ['Before action', 'BEFORE'],
-  ['On hit', 'ON HIT'],
-  ['After action', 'AFTER'],
-  ['Every turn (Hold)', 'HOLD'],
-  ['Comes into play', 'ON DRAW'],
+  ['Before action', 'Before action'],
+  ['On hit', 'After action'],
+  ['After action', 'After action'],
+  ['Every turn (Hold)', 'After action'],
+  ['When appear', 'When appear'],
+  ['Comes into play', 'When appear'],
 ]
 const SHORT: [RegExp, string][] = [
   [/you play (Strike|Block|Charge)/g, 'you $1'],
@@ -1098,7 +1100,7 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
             const r = cardRule(rule)
             return (
               <span className="rule" key={i}>
-                {r.timing && <span className="tim">{r.timing}</span>}
+                {r.timing && <span className="tim">{t(r.timing)}</span>}
                 {r.cond && <span className="when"> {r.cond}</span>}
                 <span className="do">{r.act}</span>
               </span>

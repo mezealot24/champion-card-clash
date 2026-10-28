@@ -20,7 +20,8 @@
 .arena .ct-pop p { margin: 0; } .arena .ct-pop p + p { margin-top: 4px; }
 .arena .ct-pop b { color: var(--gold); }
 
-/* Compact card rule: tag + condition, then gain (green) / cost (red) */
+/* Compact card rule: timing, one line per condition, then gain (green) / cost (red) */
+.arena .card .fx .crule .when { display: block; line-height: 1.15; }
 .arena .card .fx .crule .gain, .arena .card .fx .crule .cost-l { display: block; font-weight: 900; font-size: 9.5px; line-height: 1.15; margin-top: 1px; }
 .arena .card .fx .crule .gain { color: #11703f; }
 .arena .card .fx .crule .cost-l { color: #c21d3b; }

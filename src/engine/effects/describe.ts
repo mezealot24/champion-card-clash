@@ -181,12 +181,18 @@ export function describeAct(a: ActSpec, now = false, tr: Tr = EN, res = 'resourc
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
+/** Q 2026-10-28: a card works at only 3 timings; Hold and On hit read as conditions on them (HOOK_LABEL stays the Builder's names). */
+export const TIMING: Record<Hook, string> = { modify: 'Before action', onHit: 'After action', onResolve: 'After action', onHeld: 'After action', onDraw: 'When appear', onClean: 'After action', onBlocked: 'After action' }
+
 export function describeSpec(spec: EffectSpec | null | undefined, tr: Tr = EN, res = 'resource'): string {
   return normalizeSpec(spec ?? [])
     .map((r) => {
       const conds = (r.if ?? []).map((c) => describeCond(c, tr, res))
-      const hook = tr(HOOK_LABEL[r.hook])
-      const when = r.hook === 'onHeld' && r.at === 'before' ? tr('{hook}, start of turn', { hook }) : hook
+      const mine = (r.if ?? []).some((c) => c.c === 'selfAction')
+      // On hit fires right after this card's own hit (so only on a Strike); Hold while it stays on the Field, i.e. you don't Strike (Block / Charge say so already)
+      if (r.hook === 'onHit' && !mine) conds.unshift(describeCond({ c: 'selfAction', a: 'strike' }, tr, res))
+      if (r.hook === 'onHeld' && !mine) conds.unshift(tr("you don't play Strike"))
+      const when = tr(r.hook === 'onHeld' && r.at === 'before' ? TIMING.modify : TIMING[r.hook])
       const head = [when, conds.length ? tr('if {conds}', { conds: conds.join(tr(' and ')) }) : ''].filter(Boolean).join(', ')
       // a Parry gained Before action guards this turn's hits (statuses tick before the chain); everything else gained
       // then is read from next turn on, like one gained after the attack

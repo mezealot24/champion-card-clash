@@ -1,5 +1,5 @@
 // Learnability helpers for the battle screen (playtest feedback #3, pack B): pure text, no React.
-// - compactRules: effect_json → "when · gain · cost" lines for the card face (full text stays in the card sheet)
+// - compactRules: effect_json → timing, one line per condition, then gain / cost for the card face (full text stays in the card sheet)
 // - comboInfo / comboSteps: the signature combo pattern and which steps the Field already lights
 import type { CardType } from '../engine'
 import { COMBOS } from '../engine/combos'
@@ -8,9 +8,10 @@ import { isDrawback, normalizeSpec, type ActSpec, type CondSpec, type EffectSpec
 import type { Tuning } from '../engine/tuning'
 import { t as tr } from '../i18n'
 
-export type CompactRule = { tag: string; when: string; gain: string[]; cost: string[] }
+export type CompactRule = { tag: string; when: string[]; gain: string[]; cost: string[] }
 
-const TAG: Record<Hook, string> = { modify: 'BEFORE', onHit: 'ON HIT', onResolve: 'AFTER', onHeld: 'HOLD', onDraw: 'ON DRAW', onClean: 'AFTER', onBlocked: 'AFTER' }
+// Q 2026-10-28: a card works at only 3 timings; Hold and On hit are conditions on them
+const TAG: Record<Hook, string> = { modify: 'Before action', onHit: 'After action', onResolve: 'After action', onHeld: 'After action', onDraw: 'When appear', onClean: 'After action', onBlocked: 'After action' }
 const ACT = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 const OP = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' }
 /** Short status names on the card face; game words, so most stay English in Thai too (th.ts). */
@@ -21,7 +22,7 @@ export const STATUS_SHORT: Partial<Record<string, string>> = {
 }
 const status = (k: string) => (STATUS_SHORT[k] ? tr(STATUS_SHORT[k]!) : k)
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
-const turnsTag = (t: number) => (t <= 1 ? '' : tr(' {n}t', { n: t }))
+const turnsTag = (t: number) => (t <= 1 ? '' : tr(' ({n} turns)', { n: t }))
 /** "Foe " / "Both " in front of a short line; yours has none */
 const head = (w: string) => (w === 'enemy' ? tr('Foe {x}', { x: '' }) : w === 'both' ? tr('Both {x}', { x: '' }) : '')
 const whoSays = (w: 'self' | 'enemy', x: string) => tr(w === 'self' ? 'You {x}' : 'Foe {x}', { x })
@@ -29,8 +30,8 @@ const whoSays = (w: 'self' | 'enemy', x: string) => tr(w === 'self' ? 'You {x}' 
 /** One condition in a few words; anything without a short form falls back to the full sentence. */
 export function shortCond(c: CondSpec): string {
   switch (c.c) {
-    case 'selfAction': return tr('You {a}', { a: ACT[c.a] })
-    case 'enemyAction': return tr(c.a === 'strike' ? 'Foe Strikes' : c.a === 'block' ? 'Foe Blocks' : 'Foe Charges')
+    case 'selfAction': return tr('You play {a}', { a: ACT[c.a] })
+    case 'enemyAction': return tr('Foe plays {a}', { a: ACT[c.a] })
     case 'hitResult': return c.r === 'clean' ? tr('Clean hit') : tr('Blocked')
     case 'enemyHandAtLeast': return tr('Foe {n}+ cards', { n: c.n })
     case 'enemyHandEmpty': return tr('Foe Field empty')
@@ -94,6 +95,10 @@ export function shortAct(a: ActSpec, res = 'res'): string {
     case 'status': {
       const t = a.turns === 0 || a.turns > 50 ? '' : turnsTag(a.turns)
       const n = a.n ?? 1
+      if (a.kind === 'noStrike' || a.kind === 'noBlock' || a.kind === 'noCharge') {
+        const act = { noStrike: 'Strike', noBlock: 'Block', noCharge: 'Charge' }[a.kind]
+        return `${tr(a.who === 'self' ? "You can't {a}" : a.who === 'both' ? "Both can't {a}" : "Foe can't {a}", { a: act })}${t}`
+      }
       if (a.kind === 'blockPlus') return `${h}${tr('Block {n}', { n: signed(n) })}${t}`
       if (a.kind === 'shield' || a.kind === 'parry') return `${h}${status(a.kind)} ${n}${per(a)}${t}`
       if (a.kind === 'vulnerable') return `${a.who === 'self' ? tr('You take +{n}% dmg', { n }) : `${h}${tr('takes +{n}% dmg', { n })}`}${t}`
@@ -145,17 +150,19 @@ export function isCost(a: ActSpec): boolean {
   }
 }
 
-/** Card-face version of effect_json: per rule, its timing tag, short conditions, and what you gain / pay. */
+/** Card-face version of effect_json: per rule, its timing, one short line per condition, and what you gain / pay. */
 export function compactRules(spec: EffectSpec | null | undefined, res?: string): CompactRule[] {
   return normalizeSpec(spec ?? []).map((r) => {
-    // "you play Strike" rides on the tag (BEFORE STRIKE) so the condition line stays short
+    const conds = (r.if ?? []).map(shortCond)
     const mine = (r.if ?? []).find((c): c is Extract<CondSpec, { c: 'selfAction' }> => c.c === 'selfAction')
-    const conds = (r.if ?? []).filter((c) => c !== mine).map(shortCond)
-    if (r.once) conds.push(tr('once'))
-    const tag = tr(r.hook === 'onHeld' && r.at === 'before' ? 'HOLD·START' : TAG[r.hook])
+    // On hit fires right after this card's own hit, so only when you Strike
+    if (r.hook === 'onHit' && !mine) conds.unshift(tr('You play {a}', { a: ACT.strike }))
+    // Hold = the card stays on the Field, i.e. you didn't Strike; playing Block or Charge already says so
+    if (r.hook === 'onHeld' && !mine) conds.unshift(tr("You don't Strike"))
+    if (r.once) conds.push(tr('Once per game'))
     return {
-      tag: mine ? `${tag} ${tr(ACT[mine.a].toUpperCase())}` : tag,
-      when: conds.join(' · '),
+      tag: tr(r.hook === 'onHeld' && r.at === 'before' ? TAG.modify : TAG[r.hook]),
+      when: conds,
       gain: r.do.filter((a) => !isCost(a)).map((a) => shortAct(a, res)),
       cost: r.do.filter(isCost).map((a) => shortAct(a, res)),
     }
