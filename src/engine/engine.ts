@@ -1,6 +1,6 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
-import { chillCut, getStyle, hooksOf, igniteBurn, igniteStacks } from './styles'
+import { cardHeal, chillCut, getStyle, hooksOf, igniteBurn, igniteStacks } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
 import type { EffectSpec } from './effects/spec'
 import { tuningOf } from './tuning'
@@ -207,6 +207,14 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     const want = hooksOf(state.players[side]).reduce((t, h) => t + (h.endDraw?.(state, side) ?? 0), 0)
     if (want > 0) log(state, `${side} ❄ Flash Freeze: draws ${drawCards(state, side, want)}`)
   }
+  // Regen (Tank Blood Price): heal n% of missing HP at the end of every turn it's on; a card heal (Titan Bloom gets less)
+  for (const side of SIDES) {
+    const p = state.players[side]
+    const pct = p.statuses.filter((s) => s.kind === 'regen').reduce((t, s) => t + (s.n ?? 0), 0)
+    if (pct <= 0 || p.hp <= 0) continue
+    const got = heal(state, side, cardHeal(state, side, Math.floor(((p.maxHp - p.hp) * pct) / 100)))
+    if (got) log(state, `${side} Regen ${pct}%: heals ${got}`)
+  }
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) h.endTurn?.(state, side, actions[side], actions[other(side)])
   // Ignite burns at the end of every turn it's on (Pyromancer)
   for (const side of SIDES) {
@@ -321,6 +329,17 @@ function resolveStrikes(
     }
   }
 
+  // Empower (Deep Breath): every card of this Strike +n, then it's used up
+  for (const side of strikers) {
+    const p = state.players[side]
+    // the biggest one counts (two Charges don't stack it)
+    const n = p.statuses.filter((s) => s.kind === 'empower').reduce((t, s) => Math.max(t, s.n ?? 0), 0)
+    if (!n) continue
+    p.statuses = p.statuses.filter((s) => s.kind !== 'empower')
+    for (let i = 0; i < bonus[side]!.length; i++) bonus[side]![i] += n
+    log(state, `${side} Empower: every chain card +${n} dmg`)
+  }
+
   // 1) Before action: chain auras, plus held cards of a side that didn't Strike (e.g. "if you played Charge")
   for (const side of SIDES) {
     if (actions[side] === 'strike') chains[side]!.forEach((card, i) => effectOf(state, side, card)?.modify?.(ctxFor(side, i, false)))
@@ -393,6 +412,8 @@ function resolveStrikes(
   for (const side of SIDES) hitCut[side] = hooksOf(state.players[side]).reduce((t, h) => t + (h.hitCut?.(state, side) ?? 0), 0)
   const cutLeft = { p1: Infinity, p2: Infinity }
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) if (h.hitCutHits) cutLeft[side] = Math.min(cutLeft[side], h.hitCutHits(state, side))
+  const cutSkip = { p1: 0, p2: 0 }
+  for (const side of SIDES) cutSkip[side] = hooksOf(state.players[side]).reduce((t, h) => Math.max(t, h.hitCutSkip?.(state, side) ?? 0), 0)
   const critCut = { p1: 0, p2: 0 }
   for (const side of SIDES) critCut[side] = Math.min(100, hooksOf(state.players[side]).reduce((t, h) => t + (h.critCutPct?.(state, side) ?? 0), 0))
 
@@ -411,11 +432,13 @@ function resolveStrikes(
       if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, 1)
       if (env.shroud[enemy]) dealt = Math.floor(dealt / 2)
       if (critCut[enemy] && crit[side].has(i)) dealt = Math.floor((dealt * (100 - critCut[enemy])) / 100)
-      if (hitCut[enemy] && !isBlocked(side, i) && dealt > 0 && cutLeft[enemy] > 0) {
+      if (hitCut[enemy] && !isBlocked(side, i) && dealt > 0 && cutSkip[enemy] > 0) cutSkip[enemy]--
+      else if (hitCut[enemy] && !isBlocked(side, i) && dealt > 0 && cutLeft[enemy] > 0) {
         dealt = Math.max(0, dealt - hitCut[enemy])
         cutLeft[enemy]--
       }
-      const parry = !isBlocked(side, i) && dealt > 0 ? sized(enemy, 'parry')[0] : undefined
+      // pierce 2 (Crushing Weight) ignores Parry too
+      const parry = !isBlocked(side, i) && dealt > 0 && pierce[side]![i] !== 2 ? sized(enemy, 'parry')[0] : undefined
       if (parry) {
         parry.n = (parry.n ?? 1) - 1
         env.hitsParried[enemy]++
@@ -600,6 +623,7 @@ export type CardRowLike = {
   in_deck?: boolean
   effect_json?: EffectSpec | null
   cost?: number | null
+  cost_pct?: number | null
   style_only?: string | null
 }
 
@@ -614,6 +638,7 @@ export function buildDeck(rows: CardRowLike[]): CardDef[] {
       effectText: r.effect,
       effectSpec: r.effect_json ?? null,
       cost: r.cost ?? null,
+      costPct: r.cost_pct ?? null,
       styleOnly: r.style_only ?? null,
     })))
 }

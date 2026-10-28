@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import {
-  costOf,
+  costNow,
   isEffectMissing,
   legalActions,
   overdriveAdd,
@@ -925,9 +925,13 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
     ...(p.comboData?.conqueror
       ? [{ label: conqMax(game, side) ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: t('Juggernaut stacks: +1 dmg per stack on every chain card. At {max}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.', { max: conqMaxN }) }]
       : []),
-    // Tank Lifeline: Endurance stacks (perkData), with their cut / regen
+    // Tank Lifeline v3: Endurance canisters (perkData), collected on the next Strike
     ...(p.perkData?.endurance
-      ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${enduranceNum(game, side).ascEnduranceMax}`, tone: 'buff' as const, tip: t('{n} Endurance: {hits} hits that reach you deal {cut} less dmg, Ignite burns and Critical hits {guard}% less, and you regain {regen} HP at the end of every turn. Loses {decay} every end of turn.', { n: p.perkData.endurance, cut: enduranceNum(game, side).ascEnduranceCut, hits: Math.max(0, p.perkData.endurance - 1), guard: Math.min(100, p.perkData.endurance * enduranceNum(game, side).ascEnduranceGuard), regen: Math.floor(((p.maxHp - p.hp) * p.perkData.endurance * enduranceNum(game, side).ascEnduranceRegen) / 100), decay: enduranceNum(game, side).ascEnduranceDecay }) }]
+      ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${enduranceNum(game, side).endMax}`, tone: 'buff' as const, tip: t('{n} Endurance. Strike to collect: heal {heal} HP and slot 1 +{dmg} dmg. At {max} without Striking it counter-spins for {spin} dmg.', { n: p.perkData.endurance, heal: Math.floor(((p.maxHp - p.hp) * p.perkData.endurance * enduranceNum(game, side).endHealPct * ((p.hp * 100) / Math.max(1, p.maxHp) < enduranceNum(game, side).hpPct ? 2 : 1)) / 100), dmg: p.perkData.endurance * enduranceNum(game, side).endSlotDmg, max: enduranceNum(game, side).endMax, spin: enduranceNum(game, side).endMax * enduranceNum(game, side).spinDmg }) }]
+      : []),
+    // Tank Titan Bloom v3: holding the tree
+    ...(p.style === 'TK:2' && (p.styleData?.grown ?? 0) > tuningOf(game, side)['TK:2'].treeAt
+      ? [{ label: '🌳 Tree', tone: 'buff' as const, tip: t('Holding the tree: every card +{n} dmg, Field max {field}. A {cards}-card Strike throws it: every card +{throw} dmg, lose {cost} grown Max HP.', { n: tuningOf(game, side)['TK:2'].treeDmg, field: tuningOf(game, side)['TK:2'].treeField, cards: tuningOf(game, side)['TK:2'].throwCards, throw: tuningOf(game, side)['TK:2'].throwDmg, cost: tuningOf(game, side)['TK:2'].throwCost }) }]
       : []),
     ...((p.perkData?.undyingUntil ?? 0) >= game.turn
       ? [{ label: '💀 Undying', tone: 'buff' as const, tip: t("Your HP can't drop below 1 until turn {turn}, and every chain card deals bonus dmg. When it ends you heal the bonus dmg that landed.", { turn: p.perkData!.undyingUntil! }) }]
@@ -1026,7 +1030,7 @@ function cardFacts(game: GameState, side: Side, card: CardInst) {
   const p = game.players[side]
   const { id, type, dmg, effectText, effectSpec } = card.def
   const res = game.rules.resources ? resourceOf(p.championId, tuningOf(game, side)) : undefined
-  const cost = res ? costOf(p.championId, card, tuningOf(game, side), p.costMod) : 0
+  const cost = res ? costNow(game, side, card) : 0
   const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (p.res ?? 0) ? res.unpaidDmgPct : undefined
   const grow = (card.grow ?? 0) + (card.growNext ?? 0)
   const base = short != null ? Math.floor((dmg * short) / 100) : dmg

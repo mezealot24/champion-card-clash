@@ -17,8 +17,8 @@ export type ChampInfo = {
 export const CHAMP_INFO: Record<string, ChampInfo> = {
   TK: {
     role: 'Wall. Huge HP, outlasts everyone.',
-    plays: ['Block a lot and keep your Field.', 'Heals keep you in the fight.', 'S cards cost HP instead of a resource.'],
-    resource: 'S cards cost {TK.sCost} HP',
+    plays: ['Pay HP for big S cards, then win it back.', 'Few heals: you win by hitting, not by waiting.', 'S cards cost HP instead of a resource.'],
+    resource: 'S cards cost HP (some a % of your current HP)',
     combo: 'Two P and one K in one chain. If the enemy Blocks one of them, heal {TK.comboHealPct}% of your HP.',
   },
   BR: {
@@ -43,8 +43,8 @@ export const CHAMP_INFO: Record<string, ChampInfo> = {
 
 /** One line per Style: what it does in plain words. Full rules stay in the Style's effect text. */
 export const STYLE_SUMMARY: Record<string, string> = {
-  'TK:1': 'Below {hpPct}% HP, every clean hit you take heals you.',
-  'TK:2': 'Hits you take grow your Max HP. More Max HP = more damage.',
+  'TK:1': 'Getting hurt fills Endurance. Strike to cash it in: heal and hit harder.',
+  'TK:2': 'Hits grow your Max HP. Grow big, hold the tree, then throw it.',
   'BR:1': 'Warm-up at {warmUpRage}+ Rage: first {slots} chain cards deal +{warmUpDmg}. Below {hpPct}% HP, True Fury gives +{bonusDmg}; stopped hits chip {chipDmg} and give +{chipRage} Rage.',
   'BR:2': 'Each chain card adds a stack (+{dmgPerStack} dmg). Full stacks: lifesteal.',
   'AS:1': 'Start with {startDraw} cards. Strike vs Strike refills Energy and draws {dualDraw}.',

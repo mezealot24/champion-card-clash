@@ -89,118 +89,104 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
  * Ascendancy tree per Style. Node ids A1..A4 / B1..B4 (Mage, Tank, Assassin: A1..D3); take them top-down in a branch, the last node = capstone.
  * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank / Assassin v2: named asc keys).
  */
-/** Shown under the Lifeline Style text (Q 2026-10-25): what one Endurance does; numbers filled from TK:1 */
-export const ENDURANCE_TEXT = '⛨ Endurance (Lifeline Ascendancy): one shared pool, max {ascEnduranceMax}; every node that gives Endurance (Second Wind too) adds to the same pool. Hits that reach you deal {ascEnduranceCut} less dmg, on (Endurance − 1) hits a turn (1 Endurance: none, 6: 5 hits). Each Endurance: Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). You lose {ascEnduranceDecay} Endurance at the end of every turn.'
+/** Shown under the Lifeline Style text: how ⛨ Endurance works (Tank v3, Q 2026-10-28); numbers filled from TK:1 */
+export const ENDURANCE_TEXT = '⛨ Endurance: canisters, max {endMax}. Gain 1 (once a turn each) when you pay an S card\'s HP cost, when one hit deals you {endHeavyPct}%+ of your Max HP, or when 2+ hits reach you in a turn. When you Strike, collect them all: heal {endHealPct}% of your missing HP each (×2 below {hpPct}% HP) and slot 1 +{endSlotDmg} dmg each. Reaching the cap on a turn you don\'t Strike: counter-spin, {spinDmg} dmg each to the opponent (ignores Block and Shield). Below {hpPct}% HP, S cards cost 1 Endurance instead of HP.'
 
 export const TREES: Record<string, TreeData> = {
   /**
    * Tank v2 (Q 2026-10-25, design/tank-ascendancy-v2-2026-10-25.md): same shape as Mage v2, from PoE Juggernaut
    * (Lifeline) and Guardian (Titan Bloom). Everything that stacks has a cap (Hoarfrost lesson).
    */
+  /**
+   * Tank v3 (Q 2026-10-28, design/tank-rework-v3-lifeline-asc-2026-10-28.md / tank-rework-v3-titan-bloom-2026-10-28.md).
+   * Names are placeholders (themes only), to be renamed before Beta.
+   */
   'TK:1': {
-    branches: ['Endurance', 'Untiring', 'Unbroken', 'Undeniable'],
+    branches: ['Endurance', 'Masochism', 'Resolve', 'Berserker'],
     depth: 3,
     bonusPoints: 1,
+    rev: 3,
     nodes: [
-      // Q 2026-10-25 (after sim): Endurance = −dmg per hit + HP regen per charge; gained by Charge or by taking 2+ hits
-      multi('A1', 'Unflinching', 'Gain 1 Endurance each time you Charge, or when 2+ hits reach you in a turn (an Ignite burn counts as 1); max {ascEnduranceMax}. Hits that reach you deal {ascEnduranceCut} less dmg, on (Endurance − 1) hits a turn (1 Endurance: none, 6: 5 hits). Each Endurance: Ignite burns and Critical hits you take deal {ascEnduranceGuard}% less, and you regain {ascEnduranceRegen}% of your missing HP at the end of every turn (rounded down). You lose {ascEnduranceDecay} Endurance at the end of every turn.', [
-        ['ascEnduranceMax', 'max Endurance', 3, 1],
-        ['ascEnduranceDecay', 'Endurance lost every end of turn', 1, 0],
-        ['ascEnduranceCut', 'dmg cut per hit (on Endurance − 1 hits a turn)', 1],
-        ['ascEnduranceRegen', 'regen % missing HP per Endurance', 1],
-        ['ascEnduranceGuard', '% less Ignite burn / Critical dmg, per Endurance', 10, 0, 100],
+      multi('A1', 'Unflinching', 'Gain 1 Endurance when your Strike hits clean (after the collect, so it carries to your next turn). Endurance cap +{ascUnflinchingMax}.', [
+        ['ascUnflinchingMax', 'Endurance cap +', 1],
       ]),
-      multi('A2', 'Unyielding', 'When a Charge break hits you, you lose all your Endurance, but heal {ascUnyielding}% of that chain\'s dmg per Endurance lost, spread over the next {ascUnyieldingTurns} turns (rounded down). Endurance max +{ascUnyieldingMax}.', [
-        ['ascUnyielding', 'heal % of chain dmg, per Endurance lost', 3],
-        ['ascUnyieldingTurns', 'turns the heal is spread over', 5, 1],
-        ['ascUnyieldingMax', 'max Endurance +', 1],
+      node('A2', 'Pressure', 'When you collect, every chain card +{ascPressure} dmg per Endurance collected (not only slot 1).', 'ascPressure', 'dmg per card per Endurance', 1),
+      capstone('A3', 'Whirl', 'A counter-spin also undoes half the hit dmg you took that turn and heals {ascWhirl}% of your missing HP per Endurance spent.', 'Your Field holds at most {ascWhirlField} cards.', [
+        ['ascWhirl', 'heal % missing HP per Endurance', 2, 0, 100],
+        ['ascWhirlField', 'Cost: Field max cards', 4, 1, 5],
       ]),
-      capstone('A3', 'Unrelenting', 'Endurance max +{ascUnrelenting}. {ascUnrelentingPct}% of the hit dmg you take is not lost at once: it drains over the next {ascUnrelentingTurns} turns instead.', 'Your Field holds at most {ascUnrelentingField} cards.', [
-        ['ascUnrelenting', 'max Endurance +', 2],
-        ['ascUnrelentingField', 'Cost: Field max cards', 4, 1, 5],
-        ['ascUnrelentingTurns', 'turns the dmg drains over', 3, 1],
-        ['ascUnrelentingPct', '% of hit dmg delayed', 50, 0, 100],
+      multi('B1', 'Thick Skull', 'Lifeline red line +{ascThickSkull}%. Each time you lose {ascThickSkullLoss}% of your Max HP (S costs count), gain 1 Endurance (once a turn).', [
+        ['ascThickSkull', 'red line % +', 5],
+        ['ascThickSkullLoss', '% Max HP lost per Endurance', 15, 1],
       ]),
-      // Q 2026-10-25 14:58: Untiring = Endurance from HP lost / Blocks / Second Wind (uses Unflinching's Endurance numbers)
-      multi('B1', 'Early Rally', 'Lifeline HP line +{ascEarlyRally}%. Each time you lose {ascEarlyRallyLoss}% Max HP, gain 1 Endurance (once a turn). Endurance max +{ascEarlyRallyMax}.', [
-        ['ascEarlyRally', 'HP line % +', 5],
-        ['ascEarlyRallyLoss', '% Max HP lost per Endurance', 15, 1],
-        ['ascEarlyRallyMax', 'max Endurance +', 1],
+      node('B2', 'Shrug Off', 'The first lock each turn (Charge break, can\'t Charge / Block / Strike, Frozen) doesn\'t happen to you: lose {ascShrugOff}% of your current HP and gain 1 Endurance instead.', 'ascShrugOff', '% current HP paid', 7, 0, 100),
+      capstone('B3', 'Bloodied', 'The first time you drop into the red: for {ascBloodied} turns gain 1 Endurance at the end of every turn, and chain slot 1 +1 dmg per 10% of your missing HP.', 'You can\'t gain Shield.', [
+        ['ascBloodied', 'turns', 3, 1],
       ]),
-      node('B2', 'Untiring', 'A turn your Block stops a hit, gain 1 Endurance.', 'ascUntiring', 'unused', 0),
-      capstone('B3', 'Second Wind', 'Lifeline can switch on one more time after it goes off. Gain 1 Endurance at the end of every turn.', 'Every heal and regen you get is {ascSecondWindHealCut}% smaller.', [
-        ['ascSecondWindHealCut', 'Cost: heal cut %', 25, 0, 100],
+      multi('C1', 'Steady', 'Each turn, the {ascSteadyHits} hits after the first that reach you deal {ascSteady} less. A Charge break can\'t throw away your first {ascSteadySafe} Field cards.', [
+        ['ascSteady', 'dmg cut per hit', 3],
+        ['ascSteadyHits', 'hits cut', 2, 0],
+        ['ascSteadySafe', 'safe slots', 2, 0, 5],
       ]),
-      // Q 2026-10-25 15:06: Unstoppable + Unbroken merged into C; D = Undeniable (spend Endurance on offence)
-      multi('C1', 'Unstoppable', 'When a Charge break hits you, gain {ascUnstoppableEnd} Endurance, and it can\'t throw away your first {ascUnstoppable} Field cards. Endurance max +{ascUnstoppableMax}.', [
-        ['ascUnstoppable', 'safe slots', 2, 0, 5],
-        ['ascUnstoppableEnd', 'Endurance per Charge break', 2],
-        ['ascUnstoppableMax', 'max Endurance +', 1],
+      multi('C2', 'Overflow', 'Healing past your Max HP becomes Shield (up to {ascOverflow}). When you Strike with Shield, slot 1 +dmg equal to half your Shield.', [
+        ['ascOverflow', 'Shield cap', 20],
       ]),
-      multi('C2', 'Last Bastion', 'The first time your HP drops into the red, gain Shield {ascLastBastion} + {ascLastBastionPct}% of your missing HP. While your HP is in the red, hits that reach you deal {ascDefiance} less dmg.', [
-        ['ascLastBastion', 'Shield', 10],
-        ['ascLastBastionPct', 'Shield % of missing HP', 10],
-        ['ascDefiance', 'dmg cut per hit in the red', 2],
+      capstone('C3', 'Duel', 'After 2 turns in a row where both sides Strike, your next Strike that hits clean also deals {ascDuel}% of your Max HP, heals you {ascDuelHeal}% of your Max HP and steals {ascDuelSteal} Max HP from the opponent (up to {ascDuelCap} a match).', 'Your S cards cost {ascDuelCost}% of your current HP more.', [
+        ['ascDuel', 'dmg % of your Max HP', 4, 0, 100],
+        ['ascDuelHeal', 'heal % of your Max HP', 2, 0, 100],
+        ['ascDuelSteal', 'Max HP stolen', 6],
+        ['ascDuelCap', 'Max HP stolen cap', 30],
+        ['ascDuelCost', 'Cost: S cost + % current HP', 5, 0, 100],
       ]),
-      capstone('C3', 'Grasp of the Undying', 'Once per match, a hit that would knock you out leaves you on 1 HP and Undying for {ascUndyingTurns} turns: your HP can\'t drop below 1, and every chain card deals +{ascUndyingPct}% of your Max HP. When Undying ends, heal the bonus dmg it landed.', 'Your S cards cost {ascUndyingCost}% of your current HP each (instead of their usual cost).', [
-        ['ascUnbroken', 'times per match', 1],
-        ['ascUndyingTurns', 'Undying turns', 3, 1],
-        ['ascUndyingPct', 'dmg per card, % Max HP', 5],
-        ['ascUndyingCost', 'Cost: S cost % of current HP', 10, 1, 100],
-      ]),
-      multi('D1', 'Momentum', 'Each Strike in a row (no other action between) gives every chain card +{ascMomentum} dmg, up to +{ascMomentumCap}. A chain of {ascMomentumCards}+ cards gives {ascMomentumEnd} Endurance.', [
+      multi('D1', 'Momentum', 'Each Strike in a row (no other action between) gives every chain card +{ascMomentum} dmg, up to +{ascMomentumCap}. At the end of a turn the opponent didn\'t Strike, they lose {ascMomentumChip} HP.', [
         ['ascMomentum', 'dmg per Strike in a row', 1],
         ['ascMomentumCap', 'max dmg', 3],
-        ['ascMomentumCards', 'chain size for Endurance', 3, 1],
-        ['ascMomentumEnd', 'Endurance for a long chain', 2],
+        ['ascMomentumChip', 'HP lost when they don\'t Strike', 4],
       ]),
-      multi('D2', 'Undeniable', 'With Endurance, your first {ascUndeniable} chain card ignores Block. Without it, gain 1 Endurance, but slot 1 deals {ascUndeniableHalf}% less dmg.', [
-        ['ascUndeniable', 'slots that ignore Block', 1, 0, 5],
-        ['ascUndeniableHalf', 'slot 1 dmg cut % with no Endurance', 50, 0, 100],
-      ]),
-      capstone('D3', 'Unleashed', 'When you Strike, spend all Endurance: every chain card +{ascUnleashed} dmg + {ascUnleashedHpPct}% of your Max HP (rounded down) per Endurance spent.', 'The spent Endurance is gone, and you are Vulnerable (+{ascUnleashedVuln}% dmg taken) next turn.', [
-        ['ascUnleashed', 'dmg per Endurance', 1],
-        ['ascUnleashedHpPct', '% Max HP dmg per Endurance', 1, 0, 100],
-        ['ascUnleashedVuln', 'Cost: Vulnerable %', 50, 0, 100],
+      node('D2', 'Spin to Win', 'Counter-spin deals +{ascSpin} more per Endurance, and also fires when your Block stops 2+ hits.', 'ascSpin', 'spin dmg + per Endurance', 3),
+      capstone('D3', 'Culling Blade', 'When you collect, every chain card +{ascCulling} dmg per Endurance. After one of your S cards resolves, if the opponent\'s HP is below {ascCullingPct}% of your Max HP, they are knocked out (ignores Block and Shield).', 'After a collect, next turn you are Vulnerable (+{ascCullingVuln}% dmg taken) and can\'t Block.', [
+        ['ascCulling', 'dmg per card per Endurance', 2],
+        ['ascCullingPct', 'knock-out line, % of your Max HP', 15, 0, 100],
+        ['ascCullingVuln', 'Cost: Vulnerable %', 35, 0, 100],
       ]),
     ],
   },
   'TK:2': {
-    branches: ['Bloom', 'Bramble', 'Timber', 'Time of Need'],
+    branches: ['Bloom', 'Butcher', 'Timber', 'Time of Need'],
     depth: 3,
     bonusPoints: 1,
+    rev: 3,
     nodes: [
-      node('A1', 'Taproot', 'Titan Bloom: +{ascTaproot} Max HP per facing pair.', 'ascTaproot', 'per facing +', 1),
+      node('A1', 'Taproot', 'Facing pairs give +{ascTaproot} more Meat each.', 'ascTaproot', 'meat per facing +', 1),
       node('A2', 'Seedling', 'Start the match with {ascSeedling} Max HP already grown.', 'ascSeedling', 'Max HP grown at start', 20),
-      // Q 2026-10-25 (after sim): no Cost (Bloom was worse than no tree); Charge heals instead
-      multi('A3', 'Ancient', 'Titan Bloom cap +{ascAncient} and +{ascAncientHit} Max HP per hit taken. Each time you Charge, heal {ascAncientHeal} + {ascAncientPct}% of your missing HP.', [
+      capstone('A3', 'Ancient', 'Titan Bloom cap +{ascAncient} and +{ascAncientHit} Max HP per hit taken. When you Charge, heal {ascAncientPct}% of your missing HP.', 'The hold-the-tree line is {ascAncientCost} higher (+60 → +90 grown).', [
         ['ascAncient', 'cap +', 100],
         ['ascAncientHit', 'per hit taken +', 2],
-        ['ascAncientHeal', 'Charge heal', 4],
-        ['ascAncientPct', 'Charge heal % of missing HP', 4, 0, 100],
+        ['ascAncientPct', 'Charge heal % of missing HP', 2, 0, 100],
+        ['ascAncientCost', 'Cost: hold-the-tree line +', 30],
       ]),
-      node('B1', 'Bark Guard', 'Titan Bloom: +{ascBarkGuard} Max HP per hit Blocked.', 'ascBarkGuard', 'per hit Blocked +', 1),
-      node('B2', 'Thorns', 'Each hit your Block stops deals {ascThorns} dmg back.', 'ascThorns', 'dmg back per hit', 2),
-      capstone('B3', 'Briar Wall', 'After a Block, your next Strike: every card +{ascBriarWall} dmg per hit that Block stopped (up to {ascBriarWallCap} hits).', 'Titan Bloom grows nothing from hits Blocked.', [
-        ['ascBriarWall', 'dmg per stopped hit', 2],
-        ['ascBriarWallCap', 'hits counted (cap)', 3],
+      node('B1', 'Fresh Meat', 'Clean hits you land give +{ascFreshMeat}% of your Max HP more Meat each.', 'ascFreshMeat', 'meat % Max HP per clean hit +', 1, 0, 100),
+      node('B2', 'Butcher\'s Brand', 'Your first clean hit in a Strike brands the opponent. On your next Strike, each clean hit on them heals you {ascBrand}% of your grown Max HP.', 'ascBrand', 'heal % of grown Max HP per clean hit', 1, 0, 100),
+      capstone('B3', 'Carve', 'Each clean hit steals {ascCarve} Max HP from the opponent (up to {ascCarveCap} a match) and adds it to your grown Max HP.', 'You get no healing from cards at all.', [
+        ['ascCarve', 'Max HP stolen per clean hit', 2],
+        ['ascCarveCap', 'cap a match', 40],
       ]),
       node('C1', 'Heartwood', 'Titan Bloom needs {ascHeartwood} less Max HP grown for each +1 dmg.', 'ascHeartwood', 'HP per dmg −', 5),
       multi('C2', 'Ironbark Fist', 'Chain slot 1 deals +1 dmg per {ascIronbark} Max HP grown, up to +{ascIronbarkCap}.', [
-        ['ascIronbark', 'Max HP grown per +1', 10, 1],
-        ['ascIronbarkCap', 'dmg cap', 8],
+        ['ascIronbark', 'Max HP grown per +1', 8, 1],
+        ['ascIronbarkCap', 'dmg cap', 10],
       ]),
-      capstone('C3', 'Timber!', 'When you Strike with {ascTimberCards}+ cards, fell the tree: every card +1 dmg per {ascTimber} Max HP grown, up to +{ascTimberCap}.', 'Your grown Max HP goes back to 0 (Max HP drops, Titan Bloom dmg resets).', [
-        ['ascTimberCards', 'chain cards needed', 4, 1, 5],
-        ['ascTimber', 'Max HP grown per +1', 10, 1],
-        ['ascTimberCap', 'dmg cap', 10],
+      capstone('C3', 'Tree Grab', 'Hold the tree from +{ascTreeGrab} grown; throwing it costs only {ascTreeGrabCost} grown and gives every card +{ascTreeGrabDmg} dmg.', 'Your Field holds at most {ascTreeGrabField} cards all match.', [
+        ['ascTreeGrab', 'hold line (grown)', 40],
+        ['ascTreeGrabCost', 'throw cost (grown)', 30],
+        ['ascTreeGrabDmg', 'throw dmg per card', 10],
+        ['ascTreeGrabField', 'Cost: Field max cards', 4, 1, 5],
       ]),
-      node('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} Max HP per debuff stack (end of turn).', 'ascLivingBark', 'per debuff stack +', 1),
+      node('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} more Max HP per debuff stack (end of turn).', 'ascLivingBark', 'per debuff stack +', 3),
       node('D2', 'Rooted', 'While you have 3+ debuff stacks, hits that reach you deal {ascRooted} less dmg.', 'ascRooted', 'dmg cut per hit', 2),
-      capstone('D3', 'Time of Need', 'Every {ascTimeOfNeed} turns, at the end of the turn, remove every debuff on you and heal {ascTimeOfNeedHeal} + {ascTimeOfNeedPct}% of your missing HP.', 'Titan Bloom cap −{ascTimeOfNeedCost}.', [
+      capstone('D3', 'Time of Need', 'Every {ascTimeOfNeed} turns, at the end of the turn, remove every debuff on you and heal {ascTimeOfNeedPct}% of your missing HP.', 'Titan Bloom cap −{ascTimeOfNeedCost}.', [
         ['ascTimeOfNeed', 'every N turns', 5, 1],
-        ['ascTimeOfNeedHeal', 'heal', 4],
-        ['ascTimeOfNeedPct', 'heal % of missing HP', 5, 0, 100],
+        ['ascTimeOfNeedPct', 'heal % of missing HP', 3, 0, 100],
         ['ascTimeOfNeedCost', 'Cost: cap −', 100],
       ]),
     ],

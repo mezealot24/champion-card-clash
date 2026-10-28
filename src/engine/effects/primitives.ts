@@ -3,7 +3,7 @@
 import { addRes, resourceOf } from '../resources'
 import { tuningOf } from '../tuning'
 import { drawCards, handMaxOf, heal as healHp, log, loseHp as loseHpRaw, markDiscarded, toDeckBottom } from '../state'
-import { addChill, addIgnite, chillStacks, getStyle, hooksOf, igniteBurn, igniteStacks } from '../styles'
+import { addChill, addIgnite, cardHeal, chillStacks, getStyle, hooksOf, igniteBurn, igniteStacks } from '../styles'
 import { CUT_CAP, cutGuarded, guardAfterCut } from '../types'
 import type { CardType, Side, StatusKind } from '../types'
 import type { Act, BaseCtx, ChainCtx, Cond, HitIn } from './types'
@@ -16,7 +16,7 @@ function sides(ctx: BaseCtx, who: Who): Side[] {
 }
 
 /** "per X": multiply an amount by a count, e.g. heal 3 per hit you blocked. */
-export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'missingHp5' | 'maxHpPct' | 'missingHpPct' | 'enemyIgnite' | 'enemyChill'
+export type Per = 'hitBlocked' | 'chainCard' | 'selfCard' | 'enemyCard' | 'chainP' | 'chainK' | 'chainS' | 'missingHp10' | 'missingHp5' | 'maxHpPct' | 'missingHpPct' | 'enemyIgnite' | 'enemyChill' | 'paidHp'
 
 export function perCount(ctx: BaseCtx, per?: Per): number {
   if (!per) return 1
@@ -48,6 +48,8 @@ export function perCount(ctx: BaseCtx, per?: Per): number {
     // Ignite stacks on the opponent (Pyromancer)
     case 'enemyIgnite': return igniteStacks(ctx.state.players[ctx.enemy])
     case 'enemyChill': return chillStacks(ctx.state.players[ctx.enemy])
+    // HP this card's cost took this turn (Tank Blood Price)
+    case 'paidHp': return ctx.card.paidHp ?? 0
     // a "per" this build doesn't know counts 0 (old builds reading newer DB rows)
     default: return 0
   }
@@ -77,7 +79,8 @@ export const heal =
     // a side at 0 HP can't be healed, so skip it (and the log line) entirely
     const live = sides(ctx, who).filter((s) => ctx.state.players[s].hp > 0)
     if (!live.length) return
-    for (const s of live) healHp(ctx.state, s, n)
+    // Titan Bloom gets less from card heals (TK:2 cardHealPct)
+    for (const s of live) healHp(ctx.state, s, cardHeal(ctx.state, s, n))
     log(ctx.state, `${ctx.card.def.id}: ${who} heals ${n}`)
   }
 
@@ -110,7 +113,10 @@ export const status =
   (ctx) => {
     const n = base === undefined ? undefined : Math.floor(base * perCount(ctx, per))
     if (n !== undefined && per && n <= 0) return
-    for (const s of sides(ctx, who)) ctx.state.players[s].statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
+    for (const s of sides(ctx, who)) {
+      if (kind === 'shield' && ctx.state.players[s].perkData?.noShield) continue
+      ctx.state.players[s].statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
+    }
     log(ctx.state, `${ctx.card.def.id}: ${who} gets ${kind}${n === undefined ? '' : ` ${n}`} for ${turns} turns`)
   }
 
@@ -173,13 +179,25 @@ export const mulDmg =
   (ctx) =>
     eachTarget(ctx, target, onlyType, ctx.mult, ctx.enemyMult, (arr, i) => (arr[i] *= pct / 100))
 
-/** Before action only: the target cards in your chain ignore Block (Pierce). */
+/** Before action only: the target cards in your chain ignore Block (Pierce); parry = they ignore Parry too (pierce 2). */
 export const pierce =
-  (target: 'this' | 'next' | 'following' | 'chain'): Act =>
+  (target: 'this' | 'next' | 'following' | 'chain', parry = false): Act =>
   (ctx) => {
     const slots = target === 'chain' ? ctx.chain.map((_, i) => i) : targetSlots(ctx, target)
-    for (const i of slots) if (i < ctx.pierce.length) ctx.pierce[i] = 1
-    if (ctx.chain.length) log(ctx.state, `${ctx.card.def.id}: Pierce (through Block)`)
+    for (const i of slots) if (i < ctx.pierce.length) ctx.pierce[i] = parry ? 2 : Math.max(1, ctx.pierce[i])
+    if (ctx.chain.length) log(ctx.state, `${ctx.card.def.id}: Pierce (through Block${parry ? ' and Parry' : ''})`)
+  }
+
+/** Before action only (Tank Shatter Guard): remove every Shield and Parry on the opponent, this card +n dmg per one removed. */
+export const shatter =
+  (n: number): Act =>
+  (ctx) => {
+    const foe = ctx.state.players[ctx.enemy]
+    const gone = foe.statuses.filter((s) => (s.kind === 'shield' || s.kind === 'parry') && (s.n ?? 0) > 0).length
+    if (!gone) return
+    foe.statuses = foe.statuses.filter((s) => s.kind !== 'shield' && s.kind !== 'parry')
+    if (ctx.slot < ctx.bonus.length) ctx.bonus[ctx.slot] += n * gone
+    log(ctx.state, `${ctx.card.def.id}: shatters ${gone} Shield / Parry (+${n * gone} dmg)`)
   }
 
 /**
@@ -435,6 +453,8 @@ const hitsInOf = (ctx: ChainCtx, pick: (h: HitIn) => boolean, type?: CardType) =
   (ctx.hitsIn?.[ctx.self] ?? []).filter((h) => pick(h) && (!type || h.type === type) && (ctx.hitsUpTo == null || h.slot <= ctx.hitsUpTo)).length
 export const hitBy = (n: number, type?: CardType): Cond => (ctx) => hitsInOf(ctx, (h) => h.landed, type) >= n
 export const blockedType = (n: number, type?: CardType): Cond => (ctx) => hitsInOf(ctx, (h) => h.blocked, type) >= n
+/** no enemy hit landed on you this turn (Blocked / Parried ones don't count) */
+export const notHit: Cond = (ctx) => hitsInOf(ctx, (h) => h.landed) === 0
 
 /** no enemy card at this card's slot */
 export const noFacing: Cond = (ctx) => !hasFacing(ctx)
@@ -458,4 +478,4 @@ export const resAtLeast = (who: 'self' | 'enemy', n: number): Cond => (ctx) => {
 }
 
 /** Status kinds that carry a size n */
-export const SIZED: StatusKind[] = ['blockPlus', 'shield', 'parry', 'vulnerable']
+export const SIZED: StatusKind[] = ['blockPlus', 'shield', 'parry', 'vulnerable', 'regen', 'empower']

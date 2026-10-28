@@ -3,7 +3,7 @@
 import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, TurnEvent } from './types'
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
-import { healAfterIgnite, hooksOf } from './styles'
+import { healAfterIgnite, hooksOf, overhealShield } from './styles'
 import { applyLoadout, type Loadout } from './loadout'
 import { resourceOf } from './resources'
 import { resolveTuning, tuningOf, type Tuning, type TuningOverrides } from './tuning'
@@ -139,6 +139,7 @@ export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   if (p.hp <= 0) return 0
   n = healAfterIgnite(p, n, tuningOf(state, side === 'p1' ? 'p2' : 'p1'))
+  overhealShield(p, n)
   const before = p.hp
   p.hp = Math.min(p.maxHp, p.hp + n)
   if (p.hp !== before) emit(state, { k: 'hp', side, delta: p.hp - before })

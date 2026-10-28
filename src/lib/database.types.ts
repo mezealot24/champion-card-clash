@@ -49,6 +49,8 @@ export type CardRow = {
   effect_json: EffectSpec | null // see src/engine/effects/spec.ts
   /** Resource cost when it strikes (src/engine/resources.ts). Null on an S card = class default. */
   cost: number | null
+  /** Tank v3: the S card also costs this % of current HP (on top of cost). Null = none. */
+  cost_pct?: number | null
   /** "MG:1" = only in the deck under that Style; "!MG:1" = under every Style but that one; null = always (engine inStyleDeck). */
   style_only?: string | null
   copies: number

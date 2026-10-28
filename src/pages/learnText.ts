@@ -17,7 +17,7 @@ const OP = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' }
 const STATUS_SHORT: Partial<Record<string, string>> = {
   noStrike: 'no Strike', noBlock: 'no Block', noCharge: 'no Charge', silence: 'Silenced', skillSilence: 'S effects off',
   trueDmg: 'True Dmg', guardBreak: 'Guard Crush', vulnerable: 'Vulnerable', deathMark: 'Marked', shield: 'Shield',
-  parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: 'Cut guard',
+  parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: 'Cut guard', regen: 'Regen', empower: 'Empower',
 }
 const who = (w: 'self' | 'enemy') => (w === 'self' ? 'You' : 'Foe')
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
@@ -40,6 +40,7 @@ export function shortCond(c: CondSpec): string {
     case 'noFacing': return 'No facing card'
     case 'lostHp': return 'Lost HP (this/last turn)'
     case 'facingSameType': return 'Facing same type'
+    case 'notHit': return 'Not hit'
     case 'facingIs': return `Facing ${c.type}`
     case 'prevIs': return `After a ${c.type}`
     case 'tookDmg': return c.n <= 1 ? 'You got hit' : `You took ${c.n}+`
@@ -88,6 +89,8 @@ export function shortAct(a: ActSpec, res = 'res'): string {
       if (a.kind === 'blockPlus') return `${head}Block ${signed(n)}${t}`
       if (a.kind === 'shield' || a.kind === 'parry') return `${head}${STATUS_SHORT[a.kind]} ${n}${per(a)}${t}`
       if (a.kind === 'vulnerable') return `${a.who === 'self' ? 'You take' : `${head}takes`} +${n}% dmg${t}`
+      if (a.kind === 'regen') return `${head}Regen ${n}% missing HP${t}`
+      if (a.kind === 'empower') return `${head}Next Strike +${n} dmg/card`
       return `${head}${STATUS_SHORT[a.kind] ?? a.kind}${t}`
     }
     case 'grow': return `${signed(a.n)} dmg ${a.dur === 'next' ? 'next hit' : 'for good'}`
@@ -101,7 +104,8 @@ export function shortAct(a: ActSpec, res = 'res'): string {
       return `${head}${x}${tail}`
     }
     case 'blockNow': return `${a.who === 'enemy' ? 'Foe ' : ''}Block ${signed(a.n)}`
-    case 'pierce': return `Pierce${OWN[a.target] ?? ''}`
+    case 'pierce': return `Pierce${a.parry ? ' + Parry' : ''}${OWN[a.target] ?? ''}`
+    case 'shatter': return `Shatter Shield/Parry, +${a.n} dmg each`
     case 'steal': return 'Steal facing card'
     case 'cut': return a.which === 'facing' ? 'Cut facing card' : `Cut ${a.n} ${a.which}`
     case 'gainRes': return `${a.who === 'enemy' ? 'Foe ' : ''}${signed(a.n)} ${res}${per(a)}`
