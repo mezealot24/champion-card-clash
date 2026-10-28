@@ -139,6 +139,17 @@ export function Arena(props: {
     }
   }, [game, turn])
 
+  // while the battle is up, a long press anywhere (Android Chrome) selects nothing and opens no menu or search sheet
+  useEffect(() => {
+    const stop = (e: Event) => e.preventDefault()
+    document.addEventListener('contextmenu', stop)
+    document.addEventListener('selectstart', stop)
+    return () => {
+      document.removeEventListener('contextmenu', stop)
+      document.removeEventListener('selectstart', stop)
+    }
+  }, [])
+
   useLayoutEffect(() => {
     const fit = () => {
       const w = window.innerWidth
@@ -215,35 +226,6 @@ export function Arena(props: {
   }
   const shake = (el: Element | null, px = 6) =>
     anim(el, [{ transform: 'translate(0,0)' }, { transform: `translate(${-px}px,${px / 2}px)` }, { transform: `translate(${px}px,${-px / 2}px)` }, { transform: `translate(${-px / 2}px,0)` }, { transform: 'translate(0,0)' }], 260)
-
-  // ---------- camera and impact (the stage's own transform fits it to the window, so these use `translate` / `scale`) ----------
-  const camShake = (px: number) => {
-    if (reduceMotion()) return
-    const st = stageRef.current
-    st?.animate([{ translate: '0 0' }, { translate: `${-px}px ${px * 0.6}px` }, { translate: `${px * 0.8}px ${-px * 0.5}px` }, { translate: `${-px * 0.4}px ${px * 0.3}px` }, { translate: '0 0' }], { duration: 280 / k(), easing: 'ease-out' })
-  }
-  // zoom toward a stage point for a moment (signature combos, K.O.)
-  const camZoom = (x: number, y: number, z: number, ms: number) => {
-    const st = stageRef.current
-    if (!st || reduceMotion()) return Promise.resolve()
-    const fit = st.getBoundingClientRect().width / W
-    const tx = x * fit * (1 - z)
-    const ty = y * fit * (1 - z)
-    return st
-      .animate([{ scale: '1', translate: '0 0' }, { scale: `${z}`, translate: `${tx}px ${ty}px`, offset: 0.25 }, { scale: `${z}`, translate: `${tx}px ${ty}px`, offset: 0.75 }, { scale: '1', translate: '0 0' }], { duration: ms / k(), easing: 'cubic-bezier(.3,0,.2,1)' })
-      .finished.catch(() => undefined)
-  }
-  // freeze everything in the hit for a beat so the blow lands
-  const hitStop = async (els: (Element | null | undefined)[], ms: number) => {
-    const running = els.flatMap((e) => (e ? (e as HTMLElement).getAnimations({ subtree: true }) : []))
-    running.forEach((a) => a.pause())
-    await wait(ms)
-    running.forEach((a) => a.play())
-  }
-  const flash = (color = '#fff', peak = 0.5) => {
-    const el = add(`<div class="flash" style="background:${color}"></div>`)
-    anim(el, [{ opacity: peak }, { opacity: 0 }], 220, { easing: 'ease-out' }).then(() => el.remove())
-  }
 
   // ---------- Champion poses (AI stands left facing right, you stand right facing left) ----------
   const facing = (side: Side) => (side === 'p2' ? 1 : -1)
@@ -325,7 +307,7 @@ export function Arena(props: {
     if (hitF) showPose(hitF, 'hit', 420)
     const knock = Math.min(34, 10 + dmg * 0.8)
     return anim(fighter(side), [
-      { transform: 'none', filter: 'brightness(3) saturate(0)' },
+      { transform: 'none', filter: 'none' },
       { transform: `translateX(${-knock * d}px) rotate(${-10 * d}deg)`, filter: 'brightness(1.6) sepia(1) saturate(6) hue-rotate(-40deg)', offset: 0.25 },
       { transform: `translateX(${-knock * 0.4 * d}px)`, filter: 'none', offset: 0.6 },
       { transform: 'none', filter: 'none' },
@@ -447,10 +429,6 @@ export function Arena(props: {
     if (next.winner) {
       if (next.winner !== 'draw') {
         const loser = other(next.winner)
-        const p = pos(fighter(loser))
-        flash('#fff', 0.7)
-        camShake(10)
-        camZoom(p.x, p.y, 1.35, 1300)
         await charHit(loser, 40)
         setDown(loser)
       }
@@ -474,7 +452,6 @@ export function Arena(props: {
     const dy = (b.y - a.y) * 0.55
     const slot = el?.parentElement
     if (slot) slot.style.zIndex = '10'
-    const me = fighter(ev.side)
     charAttack(ev.side, ev.type, pose)
     const dash = anim(el, [
       { transform: 'none' },
@@ -496,12 +473,7 @@ export function Arena(props: {
       spark(b.x, b.y, ev.crit ? '#ffc84a' : '#fff2b8')
       if (ev.crit) pop(b.x, b.y - 40, t('CRITICAL'), 'crit')
       if (ev.absorbed) pop(b.x - 20, b.y - 34, `${t('SHIELD')} −${ev.absorbed}`, 'soft')
-      if (ev.dealt > 0) {
-        if (ev.crit || ev.dealt >= 20) flash(ev.crit ? '#ffe7a3' : '#fff', ev.crit ? 0.55 : 0.3)
-        await hitStop([me, target, el], ev.crit ? 130 : Math.min(110, 40 + ev.dealt * 2))
-        charHit(foe, ev.dealt)
-        camShake(Math.min(9, 2 + ev.dealt / 4) * (ev.crit ? 1.4 : 1))
-      }
+      if (ev.dealt > 0) charHit(foe, ev.dealt)
       shake(q(`.hud.${foe} .portrait`))
       setHits(t(count[ev.side] > 1 ? '{n} HITS' : '{n} HIT', { n: count[ev.side] }))
     }
@@ -602,8 +574,6 @@ export function Arena(props: {
     }
     flushSync(() => setGlow(lit))
     charCombo(side)
-    const fp = pos(fighter(side))
-    camZoom(fp.x, fp.y, 1.18, 1100)
     anim(q('.fxl .dim'), [{ opacity: 0 }, { opacity: 1 }, { opacity: 1 }, { opacity: 0 }], BANNER_MS)
     const b = add(`<div class="banner"><span>${t('Signature combo')} · ${name}</span><b>${title}</b><span>${sub}</span><small>${t('Tap to skip')}</small></div>`)
     // long enough to read (playtest feedback); a tap ends it without skipping the rest of the turn
