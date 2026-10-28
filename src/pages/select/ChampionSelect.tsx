@@ -12,6 +12,8 @@ import { AscTree, OathPicker } from '../loadout/LoadoutParts'
 import { tutorialDone } from '../settings'
 import { TimerSetting } from '../timer/TurnTimer'
 import { ComboLine } from '../tutorial/Tutorial'
+import { ARCADE_STAGES } from '../arcade/arcade'
+import type { Mode } from '../menu/TitleMenu'
 import { CHAMP_INFO, comboPattern, STYLE_SUMMARY } from './info'
 import { Portrait } from './Portrait'
 import './select.css'
@@ -55,9 +57,16 @@ export function ChampionSelect(props: {
   missing: (id: string) => number
   onStart: () => void
   onTutorial: () => void
+  /** which menu entry led here: Arcade (random ladder), Versus (pick the opponent) or Multiplayer (online) */
+  mode: Mode
+  /** Versus: the opponent is rolled at random when the match starts */
+  foeRandom: boolean
+  setFoeRandom: (r: boolean) => void
+  onMenu: () => void
 }) {
   useLang()
-  const { champions, picks, foe, step, setStep } = props
+  const { champions, picks, foe, step, setStep, mode } = props
+  const modeName = mode === 'arcade' ? t('Arcade') : mode === 'multi' ? t('Multiplayer') : t('Versus')
   const me = picks.p1
   const info = CHAMP_INFO[me]
   const champ = champions.find((c) => c.id === me)
@@ -86,7 +95,9 @@ export function ChampionSelect(props: {
   return (
     <div className="select" style={{ '--tint': champColor(me) } as React.CSSProperties}>
       <header className="sel-head">
-        <small>Champion Card Clash</small>
+        <button type="button" className="menu-btn" onClick={props.onMenu} aria-label={t('Menu')}>
+          ◀ <b>{modeName}</b>
+        </button>
         <span className="sel-head-tools">
           <LangToggle />
           <button type="button" className={`tut-btn${newPlayer ? ' new' : ''}`} onClick={props.onTutorial}>
@@ -256,9 +267,25 @@ export function ChampionSelect(props: {
             ))}
           </section>
 
+          {mode === 'arcade' ? (
+            <section className="box match">
+              <h2>
+                {t('Arcade')} <span>{t('{n} stages · random opponents', { n: ARCADE_STAGES })}</span>
+              </h2>
+              <p className="lo-note">{t('Each stage the AI gets tougher, from Rookie to Legend. Lose and you can Continue from the same stage.')}</p>
+              <TimerSetting />
+            </section>
+          ) : mode === 'multi' ? (
+            <section className="box match">
+              <h2>
+                {t('Opponent')} <span>{t('a real player')}</span>
+              </h2>
+              <TimerSetting />
+            </section>
+          ) : (
           <section className="box match">
             <h2>
-              {t('Opponent')} <span>{foe === 'online' ? t('a real player') : `${foeName} · ${foeChamp} · ${STYLES[foeStyle]?.name ?? foeStyle}`}</span>
+              {t('Opponent')} <span>{`${foeName} · ${props.foeRandom ? t('Random') : `${foeChamp} · ${STYLES[foeStyle]?.name ?? foeStyle}`}`}</span>
             </h2>
             <div className="vs-row">
               <label>
@@ -268,45 +295,48 @@ export function ChampionSelect(props: {
                   <option value="tuktah" disabled={!props.canTuktah}>
                     {t('Tuktah (Claude)')}{props.canTuktah ? '' : ` · ${t('open on claude.ai')}`}
                   </option>
-                  <option value="online" disabled={!props.canOnline}>
-                    {t('Online 1v1')}{props.canOnline ? '' : ` · ${t('open on claude.ai')}`}
-                  </option>
                 </select>
               </label>
-              {foe !== 'online' && (
-                <>
-                  <label>
-                    {t("{who}'s Champion", { who: foeName })}
-                    <select value={picks.p2} onChange={(e) => props.setChamp('p2', e.target.value)}>
-                      {champions.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    {t("{who}'s Path", { who: foeName })}
-                    <select value={foeStyle} onChange={(e) => props.setStyle('p2', e.target.value)}>
-                      {props
-                        .stylesOf(picks.p2)
-                        .filter((s) => STYLES[`${s.champion_id}:${s.slot}`])
-                        .map((s) => {
-                          const key = `${s.champion_id}:${s.slot}`
-                          return (
-                            <option key={key} value={key}>
-                              {s.name}
-                            </option>
-                          )
-                        })}
-                    </select>
-                  </label>
-                </>
+              <label>
+                {t("{who}'s Champion", { who: foeName })}
+                <select
+                  value={props.foeRandom ? '?' : picks.p2}
+                  onChange={(e) => {
+                    props.setFoeRandom(e.target.value === '?')
+                    if (e.target.value !== '?') props.setChamp('p2', e.target.value)
+                  }}
+                >
+                  <option value="?">{t('Random')}</option>
+                  {champions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!props.foeRandom && (
+                <label>
+                  {t("{who}'s Path", { who: foeName })}
+                  <select value={foeStyle} onChange={(e) => props.setStyle('p2', e.target.value)}>
+                    {props
+                      .stylesOf(picks.p2)
+                      .filter((s) => STYLES[`${s.champion_id}:${s.slot}`])
+                      .map((s) => {
+                        const key = `${s.champion_id}:${s.slot}`
+                        return (
+                          <option key={key} value={key}>
+                            {s.name}
+                          </option>
+                        )
+                      })}
+                  </select>
+                </label>
               )}
             </div>
-            {foe !== 'online' && <p className="lo-note">{t('The {who} also gets a random Oath and a full Ascendancy tree.', { who: foeName })}</p>}
+            <p className="lo-note">{t('The {who} also gets a random Oath and a full Ascendancy tree.', { who: foeName })}</p>
             <TimerSetting />
           </section>
+          )}
         </>
       )}
 
@@ -318,9 +348,14 @@ export function ChampionSelect(props: {
         )}
         {step === 'fight' ? (
           <>
-            {foe !== 'online' && <Portrait champ={picks.p2} style={foeStyle} bust className="foe-art" />}
+            {mode === 'versus' &&
+              (props.foeRandom ? (
+                <span className="foe-art foe-random" aria-hidden="true">?</span>
+              ) : (
+                <Portrait champ={picks.p2} style={foeStyle} bust className="foe-art" />
+              ))}
             <button type="button" className="start" onClick={props.onStart}>
-              {foe === 'online' ? t('Find a match') : t('Fight!')}
+              {mode === 'multi' ? t('Find a match') : mode === 'arcade' ? t('Start Arcade') : t('Fight!')}
             </button>
           </>
         ) : (

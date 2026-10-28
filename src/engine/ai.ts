@@ -53,9 +53,11 @@ export type AiWeights = {
   res: number
   /** turns looked ahead (1 = this turn only; 2 = also the reply turn, about 9x slower) */
   depth: number
+  /** share of a uniform random pick mixed into the solved mix (Arcade's easy stages raise it) */
+  noise: number
 }
 
-export const AI_WEIGHTS: AiWeights = { fieldValue: 0.5, fullField: 1, combo: 5, status: 1, res: 1.5, depth: 2 }
+export const AI_WEIGHTS: AiWeights = { fieldValue: 0.5, fullField: 1, combo: 5, status: 1, res: 1.5, depth: 2, noise: 0.08 }
 
 /** Rough worth of a status to whoever has it, per remaining turn (shield is counted as HP instead). */
 const STATUS_VALUE: Partial<Record<StatusKind, number>> = {
@@ -183,7 +185,7 @@ export function pickSmartAction(
   const { mine, table } = payoff(state, side, w, w.depth)
   const mixed = solve(table).mix
   // a little noise so the AI never becomes a pure function of the board
-  const probs = mixed.map((p) => 0.92 * p + 0.08 / mine.length)
+  const probs = mixed.map((p) => (1 - w.noise) * p + w.noise / mine.length)
   let r = rand()
   for (let i = 0; i < mine.length; i++) if ((r -= probs[i]) < 0) return mine[i]
   return mine[0]

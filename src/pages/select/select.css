@@ -124,3 +124,8 @@
 @media (prefers-reduced-motion: reduce) { .champ { transition: none; } .champ:hover { transform: none; } .hero-art .face { animation: none; } }
 .sel-head-tools { display: flex; align-items: center; gap: 8px; }
 .sel-head .lang-toggle { color: var(--s-muted); }
+
+/* Back to the title menu, with the mode name */
+.menu-btn { background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--s-line); border-radius: 999px; padding: 5px 14px 5px 10px; font-size: 13px; font-weight: 800; }
+.menu-btn b { font: 15px 'Lilita One', 'Kanit', 'Arial Black', sans-serif; letter-spacing: .5px; text-transform: uppercase; }
+.foe-random { display: grid; place-items: center; aspect-ratio: 1; font: 30px 'Lilita One', 'Arial Black', sans-serif; color: var(--s-gold); transform: none; }
