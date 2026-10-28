@@ -1037,7 +1037,7 @@ function cardFacts(game: GameState, side: Side, card: CardInst) {
   const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (p.res ?? 0) ? res.unpaidDmgPct : undefined
   const grow = (card.grow ?? 0) + (card.growNext ?? 0)
   const base = short != null ? Math.floor((dmg * short) / 100) : dmg
-  const text = effectSpec?.length ? describeSpec(effectSpec) : effectText
+  const text = effectSpec?.length ? describeSpec(effectSpec, t, res?.name) : effectText
   const missing = isEffectMissing(id, effectText, effectSpec)
   const costName = res?.payWithHp ? 'HP' : (res?.name ?? '')
   // why this card's effect won't fire if it's played now (same rules as effectOf in engine/state.ts)

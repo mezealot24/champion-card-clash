@@ -3,6 +3,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { t, withLang } from '.'
+import { DMG_TARGET, HOOK_LABEL, PCT_OF, PER_LABEL, PIERCE_TARGET, STATUS, TYPE, WHO } from '../engine/effects/describe'
+import { ENDURANCE_TEXT, OATHS, TREES } from '../engine/loadoutData'
+import { PER, STATUS_SHORT } from '../pages/learnText'
 import { CHAMP_INFO, STYLE_SUMMARY } from '../pages/select/info'
 import { TUTORIAL } from '../pages/tutorial/script'
 import { TIERS } from '../pages/arcade/arcade'
@@ -21,10 +24,10 @@ function files(dir: string): string[] {
   })
 }
 
-/** English keys written as literals in t() calls across src/pages. */
+/** English keys written as literals in t() calls across src/pages, and in tr() calls of the card text (effects/describe.ts). */
 function literalKeys(): string[] {
   const out = new Set<string>()
-  for (const f of files(join(__dirname, '..', 'pages'))) {
+  for (const f of [...files(join(__dirname, '..', 'pages')), join(__dirname, '..', 'engine', 'effects', 'describe.ts')]) {
     const src = readFileSync(f, 'utf8')
     for (const rx of [CALL, PL])
       for (const m of src.matchAll(rx)) for (const g of m.slice(1)) if (g) out.add(g.replace(/\\(['"])/g, '$1'))
@@ -43,6 +46,14 @@ const dataKeys = [
   ...['SECOND HELPING', 'Heal 10% of your HP', 'DEATH MARK', 'Every later Strike bursts +50%', 'SEALED', "Enemy can't Block next turn", 'GUARD CRUSH', 'Next Strike breaks through Block'],
   ...['Tank pays for S cards with HP.'],
   ...TIERS.map((x) => x.name),
+  // card text tables (effects/describe.ts, learnText.ts)
+  ...[HOOK_LABEL, WHO, TYPE, STATUS, PER_LABEL, PCT_OF, DMG_TARGET, PIERCE_TARGET, STATUS_SHORT, PER].flatMap((m) => Object.values(m) as string[]),
+  ...['oldest', 'newest', 'this turn only', 'this turn', 'next turn', 'for {n} turns', 'Mana', 'Rage', 'Energy', 'resource', ' next', ' later', ' chain'],
+  ...['HOLD·START', 'BEFORE', 'ON HIT', 'AFTER', 'HOLD', 'ON DRAW', 'Foe Strikes', 'Foe Blocks', 'Foe Charges', 'You {x}', 'Foe {x}', 'Cut {n} oldest', 'Cut {n} newest'],
+  // Ascendancy and Oath pieces (loadoutData.ts), shown through t() before their {numbers} are filled
+  ...Object.values(TREES).flatMap((tree) => tree.nodes.flatMap((n) => [n.text, ...(n.cost ? [n.cost] : [])])),
+  ...Object.values(OATHS).flatMap((os) => os.map((o) => o.text)),
+  ENDURANCE_TEXT,
 ]
 
 const slots = (s: string) => (s.match(/\{[\w.|]+\}/g) ?? []).sort()

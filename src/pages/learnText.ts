@@ -12,108 +12,116 @@ export type CompactRule = { tag: string; when: string; gain: string[]; cost: str
 
 const TAG: Record<Hook, string> = { modify: 'BEFORE', onHit: 'ON HIT', onResolve: 'AFTER', onHeld: 'HOLD', onDraw: 'ON DRAW', onClean: 'AFTER', onBlocked: 'AFTER' }
 const ACT = { strike: 'Strike', block: 'Block', charge: 'Charge' }
-const ACTS = { strike: 'Strikes', block: 'Blocks', charge: 'Charges' }
 const OP = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' }
-const STATUS_SHORT: Partial<Record<string, string>> = {
+/** Short status names on the card face; game words, so most stay English in Thai too (th.ts). */
+export const STATUS_SHORT: Partial<Record<string, string>> = {
   noStrike: 'no Strike', noBlock: 'no Block', noCharge: 'no Charge', silence: 'Silenced', skillSilence: 'S effects off',
   trueDmg: 'True Dmg', guardBreak: 'Guard Crush', vulnerable: 'Vulnerable', deathMark: 'Marked', shield: 'Shield',
   parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: 'Cut guard', regen: 'Regen', empower: 'Empower',
 }
-const who = (w: 'self' | 'enemy') => (w === 'self' ? 'You' : 'Foe')
+const status = (k: string) => (STATUS_SHORT[k] ? tr(STATUS_SHORT[k]!) : k)
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
-const turnsTag = (t: number) => (t <= 1 ? '' : ` ${t}t`)
+const turnsTag = (t: number) => (t <= 1 ? '' : tr(' {n}t', { n: t }))
+/** "Foe " / "Both " in front of a short line; yours has none */
+const head = (w: string) => (w === 'enemy' ? tr('Foe {x}', { x: '' }) : w === 'both' ? tr('Both {x}', { x: '' }) : '')
+const whoSays = (w: 'self' | 'enemy', x: string) => tr(w === 'self' ? 'You {x}' : 'Foe {x}', { x })
 
 /** One condition in a few words; anything without a short form falls back to the full sentence. */
 export function shortCond(c: CondSpec): string {
   switch (c.c) {
-    case 'selfAction': return `You ${ACT[c.a]}`
-    case 'enemyAction': return `Foe ${ACTS[c.a]}`
-    case 'hitResult': return c.r === 'clean' ? 'Clean hit' : 'Blocked'
-    case 'enemyHandAtLeast': return `Foe ${c.n}+ cards`
-    case 'enemyHandEmpty': return 'Foe Field empty'
-    case 'handCompare': return { '<': 'Fewer cards than foe', '<=': 'No more cards than foe', '=': 'Same cards as foe', '>': 'More cards than foe' }[c.op]
-    case 'enemyChainAtLeast': return `Foe chain ${c.n}+`
-    case 'chainAll': return `All ${c.type}`
-    case 'chainLength': return c.op === '=' ? `Chain = ${c.n}` : `Chain ${c.n}+`
-    case 'slotIs': return `Slot ${c.n}`
-    case 'hasFacing': return 'Facing card'
-    case 'noFacing': return 'No facing card'
-    case 'lostHp': return 'Lost HP (this/last turn)'
-    case 'facingSameType': return 'Facing same type'
-    case 'notHit': return 'Not hit'
-    case 'facingIs': return `Facing ${c.type}`
-    case 'prevIs': return `After a ${c.type}`
-    case 'tookDmg': return c.n <= 1 ? 'You got hit' : `You took ${c.n}+`
-    case 'hpAtMost': return `HP ≤ ${c.n}`
-    case 'hpNotAbove': return 'HP ≤ Foe'
-    case 'hp': return `${c.who === 'self' ? 'HP' : 'Foe HP'} ${OP[c.op]} ${c.n}${c.pct ? '%' : ''}`
-    case 'enteredWith': return `Came in with ${c.n}+`
-    case 'silenced': return `${who(c.who)} Silenced`
-    case 'hasStatus': return `${who(c.who)}: ${STATUS_SHORT[c.kind] ?? c.kind}`
-    case 'res': return `${who(c.who)} ${c.n}+ res`
-    case 'chainHas': return c.n <= 1 ? `${c.who === 'self' ? 'Chain' : 'Foe chain'} has ${c.type}` : `${c.who === 'self' ? 'Chain' : 'Foe chain'} ${c.n}+ ${c.type}`
-    case 'fieldHas': return `${who(c.who)} ${c.n}+ ${c.type} on Field`
-    case 'fieldAll': return `${c.who === 'self' ? 'Field' : 'Foe Field'} all ${c.type}`
-    case 'ignite': return c.op === '<' ? `${who(c.who)} Ignite < ${c.n}` : `${who(c.who)} Ignite ${c.n}+`
-    case 'chill': return c.op === '<' ? `${who(c.who)} Chill < ${c.n}` : `${who(c.who)} Chill ${c.n}+`
-    default: return describeCond(c)
+    case 'selfAction': return tr('You {a}', { a: ACT[c.a] })
+    case 'enemyAction': return tr(c.a === 'strike' ? 'Foe Strikes' : c.a === 'block' ? 'Foe Blocks' : 'Foe Charges')
+    case 'hitResult': return c.r === 'clean' ? tr('Clean hit') : tr('Blocked')
+    case 'enemyHandAtLeast': return tr('Foe {n}+ cards', { n: c.n })
+    case 'enemyHandEmpty': return tr('Foe Field empty')
+    case 'handCompare': return { '<': tr('Fewer cards than foe'), '<=': tr('No more cards than foe'), '=': tr('Same cards as foe'), '>': tr('More cards than foe') }[c.op]
+    case 'enemyChainAtLeast': return tr('Foe chain {n}+', { n: c.n })
+    case 'chainAll': return tr('All {type}', { type: c.type })
+    case 'chainLength': return c.op === '=' ? tr('Chain = {n}', { n: c.n }) : tr('Chain {n}+', { n: c.n })
+    case 'slotIs': return tr('Slot {n}', { n: c.n })
+    case 'hasFacing': return tr('Facing card')
+    case 'noFacing': return tr('No facing card')
+    case 'lostHp': return tr('Lost HP (this/last turn)')
+    case 'facingSameType': return tr('Facing same type')
+    case 'notHit': return tr('Not hit')
+    case 'facingIs': return tr('Facing {type}', { type: c.type })
+    case 'prevIs': return tr('After a {type}', { type: c.type })
+    case 'tookDmg': return c.n <= 1 ? tr('You got hit') : tr('You took {n}+', { n: c.n })
+    case 'hpAtMost': return tr('HP ≤ {n}', { n: c.n })
+    case 'hpNotAbove': return tr('HP ≤ Foe')
+    case 'hp': return tr(c.who === 'self' ? 'HP {op} {n}' : 'Foe HP {op} {n}', { op: OP[c.op], n: `${c.n}${c.pct ? '%' : ''}` })
+    case 'enteredWith': return tr('Came in with {n}+', { n: c.n })
+    case 'enteredAt': return tr('Drawn into slot {n}', { n: c.n })
+    case 'hitBy': return c.n <= 1 ? tr('Hit by {type}', { type: c.type ?? tr('a card') }) : tr('Hit by {n}+ {type}', { n: c.n, type: c.type ?? tr('cards') })
+    case 'blockedType': return c.n <= 1 ? tr('Blocked {type}', { type: c.type ?? tr('a hit') }) : tr('Blocked {n}+ {type}', { n: c.n, type: c.type ?? tr('hits') })
+    case 'silenced': return whoSays(c.who, tr('Silenced'))
+    case 'hasStatus': return tr(c.who === 'self' ? 'You: {status}' : 'Foe: {status}', { status: status(c.kind) })
+    case 'res': return whoSays(c.who, tr('{n}+ res', { n: c.n }))
+    case 'chainHas': return c.n <= 1 ? tr(c.who === 'self' ? 'Chain has {type}' : 'Foe chain has {type}', { type: c.type }) : tr(c.who === 'self' ? 'Chain {n}+ {type}' : 'Foe chain {n}+ {type}', { n: c.n, type: c.type })
+    case 'fieldHas': return whoSays(c.who, tr('{n}+ {type} on Field', { n: c.n, type: c.type }))
+    case 'fieldAll': return tr(c.who === 'self' ? 'Field all {type}' : 'Foe Field all {type}', { type: c.type })
+    case 'ignite': return whoSays(c.who, c.op === '<' ? tr('Ignite < {n}', { n: c.n }) : tr('Ignite {n}+', { n: c.n }))
+    case 'chill': return whoSays(c.who, c.op === '<' ? tr('Chill < {n}', { n: c.n }) : tr('Chill {n}+', { n: c.n }))
+    default: return describeCond(c, tr)
   }
 }
 
 const OWN: Record<string, string> = { this: '', next: ' next', following: ' later', chain: ' chain' }
-const FOE: Record<string, string> = { facing: 'Facing', enemyAll: 'Foe' }
 /** Whose card the dmg change lands on, as the line's head (foe) or tail (yours). */
 function target(t: unknown, only?: CardType): { head: string; tail: string } {
   const o = only ? ` ${only}` : ''
-  if (typeof t === 'object' && t) return 'enemySlot' in t ? { head: `Foe slot ${(t as { enemySlot: number }).enemySlot}${o} `, tail: '' } : { head: '', tail: ` slot ${(t as { slot: number }).slot}${o}` }
-  if (FOE[t as string]) return { head: `${FOE[t as string]}${o}${t === 'enemyAll' ? ' cards' : ''} `, tail: '' }
-  return { head: '', tail: `${OWN[t as string] ?? ''}${o}` }
+  if (typeof t === 'object' && t) return 'enemySlot' in t ? { head: tr('Foe slot {n}{type} ', { n: (t as { enemySlot: number }).enemySlot, type: o }), tail: '' } : { head: '', tail: tr(' slot {n}{type}', { n: (t as { slot: number }).slot, type: o }) }
+  if (t === 'facing') return { head: tr('Facing{type} ', { type: o }), tail: '' }
+  if (t === 'enemyAll') return { head: tr('Foe{type} cards ', { type: o }), tail: '' }
+  const own = OWN[t as string] ? tr(OWN[t as string]) : ''
+  return { head: '', tail: `${own}${o}` }
 }
-const PER: Record<string, string> = {
+export const PER: Record<string, string> = {
   hitBlocked: 'blocked hit', chainCard: 'chain card', selfCard: 'card you hold', enemyCard: 'foe card', chainP: 'P', chainK: 'K', chainS: 'S',
-  missingHp10: '10 missing HP', missingHp5: '5 missing HP', enemyIgnite: 'foe Ignite', enemyChill: 'foe Chill',
+  missingHp10: '10 missing HP', missingHp5: '5 missing HP', enemyIgnite: 'foe Ignite', enemyChill: 'foe Chill', paidHp: 'HP paid',
 }
-const per = (a: { per?: string }) => (a.per && PER[a.per] ? ` per ${PER[a.per]}` : '')
+const per = (a: { per?: string }) => (a.per && PER[a.per] ? tr(' per {what}', { what: tr(PER[a.per]) }) : '')
 
 /** One action in a few words (res = the class resource name, e.g. Mana). */
 export function shortAct(a: ActSpec, res = 'res'): string {
+  const h = 'who' in a ? head(a.who) : ''
   switch (a.a) {
-    case 'draw': return `${a.who === 'self' ? '' : a.who === 'enemy' ? 'Foe ' : 'Both '}Draw ${a.n}${per(a)}`
-    case 'heal': return `${a.who === 'enemy' ? 'Foe ' : ''}+${a.n}${a.per === 'maxHpPct' ? '% Max HP' : a.per === 'missingHpPct' ? '% missing HP' : ' HP'}${per(a)}`
-    case 'loseHp': return `${a.who === 'enemy' ? 'Foe ' : a.who === 'both' ? 'Both ' : ''}−${a.n} HP${per(a)}`
-    case 'maxHp': return `${a.who === 'enemy' ? 'Foe ' : ''}Max HP ${signed(a.n)}`
+    case 'draw': return `${h}${tr('Draw {n}', { n: a.n })}${per(a)}`
+    // Q 2026-10-28: "+2% Max HP" read as Max HP growing; it's a heal of 2% of Max HP
+    case 'heal': return `${a.who === 'enemy' ? head('enemy') : ''}${a.per === 'maxHpPct' ? tr('Heal {n}% Max HP', { n: a.n }) : a.per === 'missingHpPct' ? tr('Heal {n}% missing HP', { n: a.n }) : tr('Heal {n}', { n: a.n })}${a.per === 'maxHpPct' || a.per === 'missingHpPct' ? '' : per(a)}`
+    case 'loseHp': return `${h}${tr('−{n} HP', { n: a.n })}${per(a)}`
+    case 'maxHp': return `${a.who === 'enemy' ? head('enemy') : ''}${tr('Max HP {n}', { n: signed(a.n) })}`
     case 'status': {
-      const t = a.turns === 0 ? '' : turnsTag(a.turns)
+      const t = a.turns === 0 || a.turns > 50 ? '' : turnsTag(a.turns)
       const n = a.n ?? 1
-      const head = a.who === 'enemy' ? 'Foe ' : a.who === 'both' ? 'Both ' : ''
-      if (a.kind === 'blockPlus') return `${head}Block ${signed(n)}${t}`
-      if (a.kind === 'shield' || a.kind === 'parry') return `${head}${STATUS_SHORT[a.kind]} ${n}${per(a)}${t}`
-      if (a.kind === 'vulnerable') return `${a.who === 'self' ? 'You take' : `${head}takes`} +${n}% dmg${t}`
-      if (a.kind === 'regen') return `${head}Regen ${n}% missing HP${t}`
-      if (a.kind === 'empower') return `${head}Next Strike +${n} dmg/card`
-      return `${head}${STATUS_SHORT[a.kind] ?? a.kind}${t}`
+      if (a.kind === 'blockPlus') return `${h}${tr('Block {n}', { n: signed(n) })}${t}`
+      if (a.kind === 'shield' || a.kind === 'parry') return `${h}${status(a.kind)} ${n}${per(a)}${t}`
+      if (a.kind === 'vulnerable') return `${a.who === 'self' ? tr('You take +{n}% dmg', { n }) : `${h}${tr('takes +{n}% dmg', { n })}`}${t}`
+      if (a.kind === 'regen') return `${h}${tr('Regen {n}% missing HP', { n })}${t}`
+      if (a.kind === 'empower') return `${h}${tr('Next Strike +{n} dmg/card', { n })}`
+      return `${h}${status(a.kind)}${t}`
     }
-    case 'grow': return `${signed(a.n)} dmg ${a.dur === 'next' ? 'next hit' : 'for good'}`
+    case 'grow': return a.dur === 'next' ? tr('{n} dmg next hit', { n: signed(a.n) }) : tr('{n} dmg for good', { n: signed(a.n) })
     case 'addDmg': {
-      const { head, tail } = target(a.target, a.onlyType)
-      return `${head}${signed(a.n)} dmg${tail}${per(a)}${a.max != null ? ` (max ${a.max})` : ''}`
+      const { head: hd, tail } = target(a.target, a.onlyType)
+      return `${hd}${tr('{n} dmg', { n: signed(a.n) })}${tail}${per(a)}${a.max != null ? tr(' (max {n})', { n: a.max }) : ''}`
     }
     case 'mulDmg': {
-      const { head, tail } = target(a.target, a.onlyType)
-      const x = a.pct === 0 ? '0 dmg' : a.pct < 100 ? `−${100 - a.pct}% dmg` : a.pct % 100 === 0 ? `×${a.pct / 100} dmg` : `${a.pct}% dmg`
-      return `${head}${x}${tail}`
+      const { head: hd, tail } = target(a.target, a.onlyType)
+      const x = a.pct === 0 ? tr('0 dmg') : a.pct < 100 ? tr('−{n}% dmg', { n: 100 - a.pct }) : a.pct % 100 === 0 ? tr('×{n} dmg', { n: a.pct / 100 }) : tr('{n}% dmg', { n: a.pct })
+      return `${hd}${x}${tail}`
     }
-    case 'blockNow': return `${a.who === 'enemy' ? 'Foe ' : ''}Block ${signed(a.n)}`
-    case 'pierce': return `Pierce${a.parry ? ' + Parry' : ''}${OWN[a.target] ?? ''}`
-    case 'shatter': return `Shatter Shield/Parry, +${a.n} dmg each`
-    case 'steal': return 'Steal facing card'
-    case 'cut': return a.which === 'facing' ? 'Cut facing card' : `Cut ${a.n} ${a.which}`
-    case 'gainRes': return `${a.who === 'enemy' ? 'Foe ' : ''}${signed(a.n)} ${res}${per(a)}`
-    case 'ignite': return a.n === 0 ? `${a.who === 'self' ? '' : 'Foe '}Ignite refresh` : `${a.who === 'self' ? '' : 'Foe '}Ignite ${a.n}${per(a)}`
-    case 'chill': return `${a.who === 'self' ? '' : 'Foe '}Chill ${a.n}${per(a)}`
-    case 'consumeIgnite': return a.burn ? 'Detonate Ignite' : 'Clear Ignite'
-    case 'infuse': return `${a.who === 'self' ? 'You ' : a.who === 'both' ? 'Both ' : ''}⟡ Infuse ${a.n}`
-    default: return describeAct(a)
+    case 'blockNow': return `${a.who === 'enemy' ? head('enemy') : ''}${tr('Block {n}', { n: signed(a.n) })}`
+    case 'pierce': return `${a.parry ? tr('Pierce + Parry') : tr('Pierce')}${OWN[a.target] ? tr(OWN[a.target]) : ''}`
+    case 'shatter': return tr('Shatter Shield/Parry, +{n} dmg each', { n: a.n })
+    case 'steal': return tr('Steal facing card')
+    case 'cut': return a.which === 'facing' ? tr('Cut facing card') : tr(a.which === 'oldest' ? 'Cut {n} oldest' : 'Cut {n} newest', { n: a.n })
+    case 'gainRes': return `${a.who === 'enemy' ? head('enemy') : ''}${signed(a.n)} ${tr(res)}${per(a)}`
+    case 'ignite': return `${a.who === 'self' ? '' : head('enemy')}${a.n === 0 ? tr('Ignite refresh') : tr('Ignite {n}', { n: a.n })}${a.n === 0 ? '' : per(a)}`
+    case 'chill': return `${a.who === 'self' ? '' : head('enemy')}${tr('Chill {n}', { n: a.n })}${per(a)}`
+    case 'consumeIgnite': return a.burn ? tr('Detonate Ignite') : tr('Clear Ignite')
+    case 'infuse': return `${a.who === 'self' ? tr('You {x}', { x: '' }) : a.who === 'both' ? head('both') : ''}⟡ Infuse ${a.n}`
+    default: return describeAct(a, false, tr)
   }
 }
 
@@ -143,10 +151,10 @@ export function compactRules(spec: EffectSpec | null | undefined, res?: string):
     // "you play Strike" rides on the tag (BEFORE STRIKE) so the condition line stays short
     const mine = (r.if ?? []).find((c): c is Extract<CondSpec, { c: 'selfAction' }> => c.c === 'selfAction')
     const conds = (r.if ?? []).filter((c) => c !== mine).map(shortCond)
-    if (r.once) conds.push('once')
-    const tag = r.hook === 'onHeld' && r.at === 'before' ? 'HOLD·START' : TAG[r.hook]
+    if (r.once) conds.push(tr('once'))
+    const tag = tr(r.hook === 'onHeld' && r.at === 'before' ? 'HOLD·START' : TAG[r.hook])
     return {
-      tag: mine ? `${tag} ${ACT[mine.a].toUpperCase()}` : tag,
+      tag: mine ? `${tag} ${tr(ACT[mine.a].toUpperCase())}` : tag,
       when: conds.join(' · '),
       gain: r.do.filter((a) => !isCost(a)).map((a) => shortAct(a, res)),
       cost: r.do.filter(isCost).map((a) => shortAct(a, res)),
