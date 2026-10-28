@@ -701,9 +701,9 @@ export function Arena(props: {
               {game.rules.suddenDeathTurn > 0 && game.turn > game.rules.suddenDeathTurn - 5 && (
                 <div
                   className="sudden"
-                  title={`After turn ${game.rules.suddenDeathTurn}: both sides lose ${game.rules.suddenDeathDmg} HP more every turn, heals −${game.rules.suddenDeathHealCut}%`}
+                  title={t('After turn {turn}: both sides lose {n} HP more every turn, heals −{cut}%', { turn: game.rules.suddenDeathTurn, n: game.rules.suddenDeathDmg, cut: game.rules.suddenDeathHealCut })}
                 >
-                  {game.turn > game.rules.suddenDeathTurn ? '☠ Sudden death' : `☠ in ${game.rules.suddenDeathTurn + 1 - game.turn}`}
+                  {game.turn > game.rules.suddenDeathTurn ? t('☠ Sudden death') : t('☠ in {n}', { n: game.rules.suddenDeathTurn + 1 - game.turn })}
                 </div>
               )}
               <div className="tools">
@@ -887,8 +887,26 @@ function statusChip(s: Status, frozen: boolean): Chip {
     : s.kind === 'cutGuard' ? ['✂ Cut guard', 'buff', t("You just lost Field cards to Cut, so your Field can't be Cut again for now.")]
     : s.kind === 'woundUp' ? ['🥊 Wound Up', 'buff', t('Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left as extra damage.')]
     : s.kind === 'chill' ? [`❄ Chill ${n}`, 'debuff', pl(n, 'Chilled ({n} stack): your damage is cut for each stack.', 'Chilled ({n} stacks): your damage is cut for each stack.')]
+    // Q 2026-10-28: these two fell through to a red "▼ EMPOWER" / "▼ REGEN" chip with no number
+    : s.kind === 'empower' ? [`⚔ Empower +${n}`, 'buff', t('Your next Strike: every chain card +{n} dmg.', { n })]
+    : s.kind === 'regen' ? [`✚ Regen ${n}%`, 'buff', t('At the end of every turn you heal {n}% of your missing HP.', { n })]
     : [s.kind, 'debuff', s.kind]
   return { label, tone, tip: tip + turnsLeft(s) }
+}
+
+/** One chip per kind for statuses that pile up: Empower counts its biggest (engine.ts), Regen adds up. */
+function mergeStacking(list: Status[]): Status[] {
+  const out: Status[] = []
+  for (const s of list) {
+    const was = s.kind === 'empower' || s.kind === 'regen' ? out.find((x) => x.kind === s.kind) : undefined
+    if (!was) out.push({ ...s })
+    else if (s.kind === 'empower') was.n = Math.max(was.n ?? 0, s.n ?? 0)
+    else {
+      was.n = (was.n ?? 0) + (s.n ?? 0)
+      was.turns = Math.max(was.turns, s.turns)
+    }
+  }
+  return out
 }
 
 const RESOURCE_TIP: Record<string, string> = {
@@ -924,7 +942,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
   const conqMaxN = tuningOf(game, side)['BR:2'].conquerorMax
   const chips: Chip[] = [
     // frozen is only a marker for cards (the No Strike chip shows the freeze); Frozen Tomb's chip stands for its No Strike / No Charge
-    ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) => statusChip(s, frozen)),
+    ...mergeStacking(p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb')))).map((s) => statusChip(s, frozen)),
     ...(p.comboData?.conqueror
       ? [{ label: conqMax(game, side) ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: t('Juggernaut stacks: +1 dmg per stack on every chain card. At {max}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.', { max: conqMaxN }) }]
       : []),
