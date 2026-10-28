@@ -17,6 +17,8 @@ export type CardDef = {
   cost?: number | null
   /** cards.style_only: "MG:1" = only under that Style, "!MG:1" = under every Style but that one, null = always (see inStyleDeck). */
   styleOnly?: string | null
+  /** cards.cost_pct (Tank v3, Q 2026-10-27): the S card also costs this % of current HP, on top of cost (flat). */
+  costPct?: number | null
 }
 
 /** One physical card in a game. uid is unique even for copies. */
@@ -27,7 +29,8 @@ export type CardDef = {
  * enteredWith = cards on the Field (this one included) when this copy last came into play.
  */
 /** owner = the side whose deck this copy goes back to, when it was stolen onto the other Field. */
-export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number; owner?: Side }
+/** paidHp = HP this copy's cost took this turn (Tank Blood Price cards read it). */
+export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number; owner?: Side; paidHp?: number }
 
 /** trueDmg = your hits ignore dmg cuts (only Block stops them) */
 /** deathMark = on the side that carries it: every Strike against it bursts for 50% of that chain's total dmg (Assassin combo, rest of game) */
@@ -41,7 +44,8 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  */
 /** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts. chill = Cryomancer's slow (n = stacks, CHILL_*).
  * frozen = marker for "can't Strike this turn" (lasts 1 turn longer than its noStrike so cards can read it). skillSilence = Skill cards' effects off (Bitter Cold). subZero = next Strike: every clean hit gives 1 Chill (Arcane Sub-Zero). thaw = can't be Frozen (after a Freeze, Cryomancer) */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'thaw' | 'venom' | 'woundUp' | 'cutGuard'
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'thaw' | 'venom' | 'woundUp' | 'cutGuard' | 'regen' | 'empower'
+/** regen = end of every turn, heal n% of missing HP (Tank Blood Price). empower = your next Strike: every chain card +n dmg, then it's gone (Deep Breath). */
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 /** A side loses at most this many Field cards to Cut effects per turn (Claude default 2026-10-16). Charge break doesn't count. */
 export const CUT_CAP = 2
@@ -100,7 +104,7 @@ export type PlayerState = {
   /** Field size for this player when a loadout changes it (default: rules.handMax). */
   fieldMax?: number
   /** S card cost changes from the loadout: +pct % then +flat (Tank: HP). */
-  costMod?: { pct: number; flat: number; hpPct?: number }
+  costMod?: { pct: number; flat: number; hpPct?: number; addHpPct?: number }
   /** Loadout bookkeeping (once-per-match pieces and the like). */
   perkData?: Record<string, number>
 }

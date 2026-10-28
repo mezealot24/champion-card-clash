@@ -102,18 +102,6 @@ describe('loadout', () => {
     expect(s.players.p1.res).toBeLessThan(2) // paid the normal cost
   })
 
-  it('Grasp of the Undying: a knockout hit leaves the Tank at 1 HP once', () => {
-    let s = game('TK', { asc: ['C1', 'C2', 'C3'] }, 'TK:1')
-    s.players.p1.hp = 5
-    s.players.p2.hand = [hit(50)]
-    s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-    // stays at 1 and goes Undying; Cost: S cards cost 10% of current HP
-    expect(s.players.p1.costMod?.hpPct).toBe(10)
-    expect(s.log.some((l) => l.includes('Grasp of the Undying'))).toBe(true)
-    expect(s.players.p1.hp).toBeGreaterThanOrEqual(1)
-    expect(s.players.p1.perkData?.unbroken).toBe(1)
-    expect(s.winner).toBeNull()
-  })
 })
 
 describe('randomLoadout', () => {
@@ -156,158 +144,137 @@ describe('randomLoadout', () => {
     })
   })
 
-  describe('Tank v2 Ascendancy', () => {
+  describe('Tank v3 Ascendancy', () => {
     const tk = (style: string, asc: string[]) => game('TK', { asc, points: 6 }, style, 'TK')
-    it('Endurance: Charge or 2+ hits give a stack, old stacks decay 1 a turn', () => {
+    const end = (s: GameState) => s.players.p1.perkData?.endurance ?? 0
+    const skill = (dmg: number, costPct: number): CardInst => ({ uid: `s${uid++}`, def: { id: 'XX-S', type: 'S', dmg, effectText: '', costPct } })
+    it('Unflinching: a clean hit gives 1 Endurance after the collect, cap 4', () => {
       let s = tk('TK:1', ['A1'])
-      for (let i = 0; i < 4; i++) {
-        s.players.p2.hand = [hit(10), hit(10)]
-        s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      }
-      // 1 new stack a turn, 1 old stack decays a turn
-      expect(s.players.p1.perkData?.endurance).toBe(1)
-      const hp = s.players.p1.hp
-      s.players.p2.hand = [hit(10), hit(10)]
-      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(hp - s.players.p1.hp).toBeLessThanOrEqual(8)
-      expect(s.log.some((l) => l.includes('Endurance'))).toBe(true)
-      for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
-      expect(s.players.p1.perkData?.endurance).toBe(0)
+      expect(tuningOf(s, 'p1')['TK:1'].endMax).toBe(4)
+      expect(tuningOf(s, 'p2')['TK:1'].endMax).toBe(3)
+      s.players.p1.hand = [hit(5)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(end(s)).toBe(1)
     })
-    it('Endurance: Charge alone gives a stack', () => {
-      let s = tk('TK:1', ['A1'])
-      s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-      expect(s.players.p1.perkData?.endurance).toBe(1)
-    })
-    it('Unflinching: an Ignite burn counts as a hit', () => {
-      let s = tk('TK:1', ['A1'])
-      s.players.p1.statuses.push({ kind: 'ignite', turns: 3, n: 1 })
-      s.players.p2.hand = [hit(10)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.players.p1.perkData?.endurance).toBe(1)
-    })
-    it('Unrelenting: max 3+1+2, hit dmg drains over 3 turns instead of landing at once', () => {
+    it('Whirl: a counter-spin undoes half the hit dmg that turn; Field holds 4', () => {
       let s = tk('TK:1', ['A1', 'A2', 'A3'])
-      expect((tuningOf(s, 'p1')['TK:1'] as Record<string, number>).ascEnduranceMax).toBe(6)
-      expect((tuningOf(s, 'p2')['TK:1'] as Record<string, number>).ascEnduranceMax).toBe(3)
+      expect(s.players.p1.fieldMax).toBe(4)
+      s.players.p1.perkData = { ...s.players.p1.perkData, endurance: 3 }
+      s.players.p2.hand = [hit(20), hit(20)]
       const hp = s.players.p1.hp
-      s.players.p2.hand = [hit(30)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.log.some((l) => l.includes('Counter-spin guard'))).toBe(true)
+      expect(hp - s.players.p1.hp).toBeLessThanOrEqual(20)
+    })
+    it('Thick Skull: red line 35%; losing 15% Max HP in a turn gives 1 Endurance', () => {
+      let s = tk('TK:1', ['B1'])
+      expect(tuningOf(s, 'p1')['TK:1'].hpPct).toBe(35)
+      s.players.p2.hand = [hit(40)]
       s = resolveTurn(s, { p1: 'block', p2: 'block' })
-      s.players.p2.hand = [hit(30)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      const lost1 = hp - s.players.p1.hp
-      expect(lost1).toBeLessThan(30)
-      for (let i = 0; i < 3; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
-      expect(s.players.p1.perkData?.drain ?? 0).toBe(0)
-      expect(hp - s.players.p1.hp).toBeGreaterThan(lost1)
-    })
-    it('Unstoppable: a Charge break gives 2 Endurance; Undeniable without Endurance gives 1 and halves slot 1', () => {
-      let s = tk('TK:1', ['C1'])
-      s.players.p2.hand = [hit(5)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.players.p1.perkData?.endurance).toBe(2)
-      s = tk('TK:1', ['D1', 'D2'])
-      s.players.p1.hand = [hit(10)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(s.log.some((l) => l.includes('no Endurance, slot 1 deals half'))).toBe(true)
-      expect(s.players.p1.perkData?.endurance).toBe(1)
-    })
-    it('Undying: HP stays at 1, cards +5% Max HP, heals the bonus when it ends', () => {
-      let s = tk('TK:1', ['C1', 'C2', 'C3'])
-      s.players.p1.hp = 3
-      s.players.p2.hand = [hit(50)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.players.p1.hp).toBeGreaterThanOrEqual(1)
-      s.players.p2.hand = [hit(50)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.players.p1.hp).toBeGreaterThanOrEqual(1)
       s.players.p1.hand = [hit(1)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(s.log.some((l) => l.includes('Undying: every card +'))).toBe(true)
-      expect(s.log.some((l) => l.includes('Undying ends: heals'))).toBe(true)
-      expect(s.winner).toBeNull()
+      s.players.p2.hand = [hit(40)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      expect(end(s)).toBe(0) // Blocked: nothing lost
+
+      s.players.p2.hand = [hit(40)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(end(s)).toBe(2) // heavy hit + Thick Skull
     })
-    it('Ancient: each Charge heals 4 + 4% missing HP', () => {
+    it('Shrug Off: the first Charge break each turn is ignored for 7% current HP and 1 Endurance', () => {
+      let s = tk('TK:1', ['B1', 'B2'])
+      s.players.p1.hand = [hit(1), hit(2)]
+      s.players.p2.hand = [hit(1)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.players.p1.hand.map((c) => c.def.dmg).slice(0, 2)).toEqual([1, 2])
+      expect(s.log.some((l) => l.includes('Shrug Off'))).toBe(true)
+      expect(end(s)).toBe(1)
+      // a lock that lands this turn (2 turns = ticks to 1 at the start) is shrugged off at the end of it
+      s.players.p1.statuses.push({ kind: 'noBlock', turns: 2 })
+      s = resolveTurn(s, { p1: 'charge', p2: 'block' })
+      expect(legalActions(s, 'p1')).toContain('block')
+    })
+    it('Bloodied Cost: no Shield', () => {
+      const s = tk('TK:1', ['B1', 'B2', 'B3'])
+      s.players.p1.hand = [{ uid: 'sh', def: { id: 'XX-SH', type: 'P', dmg: 1, effectText: '', effectSpec: [{ hook: 'modify', do: [{ a: 'status', who: 'self', kind: 'shield', turns: 2, n: 10 }] }] } }]
+      expect(resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p1.statuses.some((x) => x.kind === 'shield')).toBe(false)
+    })
+    it('Steady: hits 2 and 3 each turn deal 3 less', () => {
+      let s = tk('TK:1', ['C1'])
+      s.players.p2.hand = [hit(10), hit(10), hit(10), hit(10)]
+      const hp = s.players.p1.hp
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(hp - s.players.p1.hp).toBe(40 - 6)
+    })
+    it('Overflow: healing past Max HP becomes Shield, up to 20; Duel Cost: S +5% current HP', () => {
+      let s = tk('TK:1', ['C1', 'C2'])
+      s.players.p1.hand = [{ uid: 'hl', def: { id: 'XX-HL', type: 'P', dmg: 1, effectText: '', effectSpec: [{ hook: 'modify', do: [{ a: 'heal', who: 'self', n: 30 }] }] } }]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.players.p1.statuses.find((x) => x.kind === 'shield')?.n).toBe(20)
+      const d = tk('TK:1', ['C1', 'C2', 'C3'])
+      d.players.p1.hand = [skill(1, 10)]
+      expect(resolveTurn(d, { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(250 - 37) // 15% of 250
+    })
+    it('Momentum: the enemy loses 4 HP at the end of a turn it didn\'t Strike', () => {
+      const s = tk('TK:1', ['D1'])
+      expect(resolveTurn(s, { p1: 'block', p2: 'charge' }).players.p2.hp).toBe(250 - 4)
+    })
+    it('Spin to Win: a Block that stops 2+ hits spins, +3 per Endurance', () => {
+      const s = tk('TK:1', ['D1', 'D2'])
+      s.players.p1.perkData = { ...s.players.p1.perkData, endurance: 1 }
+      s.players.p2.hand = [hit(5), hit(5)]
+      const t = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      expect(t.players.p2.hp).toBe(250 - 9)
+    })
+    it('Culling Blade: after an S card, an enemy below 15% of your Max HP is knocked out; Cost after a collect', () => {
+      let s = tk('TK:1', ['D1', 'D2', 'D3'])
+      s.players.p2.hp = 36 // 15% of 250 = 37
+      s.players.p1.perkData = { ...s.players.p1.perkData, endurance: 1 }
+      s.players.p1.hand = [skill(0, 0)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      expect(s.winner).toBe('p1')
+      const c = tk('TK:1', ['D1', 'D2', 'D3'])
+      c.players.p1.perkData = { ...c.players.p1.perkData, endurance: 1 }
+      c.players.p1.hand = [hit(1)]
+      const t = resolveTurn(c, { p1: 'strike', p2: 'charge' })
+      expect(legalActions(t, 'p1')).not.toContain('block')
+      expect(t.players.p1.statuses.some((x) => x.kind === 'vulnerable')).toBe(true)
+    })
+    it('Ancient: hold the tree only above +90; Charge heals 2% missing HP', () => {
       let s = tk('TK:2', ['A1', 'A2', 'A3'])
+      expect(tuningOf(s, 'p1')['TK:2'].treeAt).toBe(90)
       s.players.p1.hp = 100
       s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-      expect(s.players.p1.hp).toBeGreaterThan(100)
-      expect(s.log.some((l) => l.includes('Ancient'))).toBe(true)
+      expect(s.players.p1.hp).toBe(100 + Math.floor(((s.players.p1.maxHp - 100) * 2) / 100))
     })
-    it('Unrelenting Cost: Field holds at most 4 cards', () => {
-      const s = tk('TK:1', ['A1', 'A2', 'A3'])
+    it('Carve: clean hits steal 2 Max HP each into your grown Max HP; Cost: no card heals', () => {
+      const s = tk('TK:2', ['B1', 'B2', 'B3'])
+      expect(tuningOf(s, 'p1')['TK:2'].cardHealPct).toBe(0)
+      s.players.p1.hand = [hit(1), hit(1)]
+      const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      // (the foe is a Titan Bloom too, so it grows its Max HP back from the 2 hits)
+      expect(t.players.p1.perkData?.carved).toBe(4)
+      expect(t.log.some((l) => l.includes('Carve: steals 4'))).toBe(true)
+    })
+    it('Tree Grab: hold from +40, throw costs 30 for +10 a card; Field 4 all match', () => {
+      let s = tk('TK:2', ['C1', 'C2', 'C3'])
+      const f = tuningOf(s, 'p1')['TK:2']
+      expect([f.treeAt, f.throwCost, f.throwDmg, s.players.p1.fieldMax]).toEqual([40, 30, 10, 4])
+      s.players.p1.styleData = { ...s.players.p1.styleData, grown: 50 }
+      s.players.p1.maxHp += 50
+      s.players.p1.hand = [hit(1), hit(1), hit(1), hit(1)]
+      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(s.log.some((l) => l.includes('Throws the tree: every card +10'))).toBe(true)
       expect(s.players.p1.fieldMax).toBe(4)
     })
-    it('Unyielding: a Charge break spends all Endurance and heals chain dmg back over 5 turns', () => {
-      let s = tk('TK:1', ['A1', 'A2'])
-      s.players.p1.perkData = { ...s.players.p1.perkData, endurance: 3, enduranceAt: 1 }
-      s.players.p1.hand = [hit(1), hit(1)]
-      s.players.p2.hand = [hit(50), hit(50)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.players.p1.perkData?.endurance).toBe(0)
-      expect(s.log.some((l) => /Unyielding: Charge break spends 4 Endurance, heals \d+ over 5 turns/.test(l))).toBe(true)
-    })
-    it('Untiring: Block, HP lost and Second Wind give Endurance; Second Wind cuts heals 25%, Early Rally raises Endurance max', () => {
-      let s = tk('TK:1', ['B1', 'B2', 'B3'])
-      expect(s.players.p1.perkData?.healPct).toBe(75)
-      expect((tuningOf(s, 'p1')['TK:1'] as unknown as Record<string, number>).ascEnduranceMax).toBe(4)
-      s.players.p2.hand = [hit(10), hit(10), hit(10)]
-      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.log.some((l) => l.includes('Endurance (Block)'))).toBe(true)
-      expect(s.log.some((l) => l.includes('Endurance (Second Wind)'))).toBe(true)
-      expect(s.players.p1.perkData?.endurance).toBe(2)
-      s.players.p2.hand = [hit(50)]
-      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
-      expect(s.log.some((l) => l.includes('Endurance (HP lost)'))).toBe(true)
-    })
-    it('Undeniable: slot 1 ignores Block, Strikes in a row build Momentum, Unleashed spends Endurance', () => {
-      let s = tk('TK:1', ['A1', 'D1', 'D2', 'D3'])
-      s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
-      expect(s.players.p1.perkData?.endurance).toBe(1)
-      s.players.p1.hand = [hit(10), hit(10), hit(10)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-      expect(s.players.p2.hp).toBeLessThan(250)
-      expect(s.log.some((l) => l.includes('Endurance (3-card chain)'))).toBe(true)
-      expect(s.log.some((l) => l.includes('Unleashed: spends 3 Endurance'))).toBe(true)
-      expect(s.players.p1.statuses.some((x) => x.kind === 'vulnerable')).toBe(true)
-      expect(s.players.p1.perkData?.endurance).toBe(0)
-      s.players.p1.hand = [hit(10)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(s.log.some((l) => l.includes('Momentum: Strike 2 in a row'))).toBe(true)
-    })
-    it('Time of Need: every 5 turns removes every debuff and heals 4 + 5% missing HP, cap −100', () => {
+    it('Time of Need: every 5 turns removes debuffs and heals 3% missing HP; cap −100', () => {
       let s = tk('TK:2', ['D1', 'D2', 'D3'])
       expect(tuningOf(s, 'p1')['TK:2'].maxHpCap).toBe(400)
       s.players.p1.hp = 150
-      s.players.p1.statuses.push({ kind: 'noCharge', turns: 99 }, { kind: 'chill', turns: 99, n: 3 })
       for (let i = 0; i < 4; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
-      expect(s.players.p1.statuses.some((x) => x.kind === 'chill' || x.kind === 'noCharge')).toBe(true)
+      s.players.p1.statuses.push({ kind: 'noCharge', turns: 3 })
       s = resolveTurn(s, { p1: 'block', p2: 'block' })
-      expect(s.players.p1.statuses.some((x) => x.kind === 'chill' || x.kind === 'noCharge')).toBe(false)
+      expect(s.players.p1.statuses.some((x) => x.kind === 'noCharge')).toBe(false)
       expect(s.log.some((l) => l.includes('Time of Need'))).toBe(true)
-    })
-    it('Briar Wall: no growth from Blocked hits even with Bark Guard; next Strike gets +2 per stopped hit', () => {
-      let s = tk('TK:2', ['B3', 'B2', 'B1'])
-      expect(tuningOf(s, 'p1')['TK:2'].perHitBlocked).toBe(0)
-      s.players.p2.hand = [hit(10), hit(10), hit(10)]
-      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
-      expect(s.players.p1.perkData?.briar).toBe(2)
-      s.players.p1.hand = [hit(1)]
-      const hp = s.players.p2.hp
-      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(hp - s.players.p2.hp).toBeGreaterThanOrEqual(5)
-    })
-    it('Timber!: a 4-card Strike fells the grown Max HP into dmg, capped', () => {
-      let s = tk('TK:2', ['A1', 'A2', 'C1'])
-      expect(s.players.p1.styleData?.grown).toBe(20)
-      s = tk('TK:2', ['C1', 'C2', 'C3'])
-      s.players.p1.maxHp += 200
-      s.players.p1.styleData = { ...s.players.p1.styleData, grown: 200 }
-      s.players.p1.hand = [hit(1), hit(1), hit(1), hit(1)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(s.players.p1.styleData?.grown ?? 0).toBeLessThan(20)
-      expect(s.players.p1.maxHp).toBeLessThan(300)
-      expect(s.log.some((l) => l.includes('Timber!: 200 Max HP felled → every chain card +10 dmg'))).toBe(true)
     })
   })
 })

@@ -39,6 +39,7 @@ export function addChill(state: GameState, side: Side, n: number): number {
 export const shieldOf = (p: PlayerState) => p.statuses.filter((s) => s.kind === 'shield').reduce((t, s) => t + (s.n ?? 0), 0)
 /** Grow one lasting Shield by n, keeping the side's total Shield at most cap. Returns what it gained. */
 export function growShield(p: PlayerState, n: number, cap: number): number {
+  if (p.perkData?.noShield) return 0
   const add = Math.min(n, cap - shieldOf(p))
   if (add <= 0) return 0
   const lasting = p.statuses.find((s) => s.kind === 'shield' && s.turns > 9000)
@@ -57,6 +58,17 @@ export const igniteBurn = (p: PlayerState, t: Tuning) => {
 /** also a loadout heal cut (perkData.healPct, e.g. Second Wind's Cost) */
 export const healAfterIgnite = (p: PlayerState, n: number, t: Tuning) =>
   Math.floor((n * (100 - Math.min(t['MG:1'].healCutMax, t['MG:1'].healCutPerStack * igniteStacks(p))) * (p.perkData?.healPct ?? 100)) / 10000)
+
+/** Card heals on this side: Titan Bloom gets only TK:2 cardHealPct % of them (Tank v3, Q 2026-10-27). */
+export const cardHeal = (state: GameState, side: Side, n: number) =>
+  state.players[side].style === 'TK:2' ? Math.floor((n * tuningOf(state, side)['TK:2'].cardHealPct) / 100) : n
+
+/** Lifeline Resolve (C2): healing past Max HP becomes Shield, up to perkData.overShield in all. n = the heal after cuts. */
+export function overhealShield(p: PlayerState, n: number) {
+  const cap = p.perkData?.overShield ?? 0
+  const over = p.hp + n - p.maxHp
+  if (cap > 0 && over > 0) growShield(p, over, cap)
+}
 
 /** Add n Ignite stacks to a side (capped) and reset its timer. Returns the stacks it has now. */
 export function addIgnite(state: GameState, side: Side, n: number): number {
@@ -139,6 +151,8 @@ export type StyleDef = {
   hitCut?: (state: GameState, side: Side) => number
   /** How many hits a turn hitCut applies to (Endurance: stacks − 1); unset = every hit */
   hitCutHits?: (state: GameState, side: Side) => number
+  /** hitCut skips this many hits a turn before it starts (Lifeline Resolve: the 2 hits after the first) */
+  hitCutSkip?: (state: GameState, side: Side) => number
   /** % less HP lost to Ignite burns (Endurance) */
   burnCutPct?: (state: GameState, side: Side) => number
   /** % less dmg from Critical hits taken (Endurance) */
@@ -176,7 +190,9 @@ export const styleHeal = (state: GameState, side: Side, n: number) => {
   const p = state.players[side]
   if (p.hp <= 0) return 0
   const before = p.hp
-  p.hp = Math.min(p.maxHp, p.hp + healAfterIgnite(p, n, tuningOf(state, other(side))))
+  const got = healAfterIgnite(p, n, tuningOf(state, other(side)))
+  overhealShield(p, got)
+  p.hp = Math.min(p.maxHp, p.hp + got)
   if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
   return p.hp - before
 }
@@ -212,71 +228,183 @@ export function debuffStacks(p: PlayerState): number {
 
 export const STYLES: Record<string, StyleDef> = {
   /**
-   * Tank · Lifeline: when hit while HP is red (below hpPct = 30%), heal healPctPerHit = 4% of missing HP per hit landed this turn.
-   * Works only during the first stretch in the red: once HP is back in the green (30%+), it's off for the game (Q nerf 2026-10-16, was 60%).
+   * Tank · Lifeline v3 (Q 2026-10-28, design/tank-rework-v3-lifeline-asc-2026-10-28.md): ⛨ Endurance canisters, cap endMax.
+   * Gain 1 (once a turn per source) when you pay an S card's HP cost, when one hit deals you endHeavyPct% of your Max HP,
+   * or when 2+ hits reach you in a turn. When you Strike, collect them all: heal endHealPct% of missing HP each (×2 in the red)
+   * and slot 1 +endSlotDmg each. Reaching the cap on a turn you didn't Strike: counter-spin (spinDmg each, ignores Block / Shield).
+   * In the red an S card is paid with 1 Endurance instead of HP (resources.ts payChain).
    */
   'TK:1': {
     name: 'Lifeline',
+    actionStart: (state, side, action) => {
+      const p = state.players[side]
+      p.perkData = { ...p.perkData, struckAt: action === 'strike' ? state.turn : (p.perkData?.struckAt ?? 0) }
+    },
+    strikeStart: (state, side, chain) => {
+      const p = state.players[side]
+      p.perkData = { ...p.perkData, paidS: chain.filter((c) => c.def.type === 'S' && (c.paidHp ?? 0) > 0).length }
+    },
+    beforeHits: (state, side, bonus) => {
+      const p = state.players[side]
+      const n = endurance(p)
+      if (!n || !bonus.length) return
+      const f = tuningOf(state, side)['TK:1']
+      const red = pctHp(p) < f.hpPct
+      const got = styleHeal(state, side, Math.floor(((p.maxHp - p.hp) * f.endHealPct * n * (red ? 2 : 1)) / 100))
+      bonus[0] += f.endSlotDmg * n
+      // Ascendancy: A2 every card +1 per Endurance, D3 Culling Blade +2 per card per Endurance
+      const perCard = ((p.perkData?.collectAll ?? 0) + (p.perkData?.culling ?? 0)) * n
+      if (perCard) for (let i = 0; i < bonus.length; i++) bonus[i] += perCard
+      p.perkData = { ...p.perkData, endurance: 0 }
+      say(state, side, `⛨ Collect ${n} Endurance: heal ${got}, slot 1 +${f.endSlotDmg * n}${perCard ? `, every card +${perCard}` : ''} dmg`)
+    },
+    afterChain: (state, side) => {
+      const p = state.players[side]
+      if ((p.perkData?.paidS ?? 0) > 0) gainEndurance(state, side, 'paid an S card with HP', 'pay')
+      p.perkData = { ...p.perkData, paidS: 0 }
+      return 0
+    },
     afterHits: (state, side, r) => {
       const p = state.players[side]
-      const f = tuningOf(state, side)['TK:1']
-      if (p.styleData?.spent || r.hitsTaken === 0 || p.hp <= 0 || pctHp(p) >= f.hpPct) return
-      const n = healAfterIgnite(p, Math.floor(((p.maxHp - p.hp) * f.healPctPerHit * r.hitsTaken) / 100), tuningOf(state, other(side)))
-      const before = p.hp
-      p.hp = Math.min(p.maxHp, p.hp + n)
-      if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
-      p.styleData = { ...p.styleData, below: 1 }
-      say(state, side, `Second Wind: heal ${n} (${f.healPctPerHit}% of missing HP x ${r.hitsTaken} hits)`)
-    },
-    endTurn: (state, side) => {
-      const p = state.players[side]
-      if (p.styleData?.spent) return
-      const line = tuningOf(state, side)['TK:1'].hpPct
-      if (pctHp(p) < line) p.styleData = { ...p.styleData, below: 1 }
-      else if (p.styleData?.below) {
-        p.styleData = { ...p.styleData, spent: 1 }
-        say(state, side, `Second Wind: HP back above ${line}%, off for good`)
-      }
+      if (p.hp <= 0) return
+      const heavy = Math.ceil((p.maxHp * tuningOf(state, side)['TK:1'].endHeavyPct) / 100)
+      if (state.events?.some((e) => e.k === 'hit' && e.side === other(side) && e.dealt >= heavy)) gainEndurance(state, side, 'heavy hit', 'heavy')
+      if (r.hitsTaken >= 2) gainEndurance(state, side, `${r.hitsTaken} hits`, 'hits')
     },
   },
 
   /**
-   * Tank · Titan Bloom: starts with the Tank's normal HP / Max HP, same as Lifeline (Q 2026-10-16; was Max HP 210). Each time attacked: +1 per hit taken,
-   * +2 per hit blocked, +3 per facing card. Cap 500. Only Max HP grows; current HP does not
-   * heal (Q nerf 2026-10-15).
-   * Q buff 2026-10-16: every 20 Max HP grown this way = +1 dmg on every card you strike with (Max HP lost later doesn't undo it).
-   * Q buff 2026-10-25 (vs Pyromancer): end of every turn, +perDebuff (2) Max HP per debuff stack on you (debuffStacks).
+   * Tank · Titan Bloom v3 (Q 2026-10-28, design/tank-rework-v3-titan-bloom-2026-10-28.md).
+   * Growth (Max HP only): perHitTaken per hit taken, perHitBlocked per hit Blocked, perDebuff per debuff stack at the end of the turn.
+   * Meat (Max HP and current HP): perFacing per facing pair, meatPct% of Max HP per clean hit you land. Cap maxHpCap.
+   * Every hpPerDmg grown = every card +1 dmg. Holding the tree (grown > treeAt): every card +treeDmg, Field max treeField.
+   * A Strike of throwCards+ cards while holding throws it: every card +throwDmg instead, lose throwCost grown.
+   * Card heals give only cardHealPct% (cardHeal).
    */
   'TK:2': {
     name: 'Titan Bloom',
+    setup: (p) => {
+      p.styleData = { ...p.styleData, fieldBase: p.fieldMax ?? 0 }
+    },
     afterHits: (state, side, r) => {
       if (!r.attacked) return
       const p = state.players[side]
       const f = tuningOf(state, side)['TK:2']
-      const gain = Math.min(f.maxHpCap - p.maxHp, r.hitsTaken * f.perHitTaken + r.hitsBlocked * f.perHitBlocked + r.facing * f.perFacing)
-      if (gain <= 0) return
-      p.maxHp += gain
-      p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
-      say(state, side, `Titan Bloom: Max HP +${gain} → ${p.maxHp}`)
+      const grew = bloom(state, side, r.hitsTaken * f.perHitTaken + r.hitsBlocked * f.perHitBlocked, false)
+      const meat = p.hp > 0 ? bloom(state, side, r.facing * f.perFacing, true) : 0
+      if (grew + meat) say(state, side, `Titan Bloom: Max HP +${grew + meat}${meat ? ` (meat +${meat} HP)` : ''} → ${p.maxHp}`)
+    },
+    afterChain: (state, side, r) => {
+      const p = state.players[side]
+      if (!r.cleanHits || p.hp <= 0) return 0
+      const f = tuningOf(state, side)['TK:2']
+      const per = Math.floor((p.maxHp * (f.meatPct + (p.perkData?.meatClean ?? 0))) / 100)
+      const got = bloom(state, side, r.cleanHits * per, true)
+      if (got) say(state, side, `Titan Bloom: ${r.cleanHits} clean hits, meat +${got}`)
+      return 0
     },
     endTurn: (state, side) => {
       const p = state.players[side]
-      if (p.hp <= 0) return
-      const f = tuningOf(state, side)['TK:2']
-      const stacks = debuffStacks(p)
-      const gain = Math.min(f.maxHpCap - p.maxHp, stacks * f.perDebuff)
-      if (gain <= 0) return
-      p.maxHp += gain
-      p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
-      say(state, side, `Titan Bloom: ${stacks} debuff stack${stacks === 1 ? '' : 's'}, Max HP +${gain} → ${p.maxHp}`)
+      if (p.hp > 0) {
+        const stacks = debuffStacks(p)
+        const gain = bloom(state, side, stacks * tuningOf(state, side)['TK:2'].perDebuff, false)
+        if (gain) say(state, side, `Titan Bloom: ${stacks} debuff stack${stacks === 1 ? '' : 's'}, Max HP +${gain} → ${p.maxHp}`)
+      }
+      treeField(state, side)
     },
     beforeHits: (state, side, bonus) => {
-      const n = overgrowthDmg(state.players[side], tuningOf(state, side))
+      const p = state.players[side]
+      const t = tuningOf(state, side)
+      const f = t['TK:2']
+      let n = overgrowthDmg(p, t)
+      const grown = p.styleData?.grown ?? 0
+      if (grown > f.treeAt && bonus.length >= f.throwCards) {
+        n += f.throwDmg
+        const lose = Math.min(grown, f.throwCost)
+        p.maxHp = Math.max(1, p.maxHp - lose)
+        p.hp = Math.min(p.hp, p.maxHp)
+        p.styleData = { ...p.styleData, grown: grown - lose }
+        treeField(state, side)
+        say(state, side, `🌳 Throws the tree: every card +${f.throwDmg} dmg, Max HP −${lose}`)
+      } else if (grown > f.treeAt) n += f.treeDmg
       if (!n) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += n
       say(state, side, `Titan Bloom: all cards +${n} dmg`)
     },
   },
+}
+
+/** Titan Bloom: grow Max HP by n (up to the cap); meat = current HP grows too. Returns what it grew. */
+export function bloom(state: GameState, side: Side, n: number, meat: boolean): number {
+  const p = state.players[side]
+  const gain = Math.min(tuningOf(state, side)['TK:2'].maxHpCap - p.maxHp, n)
+  if (gain <= 0) return 0
+  p.maxHp += gain
+  if (meat && p.hp > 0) {
+    p.hp += gain
+    ;(state.events ??= []).push({ k: 'hp', side, delta: gain })
+  }
+  p.styleData = { ...p.styleData, grown: (p.styleData?.grown ?? 0) + gain }
+  return gain
+}
+
+/** Titan Bloom holds the tree (grown > treeAt): its Field shrinks to treeField; otherwise back to the loadout's size. */
+function treeField(state: GameState, side: Side) {
+  const p = state.players[side]
+  const f = tuningOf(state, side)['TK:2']
+  const base = p.styleData?.fieldBase || undefined
+  const holding = (p.styleData?.grown ?? 0) > f.treeAt
+  p.fieldMax = holding ? Math.min(base ?? Infinity, f.treeField) : base
+}
+
+/** Lifeline Endurance (Tank v3): canisters in perkData.endurance */
+export const endurance = (p: PlayerState) => p.perkData?.endurance ?? 0
+
+/** HP loss from a Style or loadout piece (not a hit): runs onHpLoss hooks, counts as the opponent's doing for Rage. */
+export function styleHurt(state: GameState, side: Side, n: number) {
+  const p = state.players[side]
+  const before = p.hp
+  p.hp = Math.max(0, p.hp - n)
+  if (p.hp >= before) return
+  for (const h of hooksOf(p)) h.onHpLoss?.(state, side)
+  ;(state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })
+  p.otherDmg ??= { foe: 0, self: 0 }
+  p.otherDmg.foe++
+}
+
+/** Lifeline: gain Endurance (once a turn per source). Reaching the cap on a turn this side didn't Strike: counter-spin. */
+export function gainEndurance(state: GameState, side: Side, why: string, src: string, by = 1) {
+  const p = state.players[side]
+  if (p.style !== 'TK:1' || p.hp <= 0) return
+  const at = `endAt_${src}`
+  if (p.perkData?.[at] === state.turn) return
+  const max = tuningOf(state, side)['TK:1'].endMax
+  const n = Math.min(max, endurance(p) + by)
+  p.perkData = { ...p.perkData, endurance: n, [at]: state.turn }
+  say(state, side, `⛨ Endurance (${why}): ${n}/${max}`)
+  if (n >= max && p.perkData.struckAt !== state.turn) counterSpin(state, side, 'full')
+}
+
+/** Lifeline counter-spin: spend all Endurance, spinDmg each to the opponent's HP (ignores Block and Shield). */
+export function counterSpin(state: GameState, side: Side, why: string) {
+  const p = state.players[side]
+  const n = endurance(p)
+  if (!n || p.hp <= 0) return
+  const dmg = n * tuningOf(state, side)['TK:1'].spinDmg
+  p.perkData = { ...p.perkData, endurance: 0 }
+  styleHurt(state, other(side), dmg)
+  say(state, side, `🌀 Counter-spin (${why}): spends ${n} Endurance, deals ${dmg}`)
+  // A3 (Ascendancy): this turn's hit dmg is halved and you heal spinGuard% of missing HP per Endurance spent
+  const guard = p.perkData?.spinGuard ?? 0
+  if (!guard) return
+  const took = (state.events ?? []).reduce((t, e) => t + (e.k === 'hit' && e.side === other(side) ? e.dealt : 0), 0)
+  const back = Math.min(p.maxHp - p.hp, Math.floor(took / 2))
+  if (back > 0) {
+    p.hp += back
+    ;(state.events ??= []).push({ k: 'hp', side, delta: back })
+  }
+  const got = styleHeal(state, side, Math.floor(((p.maxHp - p.hp) * guard * n) / 100))
+  say(state, side, `🌀 Counter-spin guard: ${back} hit dmg undone, heals ${got}`)
 }
 
 

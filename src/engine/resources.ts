@@ -118,6 +118,21 @@ export function addRes(state: GameState, side: Side, n: number) {
   p.res = Math.max(0, Math.min(def.cap, (p.res ?? 0) + n))
 }
 
+/**
+ * What this card costs to play right now. Tank (pays HP): cards.cost_pct adds that % of current HP (Blood Price, Q 2026-10-27);
+ * Grasp of the Undying's old Cost (costMod.hpPct) replaces the cost with a % of current HP; costMod.addHpPct adds one on top.
+ */
+export function costNow(state: GameState, side: Side, card: CardInst): number {
+  const p = state.players[side]
+  const def = resourceOf(p.championId, tuningOf(state, side))
+  if (!def) return 0
+  if (p.costMod?.hpPct && card.def.type === 'S' && def.payWithHp) return Math.max(1, Math.floor((p.hp * p.costMod.hpPct) / 100))
+  const pct = def.payWithHp ? (card.def.costPct ?? 0) + (card.def.type === 'S' ? (p.costMod?.addHpPct ?? 0) : 0) : 0
+  // a % cost with no flat part costs only the %
+  const flat = card.def.costPct && card.def.cost == null ? 0 : costOf(p.championId, card, tuningOf(state, side), p.costMod)
+  return flat + (pct > 0 ? Math.floor((p.hp * pct) / 100) : 0)
+}
+
 /** Pay for every card in the chain, in order. Cards that can't be paid go into p.unpaid (only drawbacks fire this turn). */
 export function payChain(state: GameState, side: Side, chain: CardInst[]) {
   const p = state.players[side]
@@ -125,13 +140,20 @@ export function payChain(state: GameState, side: Side, chain: CardInst[]) {
   p.unpaid = []
   if (!def || p.silenced || !state.rules.resources) return // Silenced: effects are off anyway, nothing to pay for
   for (const card of chain) {
-    // Grasp of the Undying's Cost: S cards cost hpPct% of current HP instead
-    const cost = p.costMod?.hpPct && card.def.type === 'S' && def.payWithHp ? Math.max(1, Math.floor((p.hp * p.costMod.hpPct) / 100)) : costOf(p.championId, card, tuningOf(state, side), p.costMod)
+    card.paidHp = undefined
+    const cost = costNow(state, side, card)
     // Bitter Cold: Skill effects are off, nothing to pay for
     if (cost <= 0 || (p.skillSilenced && card.def.type === 'S')) continue
+    // Lifeline in the red (Tank v3, Q 2026-10-27): an S card is paid with 1 Endurance instead of HP
+    if (def.payWithHp && card.def.type === 'S' && p.style === 'TK:1' && (p.perkData?.endurance ?? 0) > 0 && (p.hp * 100) / Math.max(1, p.maxHp) < tuningOf(state, side)['TK:1'].hpPct) {
+      p.perkData = { ...p.perkData, endurance: (p.perkData?.endurance ?? 0) - 1 }
+      log(state, `${side} pays 1 Endurance for ${card.def.id} (HP in the red)`)
+      continue
+    }
     if (def.payWithHp ? p.hp > cost : (p.res ?? 0) >= cost) {
       if (def.payWithHp) {
         p.hp -= cost
+        card.paidHp = cost
         ;(state.events ??= []).push({ k: 'hp', side, delta: -cost })
       }
       else p.res = (p.res ?? 0) - cost

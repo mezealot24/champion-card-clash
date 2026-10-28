@@ -45,6 +45,8 @@ export type CondSpec =
   | { c: 'enteredAt'; n: number }
   | { c: 'hitBy'; n: number; type?: CardType }
   | { c: 'blockedType'; n: number; type?: CardType }
+  // Tank v3 (2026-10-28): no enemy hit landed on you this turn
+  | { c: 'notHit' }
   // Mage redesign (2026-10-19): every card on that Field is this type (Field not empty)
   | { c: 'fieldAll'; who: 'self' | 'enemy'; type: CardType }
   // Pyromancer (2026-10-17)
@@ -59,7 +61,9 @@ export type ActSpec =
   | { a: 'addDmg'; target: P.DmgTarget; n: number; onlyType?: CardType; per?: P.Per; max?: number }
   | { a: 'mulDmg'; target: P.DmgTarget; pct: number; onlyType?: CardType }
   | { a: 'blockNow'; who: P.Who; n: number }
-  | { a: 'pierce'; target: 'this' | 'next' | 'following' | 'chain' }
+  | { a: 'pierce'; target: 'this' | 'next' | 'following' | 'chain'; parry?: boolean }
+  // Tank v3 (2026-10-28): remove the opponent's Shield and Parry first, this card +n dmg per one removed
+  | { a: 'shatter'; n: number }
   | { a: 'steal' }
   | { a: 'cut'; which: P.CutWhich; n: number }
   | { a: 'gainRes'; who: P.Who; n: number; per?: P.Per }
@@ -109,6 +113,7 @@ function cond(s: CondSpec): Cond {
     case 'enteredAt': return P.enteredAt(s.n)
     case 'hitBy': return P.hitBy(s.n, s.type)
     case 'blockedType': return P.blockedType(s.n, s.type)
+    case 'notHit': return P.notHit
     case 'fieldAll': return P.fieldAll(s.who, s.type)
     case 'ignite': return P.igniteCmp(s.who, s.op, s.n)
     case 'chill': return P.chillCmp(s.who, s.op, s.n)
@@ -128,7 +133,8 @@ function act(s: ActSpec): Act {
     case 'addDmg': return P.addDmg(s.target, s.n, s.onlyType, s.per, s.max)
     case 'mulDmg': return P.mulDmg(s.target, s.pct, s.onlyType)
     case 'blockNow': return P.blockNow(s.who, s.n)
-    case 'pierce': return P.pierce(s.target)
+    case 'pierce': return P.pierce(s.target, s.parry)
+    case 'shatter': return P.shatter(s.n)
     case 'steal': return P.steal
     case 'cut': return P.cut(s.which, s.n)
     case 'gainRes': return P.gainRes(s.who, s.n, s.per)

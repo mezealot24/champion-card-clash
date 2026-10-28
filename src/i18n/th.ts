@@ -65,10 +65,10 @@ export const TH: Record<string, string> = {
 
   // ---- Champion guide (select/info.ts) ----
   'Wall. Huge HP, outlasts everyone.': 'กำแพง HP เยอะมาก ยืนได้นานกว่าทุกคน',
-  'Block a lot and keep your Field.': 'Block บ่อยๆ เพื่อเก็บการ์ดบน Field ไว้',
-  'Heals keep you in the fight.': 'ฮีลช่วยให้ยืนสู้ได้ต่อ',
+  'Pay HP for big S cards, then win it back.': 'จ่าย HP เล่นการ์ด S แรงๆ แล้วค่อยเอาคืน',
+  'Few heals: you win by hitting, not by waiting.': 'ฮีลน้อย: ชนะด้วยการตี ไม่ใช่การรอ',
   'S cards cost HP instead of a resource.': 'การ์ด S จ่ายด้วย HP แทนทรัพยากร',
-  'S cards cost {TK.sCost} HP': 'การ์ด S ใช้ {TK.sCost} HP',
+  'S cards cost HP (some a % of your current HP)': 'การ์ด S จ่ายด้วย HP (บางใบจ่ายเป็น % ของ HP ปัจจุบัน)',
   'Two P and one K in one chain. If the enemy Blocks one of them, heal {TK.comboHealPct}% of your HP.': 'P สองใบกับ K หนึ่งใบใน chain เดียว ถ้าศัตรู Block ใบใดใบหนึ่งได้ ฮีล {TK.comboHealPct}% ของ HP',
   'Brawler. Trades hits and hits back harder.': 'นักบู๊ แลกหมัดแล้วสวนกลับแรงกว่า',
   'Taking and dealing hits builds Rage.': 'โดนตีหรือตีโดนจะได้ Rage',
@@ -90,8 +90,8 @@ export const TH: Record<string, string> = {
   "Three S cards all hit clean: the enemy can't Block next turn.": 'การ์ด S สามใบเข้าเต็มทั้งหมด: ศัตรู Block ไม่ได้ในเทิร์นถัดไป',
 
   // ---- Style one-liners (select/info.ts) ----
-  'Below {hpPct}% HP, every clean hit you take heals you.': 'เมื่อ HP ต่ำกว่า {hpPct}% ทุกครั้งที่โดนตีเต็มๆ จะได้ฮีล',
-  'Hits you take grow your Max HP. More Max HP = more damage.': 'ยิ่งโดนตี Max HP ยิ่งเพิ่ม Max HP มาก = ดาเมจแรง',
+  'Getting hurt fills Endurance. Strike to cash it in: heal and hit harder.': 'ยิ่งเจ็บ Endurance ยิ่งเต็ม Strike เพื่อเก็บ: ฮีลและตีแรงขึ้น',
+  'Hits grow your Max HP. Grow big, hold the tree, then throw it.': 'โดนตี Max HP ยิ่งโต โตจนแบกต้นไม้ แล้วขว้างใส่',
   'Warm-up at {warmUpRage}+ Rage: first {slots} chain cards deal +{warmUpDmg}. Below {hpPct}% HP, True Fury gives +{bonusDmg}; stopped hits chip {chipDmg} and give +{chipRage} Rage.': 'Warm-up เมื่อมี Rage {warmUpRage}+ การ์ด {slots} ใบแรกใน chain แรงขึ้น +{warmUpDmg}; เมื่อ HP ต่ำกว่า {hpPct}% เข้า True Fury ได้ +{bonusDmg} และ hit ที่ถูกหยุด chip {chipDmg} พร้อมได้ Rage +{chipRage}',
   'Each chain card adds a stack (+{dmgPerStack} dmg). Full stacks: lifesteal.': 'การ์ดแต่ละใบใน chain เพิ่ม 1 stack (+{dmgPerStack} dmg) stack เต็มแล้วได้ lifesteal',
   'Start with {startDraw} cards. Strike vs Strike refills Energy and draws {dualDraw}.': 'เริ่มด้วยการ์ด {startDraw} ใบ Strike ชน Strike จะเติม Energy และจั่ว {dualDraw} ใบ',
@@ -223,7 +223,8 @@ export const TH: Record<string, string> = {
   'Chilled ({n} stack): your damage is cut for each stack.': 'หนาวสั่น ({n} stack): ดาเมจลดลงตามจำนวน stack',
   'Chilled ({n} stacks): your damage is cut for each stack.': 'หนาวสั่น ({n} stack): ดาเมจลดลงตามจำนวน stack',
   'Juggernaut stacks: +1 dmg per stack on every chain card. At {max}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.': 'stack ของ Juggernaut: +1 dmg ต่อ stack ให้การ์ดทุกใบใน chain ครบ {max}: ได้ Lifesteal และ Tenacity สองสามเทิร์น ถ้า Block จะเสีย 1 stack',
-  '{n} Endurance: {hits} hits that reach you deal {cut} less dmg, Ignite burns and Critical hits {guard}% less, and you regain {regen} HP at the end of every turn. Loses {decay} every end of turn.': 'Endurance {n}: {hits} hit ที่ถึงตัวทำดาเมจน้อยลง {cut}, Ignite burn และ Critical น้อยลง {guard}% และฟื้น {regen} HP ตอนจบทุกเทิร์น ลดลง {decay} ทุกจบเทิร์น',
+  '{n} Endurance. Strike to collect: heal {heal} HP and slot 1 +{dmg} dmg. At {max} without Striking it counter-spins for {spin} dmg.': 'Endurance {n}: Strike เพื่อเก็บ ฮีล {heal} HP และช่อง 1 +{dmg} dmg ถ้าเต็ม {max} โดยไม่ได้ Strike จะหมุนสวนกลับ {spin} dmg',
+  'Holding the tree: every card +{n} dmg, Field max {field}. A {cards}-card Strike throws it: every card +{throw} dmg, lose {cost} grown Max HP.': 'แบกต้นไม้อยู่: การ์ดทุกใบ +{n} dmg, Field สูงสุด {field} ใบ Strike {cards} ใบจะขว้างต้นไม้: ทุกใบ +{throw} dmg และเสีย Max HP ที่โตมา {cost}',
   "Your HP can't drop below 1 until turn {turn}, and every chain card deals bonus dmg. When it ends you heal the bonus dmg that landed.": 'HP จะไม่ต่ำกว่า 1 จนถึงเทิร์น {turn} และการ์ดทุกใบใน chain ทำดาเมจโบนัส พอหมดผลจะฮีลเท่ากับดาเมจโบนัสที่เข้า',
   'If this side Strikes now with no S card, every chain card gets +{n} dmg and all Energy is spent.': 'ถ้าฝั่งนี้ Strike ตอนนี้โดยไม่มีการ์ด S การ์ดทุกใบใน chain ได้ +{n} dmg และใช้ Energy หมด',
   'Pays with HP': 'จ่ายด้วย HP',

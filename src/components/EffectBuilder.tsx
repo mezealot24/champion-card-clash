@@ -36,6 +36,7 @@ const COND_DEFAULTS: Record<CondSpec['c'], CondSpec> = {
   enteredAt: { c: 'enteredAt', n: 1 },
   hitBy: { c: 'hitBy', n: 1, type: 'K' },
   blockedType: { c: 'blockedType', n: 1, type: 'K' },
+  notHit: { c: 'notHit' },
   fieldAll: { c: 'fieldAll', who: 'self', type: 'S' },
   ignite: { c: 'ignite', who: 'enemy', op: '>=', n: 1 },
   chill: { c: 'chill', who: 'enemy', op: '>=', n: 1 },
@@ -70,6 +71,7 @@ const COND_LABEL: Record<CondSpec['c'], string> = {
   enteredAt: 'This card was drawn into slot N',
   hitBy: "You've been hit by N+ Punch / Kick / Skill this turn",
   blockedType: 'You Blocked N+ Punch / Kick / Skill this turn',
+  notHit: "You weren't hit this turn",
   fieldAll: 'Your / opponent\'s Field is all Punch / Kick / Skill',
   ignite: 'You / opponent Ignite stacks ≥ / < N',
   chill: 'You / opponent Chill stacks ≥ / < N',
@@ -92,12 +94,14 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
   chill: { a: 'chill', who: 'enemy', n: 1 },
   consumeIgnite: { a: 'consumeIgnite', who: 'enemy' },
   infuse: { a: 'infuse', who: 'enemy', n: 1 },
+  shatter: { a: 'shatter', n: 5 },
 }
 const ACT_LABEL: Record<string, string> = {
   draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', mulDmg: 'Dmg × % (this chain)', grow: 'Gain dmg (later attacks)', blockNow: 'Block ±N hits (this turn)',
   pierce: 'Pierce: ignore Block (Before action)', steal: "Steal opponent's card in this slot", cut: 'Cut: opponent discards Field cards', gainRes: 'Gain resource',
   ignite: 'Ignite (0 = reset timer)', consumeIgnite: 'Clear / explode Ignite', chill: 'Chill (4 = Frozen)',
   infuse: '⟡ Infuse (Mage Style element: Ignite / Chill)',
+  shatter: "Shatter: remove opponent's Shield / Parry, +dmg each (Before action)",
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -287,11 +291,12 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
             value={value.kind}
             onChange={(e) => {
               const kind = e.target.value as typeof value.kind
-              onChange(kind === 'blockPlus' || kind === 'shield' || kind === 'parry' || kind === 'vulnerable' ? { ...value, kind, n: value.n ?? (kind === 'shield' ? 10 : kind === 'vulnerable' ? 50 : 1) } : { a: 'status', who: value.who, kind, turns: value.turns })
+              onChange(kind === 'blockPlus' || kind === 'shield' || kind === 'parry' || kind === 'vulnerable' || kind === 'regen' || kind === 'empower' ? { ...value, kind, n: value.n ?? (kind === 'shield' ? 10 : kind === 'vulnerable' ? 50 : kind === 'regen' ? 3 : 1) } : { a: 'status', who: value.who, kind, turns: value.turns })
             }}
           >
             <option value="noStrike">can't Strike</option><option value="noBlock">can't Block</option><option value="noCharge">can't Charge</option><option value="silence">Silenced (card effects off)</option><option value="skillSilence">Skill effects off</option><option value="subZero">Sub-Zero (clean hits give Chill)</option>
             <option value="blockPlus">Block stops ±N hits</option><option value="shield">Shield N</option><option value="parry">Parry N hits</option><option value="vulnerable">Vulnerable N% (takes more dmg)</option>
+            <option value="regen">Regen N% missing HP each end of turn</option><option value="empower">Empower: next Strike every card +N</option>
           </select>
           {(value.kind === 'shield' || value.kind === 'parry') && <><Num value={value.n ?? 1} min={1} onChange={(n) => onChange({ ...value, n })} /> {value.kind === 'shield' ? 'points' : 'hit(s)'},</>}
           {value.kind === 'shield' && (
@@ -301,6 +306,8 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
             </select>
           )}
           {value.kind === 'vulnerable' && <><Num value={value.n ?? 50} min={1} onChange={(n) => onChange({ ...value, n })} /> % more dmg,</>}
+          {value.kind === 'regen' && <><Num value={value.n ?? 3} min={1} onChange={(n) => onChange({ ...value, n })} /> % missing HP,</>}
+          {value.kind === 'empower' && <><Num value={value.n ?? 1} min={1} onChange={(n) => onChange({ ...value, n })} /> dmg per card,</>}
           {value.kind === 'blockPlus' && <><Num value={value.n ?? 1} onChange={(n) => onChange({ ...value, n })} /> hit(s) (negative = fewer),</>}
           <Num value={value.turns} min={value.kind === 'shield' ? 0 : 1} onChange={(turns) => onChange({ ...value, turns })} /> turn(s)
         </>
@@ -337,6 +344,11 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
         <select value={value.target} onChange={(e) => onChange({ ...value, target: e.target.value as typeof value.target })}>
           <option value="this">this card</option><option value="next">next card</option><option value="following">all following</option><option value="chain">whole chain</option>
         </select>
+      )}
+      {value.a === 'pierce' && (
+        <label className="inline">
+          <input type="checkbox" checked={!!value.parry} onChange={(e) => onChange({ ...value, parry: e.target.checked || undefined })} /> Parry too
+        </label>
       )}
       {value.a === 'cut' && (
         <select value={value.which} onChange={(e) => onChange({ ...value, which: e.target.value as typeof value.which })}>

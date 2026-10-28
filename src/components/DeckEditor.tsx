@@ -146,7 +146,7 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
         <table className="deck cards-mobile">
           <thead>
             <tr>
-              <th title="Plays in battle">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 10 Rage, Assassin 1 Energy, Tank 10 HP)">Cost</th>
+              <th title="Plays in battle">Deck</th><th>ID</th><th>Name</th><th>Source</th><th>Tags</th><th>Type</th><th>dmg</th><th>?</th><th title="Resource cost when it strikes. Empty on an S card = class default (Mage 2 Mana, Bruiser 10 Rage, Assassin 1 Energy, Tank 10 HP)">Cost</th><th title="Tank: also costs this % of current HP (on top of Cost)">Cost %</th>
               <th title='"MG:1" = only under that Style · "!MG:1" = every Style but that one · empty = always'>Style</th><th title="Original damage before conversion">Base</th><th>Copies</th><th>Effect</th><th />
             </tr>
           </thead>
@@ -192,6 +192,18 @@ function DeckTable({ championId, deckSize, budget, onSaved, ...props }: DeckTabl
                     placeholder={c.type === 'S' ? 'def' : ''}
                     value={c.cost ?? ''}
                     onChange={(e) => edit(c.id, { cost: e.target.value === '' ? null : Number(e.target.value) })}
+                  />
+                </td>
+                <td className="c-cost" data-label="Cost %">
+                  <input
+                    className="num"
+                    type="number"
+                    inputMode="numeric"
+                    aria-label="Cost % of current HP"
+                    min={0}
+                    max={100}
+                    value={c.cost_pct ?? ''}
+                    onChange={(e) => edit(c.id, { cost_pct: e.target.value === '' ? null : Number(e.target.value) })}
                   />
                 </td>
                 <td className="c-style" data-label="Style"><input className="short" aria-label="Style" placeholder="all" value={c.style_only ?? ''} onChange={(e) => edit(c.id, { style_only: e.target.value.trim() || null })} /></td>

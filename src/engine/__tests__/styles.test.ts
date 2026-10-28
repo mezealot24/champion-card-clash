@@ -12,33 +12,94 @@ function game(style: string, hp: number, maxHp = 100): GameState {
   return createGame({ championId: 'TK', hpStart: hp, hpMax: maxHp, deck, style }, { championId: 'XX', hpStart: 100, hpMax: 100, deck }, { seed: 1 })
 }
 
-describe('Lifeline', () => {
-  it('heals 4% of missing HP per hit taken while HP is red (below 30%)', () => {
-    const s = game('TK:1', 30)
+const skill = (dmg: number, costPct: number, effectSpec?: CardDef['effectSpec']): CardInst => ({ uid: `s${uid++}`, def: { id: 'XX-S', type: 'S', dmg, effectText: '', costPct, effectSpec } })
+const endOf = (s: GameState) => s.players.p1.perkData?.endurance ?? 0
+
+describe('Lifeline v3: Endurance canisters', () => {
+  it('a heavy hit (10%+ Max HP) and 2+ hits in a turn each give 1', () => {
+    const s = game('TK:1', 100)
     s.players.p2.hand = [hit(10), hit(10)]
-    // 30 - 20 = 10 → missing 90 → 4% x 2 hits = 7.2 → 7
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(17)
+    const t = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect([t.players.p1.hp, endOf(t)]).toEqual([80, 2])
+    const light = game('TK:1', 100)
+    light.players.p2.hand = [hit(5)]
+    expect(endOf(resolveTurn(light, { p1: 'charge', p2: 'strike' }))).toBe(0)
   })
 
-  it('does nothing in the green (30%+) or when no hit lands', () => {
-    const s = game('TK:1', 40)
-    s.players.p2.hand = [hit(10)]
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(30)
-    const b = game('TK:1', 20)
-    b.players.p2.hand = [hit(10)]
-    expect(resolveTurn(b, { p1: 'block', p2: 'strike' }).players.p1.hp).toBe(20)
+  it('Strike collects all: heal 3% missing HP each, slot 1 +2 each', () => {
+    const s = game('TK:1', 50)
+    s.players.p1.perkData = { endurance: 2 }
+    s.players.p1.hand = [hit(5), hit(5)]
+    const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(t.players.p1.hp).toBe(53) // 50 missing × 3% × 2
+    expect(t.players.p2.hp).toBe(100 - 9 - 5)
+    expect(endOf(t)).toBe(0)
   })
 
-  it('switches off for good once HP is back in the green', () => {
-    let s = game('TK:1', 25)
-    s.players.p2.hand = [hit(1)]
-    s = resolveTurn(s, { p1: 'block', p2: 'charge' }) // red, no hit
-    s.players.p1.hp = 30
+  it('the collect heal doubles in the red', () => {
+    const s = game('TK:1', 20)
+    s.players.p1.perkData = { endurance: 1 }
+    s.players.p1.hand = [hit(1)]
+    expect(resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(24) // 80 × 3% × 2
+  })
+
+  it('reaching the cap without Striking counter-spins: 6 each, through Block', () => {
+    const s = game('TK:1', 100)
+    s.players.p1.perkData = { endurance: 2 }
+    s.players.p2.hand = [hit(1), hit(1)]
+    const t = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+    expect(endOf(t)).toBe(0)
+    expect(t.players.p2.hp).toBe(100 - 18)
+  })
+
+  it('paying an S card with HP gives 1 Endurance after the collect; % cost of current HP', () => {
+    const s = game('TK:1', 100)
+    s.players.p1.hand = [skill(10, 15, [{ hook: 'modify', do: [{ a: 'addDmg', target: 'this', n: 0.5, per: 'paidHp', max: 20 }] }])]
+    const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(t.players.p1.hp).toBe(85)
+    expect(t.players.p2.hp).toBe(100 - 17) // 10 + half of 15 paid
+    expect(endOf(t)).toBe(1)
+  })
+
+  it('in the red an S card costs 1 Endurance instead of HP (and gives none)', () => {
+    const s = game('TK:1', 20)
+    s.players.p1.perkData = { endurance: 1 }
+    s.players.p1.hand = [skill(10, 15)]
+    const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect([t.players.p1.hp, endOf(t), t.players.p2.hp]).toEqual([20, 0, 90])
+  })
+})
+
+describe('Tank v3 card tools', () => {
+  it('Regen heals n% of missing HP at the end of each turn it lasts', () => {
+    let s = game('TK:1', 40)
+    s.players.p1.statuses.push({ kind: 'regen', turns: 3, n: 3 })
     s = resolveTurn(s, { p1: 'block', p2: 'block' })
-    expect(s.players.p1.styleData?.spent).toBe(1)
-    s.players.p1.hp = 20
-    s.players.p2.hand = [hit(10)]
-    expect(resolveTurn(s, { p1: 'charge', p2: 'strike' }).players.p1.hp).toBe(10)
+    s = resolveTurn(s, { p1: 'block', p2: 'block' })
+    s = resolveTurn(s, { p1: 'block', p2: 'block' })
+    // statuses tick at the start of a turn: 3 turns pushed before turn 1 = 2 heals (a card that gives it mid-turn heals 3 times)
+    expect(s.players.p1.hp).toBe(40 + 1 + 1)
+    expect(s.players.p1.statuses.some((x) => x.kind === 'regen')).toBe(false)
+  })
+
+  it('Empower: the next Strike gets +n on every card, once', () => {
+    let s = game('TK:1', 100)
+    s.players.p1.statuses.push({ kind: 'empower', turns: 9999, n: 3 })
+    s.players.p1.hand = [hit(1), hit(1)]
+    s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(s.players.p2.hp).toBe(100 - 8)
+    expect(s.players.p1.statuses.some((x) => x.kind === 'empower')).toBe(false)
+  })
+
+  it('pierce with parry ignores Block and Parry; shatter removes Shield / Parry for +dmg', () => {
+    const s = game('TK:1', 100)
+    s.players.p2.statuses.push({ kind: 'parry', turns: 2, n: 1 })
+    s.players.p1.hand = [skill(12, 0, [{ hook: 'modify', do: [{ a: 'pierce', target: 'this', parry: true }] }])]
+    expect(resolveTurn(s, { p1: 'strike', p2: 'block' }).players.p2.hp).toBe(88)
+    const t = game('TK:1', 100)
+    t.players.p2.statuses.push({ kind: 'parry', turns: 2, n: 1 }, { kind: 'shield', turns: 9999, n: 5 })
+    t.players.p1.hand = [skill(10, 0, [{ hook: 'modify', do: [{ a: 'shatter', n: 5 }] }])]
+    expect(resolveTurn(t, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(80)
   })
 })
 
@@ -48,13 +109,13 @@ describe('Titan Bloom', () => {
     expect([s.players.p1.hp, s.players.p1.maxHp]).toEqual([210, 300])
   })
 
-  it('+1 per hit, +2 per hit blocked, +3 per facing card when attacked (Max HP only)', () => {
+  it('+2 per hit, +4 per hit blocked (Max HP only), +3 meat per facing pair (Max HP and HP)', () => {
     const s = game('TK:2', 210, 300)
     s.players.p1.hand = [hit(1), hit(1)]
     s.players.p2.hand = [hit(1), hit(1), hit(1)]
-    // Block stops 2 (+4), 1 hit lands (+1), 2 facing pairs (+6)
+    // Block stops 2 (+8), 1 hit lands (+2), 2 facing pairs (+6 meat)
     const after = resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1
-    expect([after.maxHp, after.hp]).toEqual([311, 210 - 1]) // Max HP grows, current HP does not heal
+    expect([after.maxHp, after.hp]).toEqual([316, 210 - 1 + 6])
     const quiet = game('TK:2', 210, 300)
     expect(resolveTurn(quiet, { p1: 'charge', p2: 'charge' }).players.p1.maxHp).toBe(300)
   })
@@ -166,6 +227,44 @@ describe('Titan Bloom dmg (Q buff 2026-10-16)', () => {
     const s = game('TK:2', 210, 300)
     s.players.p1.hand = [hit(1), hit(1)]
     s.players.p2.hand = [hit(1), hit(1), hit(1)]
-    expect(resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1.styleData?.grown).toBe(11)
+    expect(resolveTurn(s, { p1: 'block', p2: 'strike' }).players.p1.styleData?.grown).toBe(16)
+  })
+})
+
+describe('Titan Bloom v3: meat and the tree', () => {
+  it('each clean hit you land: +1% Max HP meat', () => {
+    const s = game('TK:2', 200, 300)
+    s.players.p1.hand = [hit(5), hit(5)]
+    const p = resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p1
+    expect([p.maxHp, p.hp]).toEqual([306, 206])
+  })
+
+  it('holding the tree (> +60 grown): every card +3 and Field max 4', () => {
+    const s = game('TK:2', 200, 361)
+    s.players.p1.styleData = { grown: 61 } // +3 from growth, +3 tree
+    s.players.p1.hand = [hit(5)]
+    const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(t.players.p2.hp).toBe(100 - 11)
+    expect(t.players.p1.fieldMax).toBe(4)
+  })
+
+  it('a 4-card Strike while holding throws it: +6 each, −50 grown', () => {
+    const s = game('TK:2', 300, 400)
+    s.players.p1.styleData = { grown: 100 }
+    s.players.p1.hand = [hit(1), hit(1), hit(1), hit(1)]
+    const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+    expect(t.players.p2.hp).toBe(100 - 4 * 12) // 1 + 5 growth + 6 throw
+    expect(t.players.p1.styleData?.grown).toBe(100 - 50 + 4 * 3) // then 4 clean hits of meat (1% of 350)
+    expect(t.log.some((l) => l.includes('Throws the tree'))).toBe(true)
+  })
+
+  it('card heals give Titan Bloom only 50%', () => {
+    const heal10 = (): CardInst => ({ uid: `c${uid++}`, def: { id: 'XX-H', type: 'P', dmg: 0, effectText: '', effectSpec: [{ hook: 'modify', do: [{ a: 'heal', who: 'self', n: 10 }] }] } })
+    const s = game('TK:2', 200, 300)
+    s.players.p1.hand = [heal10()]
+    expect(resolveTurn(s, { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(205)
+    const l = game('TK:1', 50, 100)
+    l.players.p1.hand = [heal10()]
+    expect(resolveTurn(l, { p1: 'strike', p2: 'charge' }).players.p1.hp).toBe(60)
   })
 })

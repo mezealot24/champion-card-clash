@@ -15,7 +15,7 @@ export const HOOK_LABEL: Record<Hook, string> = {
 const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero (each clean hit next Strike gives 1 Chill)', frozenTomb: 'Frozen Tomb', thaw: 'Thaw (can\'t be Frozen)', venom: 'Venom', woundUp: 'Wound Up', cutGuard: "Cut guard (can't be Cut)" }
+const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero (each clean hit next Strike gives 1 Chill)', frozenTomb: 'Frozen Tomb', thaw: 'Thaw (can\'t be Frozen)', venom: 'Venom', woundUp: 'Wound Up', cutGuard: "Cut guard (can't be Cut)", regen: 'Regen', empower: 'Empower' }
 export const PER_LABEL: Record<Per, string> = {
   hitBlocked: 'hit you blocked this turn',
   chainCard: 'card in your chain',
@@ -30,6 +30,7 @@ export const PER_LABEL: Record<Per, string> = {
   missingHpPct: '1% of your missing HP',
   enemyIgnite: 'Ignite stack on opponent',
   enemyChill: 'Chill stack on opponent',
+  paidHp: 'HP this card cost',
 }
 
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
@@ -64,6 +65,7 @@ export function describeCond(c: CondSpec): string {
     case 'enteredAt': return `this card was drawn into slot ${c.n}`
     case 'hitBy': return `you've been hit by ${c.n === 1 ? 'a' : `${c.n}+`} ${c.type ? TYPE[c.type] : 'card'}${c.n > 1 ? 's' : ''} this turn`
     case 'blockedType': return `you Blocked ${c.n === 1 ? 'a' : `${c.n}+`} ${c.type ? TYPE[c.type] : 'hit'}${c.n > 1 ? 's' : ''} this turn`
+    case 'notHit': return "you weren't hit this turn"
     case 'facingIs': return `facing card is a ${TYPE[c.type]}`
     case 'fieldHas': return `${c.who === 'self' ? 'you have' : 'opponent has'} ${c.n}+ ${TYPE[c.type]} on the Field`
     case 'fieldAll': return `${c.who === 'self' ? 'your' : "opponent's"} Field is all ${TYPE[c.type]}`
@@ -97,6 +99,8 @@ export function describeAct(a: ActSpec, now = false): string {
       }
       if (a.kind === 'shield') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Shield ${a.n ?? 1}${per(a.per)} (absorbs hit dmg, lasts ${turns === 'this turn' || turns === 'this turn only' ? turns : turns === 'next turn' ? 'through next turn' : turns})`
       if (a.kind === 'parry') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Parry ${a.n ?? 1} ${turns} (the first ${a.n ?? 1} hit${(a.n ?? 1) === 1 ? '' : 's'} past Block are parried: 0 dmg)`
+      if (a.kind === 'regen') return `${a.who === 'self' ? 'you regain' : `${WHO[a.who]} regains`} ${a.n ?? 1}% of missing HP at the end of every turn, ${a.turns} turn${a.turns === 1 ? '' : 's'}`
+      if (a.kind === 'empower') return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} next Strike: every chain card +${a.n ?? 1} dmg`
       if (a.kind === 'vulnerable') return `${a.who === 'self' ? 'you take' : `${WHO[a.who]} takes`} ${a.n ?? 1}% more dmg from hits ${turns}`
       return `${WHO[a.who]} ${STATUS[a.kind]} ${turns}`
     }
@@ -109,7 +113,8 @@ export function describeAct(a: ActSpec, now = false): string {
       const n = Math.abs(a.n)
       return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block stops ${n} ${a.n >= 0 ? 'more' : 'fewer'} hit${n === 1 ? '' : 's'} this turn`
     }
-    case 'pierce': return `${{ this: 'this card', next: 'next card', following: 'all following cards', chain: 'your whole chain' }[a.target]} ignore${a.target === 'this' || a.target === 'next' ? 's' : ''} Block`
+    case 'pierce': return `${{ this: 'this card', next: 'next card', following: 'all following cards', chain: 'your whole chain' }[a.target]} ignore${a.target === 'this' || a.target === 'next' ? 's' : ''} Block${a.parry ? ' and Parry' : ''}`
+    case 'shatter': return `remove the opponent's Shield and Parry first, this card +${a.n} dmg per one removed`
     case 'steal': return "steal the opponent's card in this slot onto your Field"
     case 'cut': {
       const what = a.which === 'facing' ? 'card in this slot' : a.n === 1 ? `${a.which} card` : `${a.n} ${a.which} cards`
