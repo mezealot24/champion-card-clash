@@ -345,7 +345,7 @@ export const TREES: Record<string, TreeData> = {
         ['ascMerciless', 'multiplier +', 1],
       ]),
       capstone('A3', 'Executioner', 'A Critical that leaves the enemy at {ascExecutioner}% Max HP or less finishes them.', 'Non-Critical attacks deal −{ascExecutionerNonCrit}% dmg.', [
-        ['ascExecutioner', 'finish at % Max HP', 20, 0, 50],
+        ['ascExecutioner', 'finish at % Max HP', 15, 0, 50],
         ['ascExecutionerNonCrit', 'Cost: non-Critical dmg −%', 20, 0, 100],
       ]),
       multi('B1', 'Primed', 'The Critical counter starts at {ascPrimed}. Each Charge adds {ascPrimedCharge} to it, once per turn.', [
