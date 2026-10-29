@@ -9,6 +9,7 @@ import type { Champ, StyleRow } from '../Battle'
 import { champColor, spriteClassOf } from '../fighters'
 import { loadoutGaps, STEPS, type SavedLoadout, type Step } from '../loadout/loadout'
 import { AscTree, OathPicker } from '../loadout/LoadoutParts'
+import { RichList } from '../loadout/RichText'
 import { tutorialDone } from '../settings'
 import { TimerSetting } from '../timer/TurnTimer'
 import { ComboLine } from '../tutorial/Tutorial'
@@ -240,7 +241,7 @@ export function ChampionSelect(props: {
                       {styleArt && <Portrait champ={me} style={key} bust className="style-art" />}
                       <span className="style-txt">
                         <b>{s.name}</b>
-                        <span>{works ? (summary ? props.fill(t(summary), key) : props.styleText[key]) : t('Not playable yet')}</span>
+                        <span>{works ? <RichList text={summary ? props.fill(t(summary), key) : props.styleText[key]} /> : t('Not playable yet')}</span>
                       </span>
                     </button>
                     {works && summary && (
@@ -248,7 +249,7 @@ export function ChampionSelect(props: {
                         {full === key ? t('Hide full rules') : t('Full rules')}
                       </button>
                     )}
-                    {full === key && <p className="full">{props.styleText[key]}</p>}
+                    {full === key && <div className="full"><RichList text={props.styleText[key] ?? ''} /></div>}
                   </div>
                 )
               })}
