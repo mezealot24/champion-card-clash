@@ -108,6 +108,7 @@ export function shortAct(a: ActSpec, res = 'res'): string {
     case 'shatter': return `Shatter Shield/Parry, +${a.n} dmg each`
     case 'steal': return 'Steal facing card'
     case 'cut': return a.which === 'facing' ? 'Cut facing card' : `Cut ${a.n} ${a.which}`
+    case 'critCounter': return `Crit count ${signed(a.n)}`
     case 'gainRes': return `${a.who === 'enemy' ? 'Foe ' : ''}${signed(a.n)} ${res}${per(a)}`
     case 'ignite': return a.n === 0 ? `${a.who === 'self' ? '' : 'Foe '}Ignite refresh` : `${a.who === 'self' ? '' : 'Foe '}Ignite ${a.n}${per(a)}`
     case 'chill': return `${a.who === 'self' ? '' : 'Foe '}Chill ${a.n}${per(a)}`
