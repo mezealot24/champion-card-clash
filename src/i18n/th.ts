@@ -123,6 +123,9 @@ export const TH: Record<string, string> = {
   'In use': 'ใช้อยู่',
   'Out of date': 'ล้าสมัย',
   'Build overview': 'ภาพรวมบิลด์',
+  // Mage presets
+  'Pile on Ignite with every Skill, then Silence them and drop the Meteor.': 'กอง Ignite ด้วย Skill ทุกใบ แล้ว Silence ศัตรูก่อนทิ้ง Meteor ปิดเกม',
+  'Hide behind ice, lock what they can do, and win the long game.': 'หลบหลังกำแพงน้ำแข็ง ล็อกทุกการกระทำของศัตรู แล้วชนะเกมยาว',
   'from your cards, Path and Oath': 'คิดจากการ์ด, Path และ Oath ของคุณ',
   'HP': 'HP',
   'Defend': 'Defend',
