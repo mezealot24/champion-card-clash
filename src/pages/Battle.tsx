@@ -6,6 +6,7 @@ import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
 import { addClear, ARCADE_STAGES, cleared, loadRun, newRun, randomFoe, saveRun, tierOf, type ArcadeRun, type Foe as FoePick, type Tier } from './arcade/arcade'
+import { ArcadeContinue } from './arcade/ArcadeContinue'
 import { ArcadeLadder } from './arcade/ArcadeLadder'
 import { TitleMenu, type Mode } from './menu/TitleMenu'
 import { DeckBuilder } from './deck/DeckBuilder'
@@ -79,6 +80,8 @@ export function Battle({ data }: { data: BattleData }) {
     saveRun(r)
   }
   const [ladder, setLadder] = useState(false)
+  // Arcade Continue after a loss: rework the Ascendancy tree and Oath before the retry (Q 2026-10-29)
+  const [rebuild, setRebuild] = useState(false)
   // AI strength of the current match (Arcade stage); null = the normal AI
   const [tier, setTier] = useState<Tier | null>(null)
   // the Arcade match whose win was already counted
@@ -272,6 +275,34 @@ export function Battle({ data }: { data: BattleData }) {
     return <TitleMenu champions={data.champions} run={run} canOnline={hasDb} onPick={pickMode} onTutorial={() => setTutorial(true)} />
   }
 
+  if (!game && mode === 'arcade' && rebuild && run) {
+    const foeAt = run.stages[run.at]
+    return (
+      <ArcadeContinue
+        run={run}
+        champName={champTitle(run.champ)}
+        styleName={STYLES[run.style]?.name ?? run.style}
+        foeName={foeAt ? `${champTitle(foeAt.champ)} · ${STYLES[foeAt.style]?.name ?? foeAt.style}` : ''}
+        saved={loadLoadout(run.champ)}
+        setSaved={(l) => {
+          saveLoadout(run.champ, l)
+          bump()
+        }}
+        points={ascPoints}
+        fill={fill}
+        onFight={() => {
+          setRebuild(false)
+          fightStage(run)
+        }}
+        onGiveUp={() => {
+          setRun(null)
+          setRebuild(false)
+          setMode(null)
+        }}
+      />
+    )
+  }
+
   if (!game && mode === 'arcade' && ladder && run) {
     return (
       <ArcadeLadder
@@ -350,9 +381,11 @@ export function Battle({ data }: { data: BattleData }) {
   const arcadeNext = () => {
     if (!run) return
     if (won) return toLadder()
-    const r = { ...run, continues: run.continues + 1 }
-    setRun(r)
-    fightStage(r)
+    // Continue: rework the build on its own screen, then retry the same stage
+    setRun({ ...run, continues: run.continues + 1 })
+    setTurn(null)
+    setGame(null)
+    setRebuild(true)
   }
   const arcadeQuit = () => {
     if (won || lost) {
