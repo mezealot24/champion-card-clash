@@ -3,7 +3,7 @@
 import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, TurnEvent } from './types'
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
-import { healAfterIgnite, hooksOf, overhealShield } from './styles'
+import { healAfterIgnite, hooksOf, noHealing, overhealShield } from './styles'
 import { applyBoss, applyLoadout, type Loadout } from './loadout'
 import { classOf, wrapInClass } from './classes'
 import { resourceOf } from './resources'
@@ -146,7 +146,7 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
  *  heals later in the same turn (After action, Hold, combos, Lifesteal) can't bring it back (Q 2026-10-17). */
 export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
-  if (p.hp <= 0) return 0
+  if (p.hp <= 0 || noHealing(state, side)) return 0
   n = healAfterIgnite(p, n, tuningOf(state, side === 'p1' ? 'p2' : 'p1'))
   overhealShield(p, n)
   const before = p.hp

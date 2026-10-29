@@ -44,7 +44,7 @@ export const CHAMP_INFO: Record<string, ChampInfo> = {
 /** One line per Style: what it does in plain words. Full rules stay in the Style's effect text. */
 export const STYLE_SUMMARY: Record<string, string> = {
   'TK:1': 'Getting hurt fills Endurance. Strike to cash it in: heal and hit harder.',
-  'TK:2': 'Hits grow your Max HP. Grow big, hold the tree, then throw it.',
+  'TK:2': 'Hits grow your Max HP. Grow into a Colossus, then Colossus Slam.',
   'BR:1': 'Warm-up at {warmUpRage}+ Rage: first {slots} chain cards deal +{warmUpDmg}. Below {hpPct}% HP, True Fury gives +{bonusDmg}; stopped hits chip {chipDmg} and give +{chipRage} Rage.',
   'BR:2': 'Each chain card adds a stack (+{dmgPerStack} dmg). Full stacks: lifesteal.',
   'AS:1': 'Start with {startDraw} cards. Strike vs Strike refills Energy and draws {dualDraw}.',

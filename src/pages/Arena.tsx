@@ -963,12 +963,12 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
     ...(p.perkData?.endurance
       ? [{ label: `⛨ Endurance ${p.perkData.endurance}/${enduranceNum(game, side).endMax}`, tone: 'buff' as const, tip: t('{n} Endurance. Strike to collect: heal {heal} HP and slot 1 +{dmg} dmg. At {max} without Striking it counter-spins for {spin} dmg.', { n: p.perkData.endurance, heal: Math.floor(((p.maxHp - p.hp) * p.perkData.endurance * enduranceNum(game, side).endHealPct * ((p.hp * 100) / Math.max(1, p.maxHp) < enduranceNum(game, side).hpPct ? 2 : 1)) / 100), dmg: p.perkData.endurance * enduranceNum(game, side).endSlotDmg, max: enduranceNum(game, side).endMax, spin: enduranceNum(game, side).endMax * enduranceNum(game, side).spinDmg }) }]
       : []),
-    // Tank Titan Bloom v3: holding the tree
+    // Tank Titan Bloom v3: Colossus (was "holding the tree", renamed Q 2026-10-29)
     ...(p.style === 'TK:2' && (p.styleData?.grown ?? 0) > tuningOf(game, side)['TK:2'].treeAt
-      ? [{ label: '🌳 Tree', tone: 'buff' as const, tip: t('Holding the tree: every card +{n} dmg, Field max {field}. A {cards}-card Strike throws it: every card +{throw} dmg, lose {cost} grown Max HP.', { n: tuningOf(game, side)['TK:2'].treeDmg, field: tuningOf(game, side)['TK:2'].treeField, cards: tuningOf(game, side)['TK:2'].throwCards, throw: tuningOf(game, side)['TK:2'].throwDmg, cost: tuningOf(game, side)['TK:2'].throwCost }) }]
+      ? [{ label: '🛡️ Colossus', tone: 'buff' as const, tip: t('Colossus: every card +{n} dmg, Field max {field}. A {cards}-card Strike is a Colossus Slam: every card +{throw} dmg, lose {cost} grown Max HP.', { n: tuningOf(game, side)['TK:2'].treeDmg, field: tuningOf(game, side)['TK:2'].treeField, cards: tuningOf(game, side)['TK:2'].throwCards, throw: tuningOf(game, side)['TK:2'].throwDmg, cost: tuningOf(game, side)['TK:2'].throwCost }) }]
       : []),
     ...((p.perkData?.undyingUntil ?? 0) >= game.turn
-      ? [{ label: '💀 Undying', tone: 'buff' as const, tip: t("Your HP can't drop below 1 until turn {turn}, and every chain card deals bonus dmg. When it ends you heal the bonus dmg that landed.", { turn: p.perkData!.undyingUntil! }) }]
+      ? [{ label: '💀 Undying', tone: 'buff' as const, tip: t("Undying until turn {turn}: your HP can't drop below 1 and nothing can heal you. Every chain card deals +{n} dmg (half when Blocked).", { turn: p.perkData!.undyingUntil!, n: Math.floor((p.maxHp * ((tuningOf(game, side)['TK:2'] as Record<string, number>).ascUndyingPct ?? 0)) / 100) }) }]
       : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
     ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: t('If this side Strikes now with no S card, every chain card gets +{n} dmg and all Energy is spent.', { n: overdriveAdd(game, side) }) }] : []),

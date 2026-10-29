@@ -104,6 +104,7 @@ export type ChainReport = {
   paidSkills: number // Skill cards in the chain whose cost was paid, hit clean or Blocked (⟡ Infuse)
   skills: number // Skill cards in the chain
   criticalHits: number // Critical cards in this chain
+  blocked: number // chain cards stopped by Block
   criticalBlocked: number // Critical cards stopped by Block
   criticalClean: number // Critical cards that dealt HP damage
   criticalParried: number // Critical cards deflected by Parry
@@ -197,7 +198,7 @@ const pctHp = (p: PlayerState) => (p.hp * 100) / p.maxHp
 /** state.heal without the state.ts import: Ignite cuts it, capped at Max HP, nothing for a side at 0 HP. Returns HP gained. */
 export const styleHeal = (state: GameState, side: Side, n: number) => {
   const p = state.players[side]
-  if (p.hp <= 0) return 0
+  if (p.hp <= 0 || noHealing(state, side)) return 0
   const before = p.hp
   const got = healAfterIgnite(p, n, tuningOf(state, other(side)))
   overhealShield(p, got)
@@ -285,9 +286,9 @@ export const STYLES: Record<string, StyleDef> = {
   /**
    * Tank · Titan Bloom v3 (Q 2026-10-28, design/tank-rework-v3-titan-bloom-2026-10-28.md).
    * Growth (Max HP only): perHitTaken per hit taken, perHitBlocked per hit Blocked, perDebuff per debuff stack at the end of the turn.
-   * Meat (Max HP and current HP): perFacing per facing pair, meatPct% of Max HP per clean hit you land. Cap maxHpCap.
-   * Every hpPerDmg grown = every card +1 dmg. Holding the tree (grown > treeAt): every card +treeDmg, Field max treeField.
-   * A Strike of throwCards+ cards while holding throws it: every card +throwDmg instead, lose throwCost grown.
+   * Vigor (Max HP and current HP; keys still say meat): perFacing per facing pair, meatPct% of Max HP per clean hit you land. Cap maxHpCap.
+   * Every hpPerDmg grown = every card +1 dmg. Colossus (grown > treeAt, keys still say tree): every card +treeDmg, Field max treeField.
+   * A Strike of throwCards+ cards as a Colossus is a Colossus Slam: every card +throwDmg instead, lose throwCost grown.
    * Card heals give only cardHealPct% (cardHeal).
    */
   'TK:2': {
@@ -301,7 +302,7 @@ export const STYLES: Record<string, StyleDef> = {
       const f = tuningOf(state, side)['TK:2']
       const grew = bloom(state, side, r.hitsTaken * f.perHitTaken + r.hitsBlocked * f.perHitBlocked, false)
       const meat = p.hp > 0 ? bloom(state, side, r.facing * f.perFacing, true) : 0
-      if (grew + meat) say(state, side, `Titan Bloom: Max HP +${grew + meat}${meat ? ` (meat +${meat} HP)` : ''} → ${p.maxHp}`)
+      if (grew + meat) say(state, side, `Titan Bloom: Max HP +${grew + meat}${meat ? ` (Vigor +${meat} HP)` : ''} → ${p.maxHp}`)
       // growing past the tree line shrinks the Field now, before this turn's Charge draw fills it
       treeField(state, side)
     },
@@ -311,7 +312,7 @@ export const STYLES: Record<string, StyleDef> = {
       const f = tuningOf(state, side)['TK:2']
       const per = Math.floor((p.maxHp * (f.meatPct + (p.perkData?.meatClean ?? 0))) / 100)
       const got = bloom(state, side, r.cleanHits * per, true)
-      if (got) say(state, side, `Titan Bloom: ${r.cleanHits} clean hits, meat +${got}`)
+      if (got) say(state, side, `Titan Bloom: ${r.cleanHits} clean hits, Vigor +${got}`)
       return 0
     },
     endTurn: (state, side) => {
@@ -339,7 +340,7 @@ export const STYLES: Record<string, StyleDef> = {
         if (p.hp < hpWas) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - hpWas })
         p.styleData = { ...p.styleData, grown: grown - lose }
         treeField(state, side)
-        say(state, side, `🌳 Throws the tree: every card +${f.throwDmg} dmg, Max HP −${lose}`)
+        say(state, side, `🛡️ Colossus Slam: every card +${f.throwDmg} dmg, Max HP −${lose}`)
       } else if (grown > f.treeAt) n += f.treeDmg
       if (!n) return
       for (let i = 0; i < bonus.length; i++) bonus[i] += n
@@ -348,13 +349,16 @@ export const STYLES: Record<string, StyleDef> = {
   },
 }
 
-/** Titan Bloom: grow Max HP by n (up to the cap); meat = current HP grows too. Returns what it grew. */
+/** Grasp of the Undying (Titan Bloom D3): no healing of any kind while Undying (perkData.undyingUntil). */
+export const noHealing = (state: GameState, side: Side) => (state.players[side].perkData?.undyingUntil ?? 0) >= state.turn
+
+/** Titan Bloom: grow Max HP by n (up to the cap); meat = current HP grows too (not while Undying). Returns what it grew. */
 export function bloom(state: GameState, side: Side, n: number, meat: boolean): number {
   const p = state.players[side]
   const gain = Math.min(tuningOf(state, side)['TK:2'].maxHpCap - p.maxHp, n)
   if (gain <= 0) return 0
   p.maxHp += gain
-  if (meat && p.hp > 0) {
+  if (meat && p.hp > 0 && !noHealing(state, side)) {
     p.hp += gain
     ;(state.events ??= []).push({ k: 'hp', side, delta: gain })
   }

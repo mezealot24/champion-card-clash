@@ -70,8 +70,8 @@
 .style-opt > button:first-child:disabled { opacity: .5; cursor: default; }
 .style-art { flex: none; width: 64px; border-radius: 10px; background: rgba(12,7,24,.45); }
 .style-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.style-txt b { font-size: 16px; font-weight: 800; }
-.style-txt span { font-size: 14px; line-height: 1.4; }
+.style-txt > b { font-size: 16px; font-weight: 800; }
+.style-txt > span { font-size: 14px; line-height: 1.4; }
 .style-opt .more { align-self: flex-start; background: none; color: var(--s-muted); border: 0; padding: 0 8px 4px; font-size: 12px; text-decoration: underline; }
 .style-opt .full { margin: 0 8px 6px; font-size: 13px; color: var(--s-muted); line-height: 1.45; }
 

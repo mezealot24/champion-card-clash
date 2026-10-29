@@ -263,18 +263,56 @@ describe('randomLoadout', () => {
       s.players.p1.maxHp += 50
       s.players.p1.hand = [hit(1), hit(1), hit(1), hit(1)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(s.log.some((l) => l.includes('Throws the tree: every card +10'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Colossus Slam: every card +10'))).toBe(true)
       expect(s.players.p1.fieldMax).toBe(4)
     })
-    it('Time of Need: every 5 turns removes debuffs and heals 3% missing HP; cap −100', () => {
-      let s = tk('TK:2', ['D1', 'D2', 'D3'])
-      expect(tuningOf(s, 'p1')['TK:2'].maxHpCap).toBe(400)
+    it('Living Bark + Rooted are one node; Time of Need (T2) cleans and heals every 5 turns, no Cost', () => {
+      let s = tk('TK:2', ['D1', 'D2'])
+      expect(tuningOf(s, 'p1')['TK:2'].maxHpCap).toBe(500)
+      expect(tuningOf(s, 'p1')['TK:2'].perDebuff).toBe(2 + 3)
       s.players.p1.hp = 150
       for (let i = 0; i < 4; i++) s = resolveTurn(s, { p1: 'block', p2: 'block' })
       s.players.p1.statuses.push({ kind: 'noCharge', turns: 3 })
       s = resolveTurn(s, { p1: 'block', p2: 'block' })
       expect(s.players.p1.statuses.some((x) => x.kind === 'noCharge')).toBe(false)
       expect(s.log.some((l) => l.includes('Time of Need'))).toBe(true)
+    })
+    it('Grasp of the Undying: a lethal hit leaves 1 HP, Undying 3 turns, draws 2, no heals; cap −100', () => {
+      let s = tk('TK:2', ['D1', 'D2', 'D3'])
+      expect(tuningOf(s, 'p1')['TK:2'].maxHpCap).toBe(400)
+      s.players.p1.hp = 5
+      s.players.p1.hand = []
+      s.players.p2.hand = [hit(30)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.winner).toBeFalsy()
+      expect(s.players.p1.hp).toBe(1)
+      expect(s.players.p1.perkData?.undyingUntil).toBe(1 + 3)
+      expect(s.log.some((l) => l.includes('Undying: draws 2'))).toBe(true)
+      // can't die again while Undying, and Vigor / heals don't add HP
+      s.players.p2.hand = [hit(50), hit(50)]
+      s = resolveTurn(s, { p1: 'block', p2: 'strike' })
+      s.players.p2.hand = [hit(50)]
+      s = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(s.winner).toBeFalsy()
+      expect(s.players.p1.hp).toBe(1)
+    })
+    it('Undying: every card +10% of your Max HP, half of that when Blocked; once per match', () => {
+      let s = tk('TK:2', ['D1', 'D2', 'D3'])
+      s.players.p1.perkData = { ...s.players.p1.perkData, undying: 1, undyingUntil: 5 }
+      const bonus = Math.floor(s.players.p1.maxHp / 10)
+      s.players.p1.hand = [hit(1), hit(1)]
+      const hp = s.players.p2.hp
+      const t = resolveTurn(s, { p1: 'strike', p2: 'block' })
+      // Block stops both cards: each still deals half the Undying dmg
+      expect(t.log.some((l) => l.includes(`2 Blocked cards still deal ${bonus}`))).toBe(true)
+      expect(t.players.p2.hp).toBeLessThanOrEqual(hp - bonus)
+      // already used: a lethal hit after Undying ends knocks out
+      let u = tk('TK:2', ['D1', 'D2', 'D3'])
+      u.players.p1.perkData = { ...u.players.p1.perkData, undying: 1, undyingUntil: 0 }
+      u.players.p1.hp = 5
+      u.players.p2.hand = [hit(30)]
+      u = resolveTurn(u, { p1: 'charge', p2: 'strike' })
+      expect(u.winner).toBe('p2')
     })
   })
 })
