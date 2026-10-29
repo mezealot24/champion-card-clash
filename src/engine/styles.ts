@@ -462,7 +462,7 @@ Object.assign(STYLES, {
    * Bruiser · Juggernaut (Q 2026-10-16, Momentum + Tenacity merged; name by Claude).
    * Every Strike: +1 Momentum stack per card in the chain, before it hits (max 6; see applyConqueror in combos.ts).
    * When the stacks reach max: Tenacity for the next 2 turns (a charge break can't throw away the slot 1 card).
-   * Every turn you Block: −1 stack. Charge keeps the stacks (no gain, no loss; Q 2026-10-16 22:03Z).
+   * Every turn you Block: −1 stack, unless a card gave you holdMomentum (Iron Stance). Charge keeps the stacks (no gain, no loss; Q 2026-10-16 22:03Z).
    */
   'BR:2': {
     name: 'Juggernaut',
@@ -488,6 +488,7 @@ Object.assign(STYLES, {
       const p = state.players[side]
       const n = p.comboData?.conqueror ?? 0
       if (action !== 'block' || !n) return
+      if (p.statuses.some((s) => s.kind === 'holdMomentum')) return say(state, side, `Juggernaut: Block, Momentum held ${n}`)
       const f = tuningOf(state, side)['BR:2']
       const left = Math.max(0, n - f.blockLoss)
       p.comboData = { ...p.comboData, conqueror: left }

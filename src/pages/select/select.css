@@ -129,3 +129,31 @@
 .menu-btn { background: var(--s-panel-2); color: var(--s-text); border: 2px solid var(--s-line); border-radius: 999px; padding: 5px 14px 5px 10px; font-size: 13px; font-weight: 800; }
 .menu-btn b { font: 15px 'Lilita One', 'Kanit', 'Arial Black', sans-serif; letter-spacing: .5px; text-transform: uppercase; }
 .foe-random { display: grid; place-items: center; aspect-ratio: 1; font: 30px 'Lilita One', 'Arial Black', sans-serif; color: var(--s-gold); transform: none; }
+
+/* Deck presets (Q 2026-10-29) + build overview bars */
+.preset-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.preset { display: flex; flex-direction: column; gap: 6px; background: var(--s-panel-2); border: 2px solid transparent; border-radius: 12px; padding: 10px; }
+.preset.on { border-color: var(--tint); background: color-mix(in srgb, var(--tint) 12%, var(--s-panel-2)); }
+.preset-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.preset-head b { font-size: 16px; font-weight: 800; }
+.preset-head span { font-size: 12px; font-weight: 800; color: var(--s-muted); text-transform: uppercase; letter-spacing: 1px; }
+.preset-pitch { margin: 0; font-size: 13px; line-height: 1.4; color: var(--s-muted); }
+.preset-use { background: var(--tint); color: #150f29; border: 0; border-radius: 10px; padding: 8px; font-weight: 900; }
+.preset-use:disabled { background: var(--s-panel); color: var(--s-muted); cursor: default; }
+
+.statbars { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.statbar { display: grid; grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 8px; }
+.statbar dt { font-size: 12px; font-weight: 800; color: var(--s-muted); text-transform: uppercase; letter-spacing: .5px; }
+.statbar dd { margin: 0; display: flex; align-items: center; gap: 8px; }
+.statbar dd b { min-width: 18px; text-align: right; font-weight: 900; }
+.statbar-track { flex: 1; height: 10px; border-radius: 999px; background: rgba(12,7,24,.55); overflow: hidden; }
+.statbar-track span { display: block; height: 100%; border-radius: inherit; background: var(--bar, var(--tint)); }
+.statbars.compact { gap: 2px; }
+.statbars.compact .statbar { grid-template-columns: 72px minmax(0, 1fr); }
+.statbars.compact .statbar-track { height: 7px; }
+.statbars.compact dd b { font-size: 13px; }
+.s-hp { --bar: #5ee08a; }
+.s-def { --bar: #5cc8ff; }
+.s-atk { --bar: #ff7a5c; }
+.s-tech { --bar: #c78bff; }
+.s-spd { --bar: #ffc84a; }
