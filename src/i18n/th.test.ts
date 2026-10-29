@@ -7,6 +7,7 @@ import { CHAMP_INFO, STYLE_SUMMARY } from '../pages/select/info'
 import { TUTORIAL } from '../pages/tutorial/script'
 import { BOSS, BOSS_TIER, TIERS } from '../pages/arcade/arcade'
 import { TH } from './th'
+import { PRESETS } from '../pages/deck/presets'
 
 const LIT = String.raw`(?:'((?:\\.|[^'\\])*)'|"((?:\\.|[^"\\])*)")`
 // t('…'), t(cond ? '…' : '…'), tr(…), and pl(n, '…', '…')
@@ -44,6 +45,9 @@ const dataKeys = [
   ...['Tank pays for S cards with HP.'],
   ...TIERS.map((x) => x.name),
   BOSS_TIER.name, BOSS.name,
+  // stat names (StatBars table) and preset pitches
+  ...['HP', 'Defend', 'ATK', 'Technique', 'Speed'],
+  ...Object.values(PRESETS).flatMap((ps) => ps.map((p) => p.pitch)),
 ]
 
 const slots = (s: string) => (s.match(/\{[\w.|]+\}/g) ?? []).sort()

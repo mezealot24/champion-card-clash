@@ -888,6 +888,7 @@ function statusChip(s: Status, frozen: boolean): Chip {
     : s.kind === 'venom' ? [`🐍 Venom ${n}`, 'debuff', pl(n, 'Poisoned ({n} stack): you lose 1 HP per stack at the end of every turn.', 'Poisoned ({n} stacks): you lose 1 HP per stack at the end of every turn.')]
     : s.kind === 'cutGuard' ? ['✂ Cut guard', 'buff', t("You just lost Field cards to Cut, so your Field can't be Cut again for now.")]
     : s.kind === 'woundUp' ? ['🥊 Wound Up', 'buff', t('Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left as extra damage.')]
+    : s.kind === 'holdMomentum' ? ['🛡 Momentum hold', 'buff', t("Your Block this turn doesn't cost Momentum.")]
     : s.kind === 'chill' ? [`❄ Chill ${n}`, 'debuff', pl(n, 'Chilled ({n} stack): your damage is cut for each stack.', 'Chilled ({n} stacks): your damage is cut for each stack.')]
     : [s.kind, 'debuff', s.kind]
   return { label, tone, tip: tip + turnsLeft(s) }
