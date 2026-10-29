@@ -121,6 +121,7 @@ export function describeAct(a: ActSpec, now = false): string {
       const what = a.which === 'facing' ? 'card in this slot' : a.n === 1 ? `${a.which} card` : `${a.n} ${a.which} cards`
       return `opponent discards their ${what} from the Field to the bottom of their deck (Cut)`
     }
+    case 'critCounter': return `Critical counter ${signed(a.n)} (Fatal Rhythm)`
     case 'gainRes': return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gain`} ${a.n} resource` + per(a.per)
     case 'ignite': return a.n === 0 ? `${WHO[a.who]}'s Ignite starts its 3 turns again` : `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Ignite${per(a.per)} (each stack burns 2 HP + 0.5% Max HP every turn and cuts heals 10%, 3 turns, max 4)`
     case 'chill': return `${WHO[a.who]} gain${a.who === 'self' ? '' : 's'} ${a.n} Chill${per(a.per)} (each stack: hits deal 10% less, 3 turns; at 4 stacks Frozen: loses 15% Max HP and can't Strike next turn)`

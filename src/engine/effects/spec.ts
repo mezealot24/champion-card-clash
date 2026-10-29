@@ -72,6 +72,8 @@ export type ActSpec =
   | { a: 'consumeIgnite'; who: P.Who; burn?: boolean }
   // ⟡ Infuse (Mage, 2026-10-19): n stacks of the card owner's Style element (Pyromancer Ignite, Cryomancer Chill)
   | { a: 'infuse'; who: P.Who; n: number }
+  // Fatal Rhythm Critical counter +n for the card's owner (Assassin Counting Steps, Q 2026-10-29)
+  | { a: 'critCounter'; n: number }
 
 /**
  * One rule = when [hook], if all [if], do all [do]. A card can have several rules.
@@ -142,6 +144,7 @@ function act(s: ActSpec): Act {
     case 'chill': return P.chill(s.who, s.n, s.per)
     case 'consumeIgnite': return P.consumeIgnite(s.who, s.burn)
     case 'infuse': return P.infuse(s.who, s.n)
+    case 'critCounter': return P.critCounter(s.n)
     // an action this build doesn't know does nothing
     default: return () => {}
   }
