@@ -117,6 +117,18 @@ export const TH: Record<string, string> = {
   '{name} only · pick one': 'เฉพาะ {name} · เลือก 1 อัน',
 
   // ---- Deck builder ----
+  'Presets': 'บิลด์สำเร็จรูป',
+  'a full build in one tap · change anything later': 'จัดครบในแตะเดียว · แก้ทีหลังได้ทุกอย่าง',
+  'Use this build': 'ใช้บิลด์นี้',
+  'In use': 'ใช้อยู่',
+  'Out of date': 'ล้าสมัย',
+  'Build overview': 'ภาพรวมบิลด์',
+  'from your cards, Path and Oath': 'คิดจากการ์ด, Path และ Oath ของคุณ',
+  'HP': 'HP',
+  'Defend': 'Defend',
+  'ATK': 'ATK',
+  'Technique': 'Technique',
+  'Speed': 'Speed',
   'Deck builder': 'จัดเด็ค',
   'Pick exactly {n} cards, up to {max} copies of each.': 'เลือกให้ครบ {n} ใบพอดี ใบเดียวกันได้ไม่เกิน {max} ใบ',
   'Your Style{name} adds {n} more, for {size} in all.': 'Style ของคุณ{name} เพิ่มให้อีก {n} ใบ รวมเป็น {size} ใบ',
