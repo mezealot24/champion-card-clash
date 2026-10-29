@@ -21,9 +21,9 @@ export type Foe = { champ: string; style: string }
 /**
  * Final boss (Q 2026-10-29, "like Seth in Street Fighter 4"): Chimera, the black shadow of one Champion that plays every
  * class at once: a random Style per class (all on), one capstone of each, perClass cards of each and every resource bar
- * (engine/boss.ts). hp and perClass are starting numbers for playtest.
+ * (engine/boss.ts). hp 111 (Q nerf 2026-10-29, was 240); perClass is a starting number for playtest.
  */
-export const BOSS = { id: 'BOSS', name: 'Chimera', hp: 240, perClass: 10 } as const
+export const BOSS = { id: 'BOSS', name: 'Chimera', hp: 111, perClass: 10 } as const
 export const BOSS_TIER: Tier = { name: 'Boss', depth: 2, noise: 0.02 }
 export const isBoss = (f?: Foe) => f?.champ === BOSS.id
 
