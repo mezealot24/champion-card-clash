@@ -7,9 +7,9 @@ describe('bullets', () => {
       'Lifeline red line +5%',
       'Each time you lose 15% of your Max HP (S costs count), gain 1 Endurance (once a turn)',
     ])
-    expect(bullets('Hold the tree from +40 grown; throwing it costs 30 grown. Burns 2 HP + 0.5% Max HP')).toEqual([
-      'Hold the tree from +40 grown',
-      'throwing it costs 30 grown',
+    expect(bullets('Become a Colossus from +40 grown; a Colossus Slam costs 30 grown. Burns 2 HP + 0.5% Max HP')).toEqual([
+      'Become a Colossus from +40 grown',
+      'a Colossus Slam costs 30 grown',
       'Burns 2 HP + 0.5% Max HP',
     ])
   })

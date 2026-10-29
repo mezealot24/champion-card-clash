@@ -255,7 +255,7 @@ describe('Titan Bloom v3: meat and the tree', () => {
     const t = resolveTurn(s, { p1: 'strike', p2: 'charge' })
     expect(t.players.p2.hp).toBe(100 - 4 * 12) // 1 + 5 growth + 6 throw
     expect(t.players.p1.styleData?.grown).toBe(100 - 50 + 4 * 3) // then 4 clean hits of meat (1% of 350)
-    expect(t.log.some((l) => l.includes('Throws the tree'))).toBe(true)
+    expect(t.log.some((l) => l.includes('Colossus Slam'))).toBe(true)
   })
 
   it('card heals give Titan Bloom only 50%', () => {

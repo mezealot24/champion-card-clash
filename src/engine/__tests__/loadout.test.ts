@@ -263,7 +263,7 @@ describe('randomLoadout', () => {
       s.players.p1.maxHp += 50
       s.players.p1.hand = [hit(1), hit(1), hit(1), hit(1)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(s.log.some((l) => l.includes('Throws the tree: every card +10'))).toBe(true)
+      expect(s.log.some((l) => l.includes('Colossus Slam: every card +10'))).toBe(true)
       expect(s.players.p1.fieldMax).toBe(4)
     })
     it('Time of Need: every 5 turns removes debuffs and heals 3% missing HP; cap −100', () => {

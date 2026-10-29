@@ -9,7 +9,7 @@ const KEYWORDS: [RegExp, string][] = [
   [/Molten Shield|Ignite|Combustion|Everburn|Infuse/, 'fire'],
   [/Frost Armor|Frozen Tomb|Absolute Zero|Frozen|Freeze|Chill|Shatter|Thaw/, 'ice'],
   [/Lifesteal|Lifeline|Tenacity|Shield|Parry|Veil|heals?|healing|ฮีล/, 'heal'],
-  [/True Fury|Endurance|Momentum|Overdrive|Acceleration|Critical|Build-up|Rage|Mana|Energy|Meat|Fury|Titan Bloom|Wound Up|Payback/, 'res'],
+  [/True Fury|Endurance|Momentum|Overdrive|Acceleration|Critical|Build-up|Rage|Mana|Energy|Vigor|Colossus Slam|Colossus|Fury|Titan Bloom|Wound Up|Payback/, 'res'],
   [/Vulnerable|knocked out|finishes them|ignores Block|can't be Blocked|Block ไม่ได้|ปิดเกม|ทะลุ Block|Cuts?|Mark(?:ed|s)?|Pierce/, 'hit'],
   [/Charge break|counter-spin|Strike|Block|Charge/, 'act'],
 ]

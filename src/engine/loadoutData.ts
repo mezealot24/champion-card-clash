@@ -157,15 +157,15 @@ export const TREES: Record<string, TreeData> = {
     bonusPoints: 1,
     rev: 3,
     nodes: [
-      node('A1', 'Taproot', 'Facing pairs give +{ascTaproot} more Meat each.', 'ascTaproot', 'meat per facing +', 1),
+      node('A1', 'Taproot', 'Facing pairs give +{ascTaproot} more Vigor each.', 'ascTaproot', 'Vigor per facing +', 1),
       node('A2', 'Seedling', 'Start the match with {ascSeedling} Max HP already grown.', 'ascSeedling', 'Max HP grown at start', 20),
-      capstone('A3', 'Ancient', 'Titan Bloom cap +{ascAncient} and +{ascAncientHit} Max HP per hit taken. When you Charge, heal {ascAncientPct}% of your missing HP.', 'The hold-the-tree line is {ascAncientCost} higher (+60 → +90 grown).', [
+      capstone('A3', 'Ancient', 'Titan Bloom cap +{ascAncient} and +{ascAncientHit} Max HP per hit taken. When you Charge, heal {ascAncientPct}% of your missing HP.', 'The Colossus line is {ascAncientCost} higher (+60 → +90 grown).', [
         ['ascAncient', 'cap +', 100],
         ['ascAncientHit', 'per hit taken +', 2],
         ['ascAncientPct', 'Charge heal % of missing HP', 2, 0, 100],
-        ['ascAncientCost', 'Cost: hold-the-tree line +', 30],
+        ['ascAncientCost', 'Cost: Colossus line +', 30],
       ]),
-      node('B1', 'Fresh Meat', 'Clean hits you land give +{ascFreshMeat}% of your Max HP more Meat each.', 'ascFreshMeat', 'meat % Max HP per clean hit +', 1, 0, 100),
+      node('B1', 'Fresh Vigor', 'Clean hits you land give +{ascFreshMeat}% of your Max HP more Vigor each.', 'ascFreshMeat', 'Vigor % Max HP per clean hit +', 1, 0, 100),
       node('B2', 'Butcher\'s Brand', 'Your first clean hit in a Strike brands the opponent. On your next Strike, each clean hit on them heals you {ascBrand}% of your grown Max HP.', 'ascBrand', 'heal % of grown Max HP per clean hit', 1, 0, 100),
       capstone('B3', 'Carve', 'Each clean hit steals {ascCarve} Max HP from the opponent (up to {ascCarveCap} a match) and adds it to your grown Max HP.', 'You get no healing from cards at all.', [
         ['ascCarve', 'Max HP stolen per clean hit', 2],
@@ -176,10 +176,10 @@ export const TREES: Record<string, TreeData> = {
         ['ascIronbark', 'Max HP grown per +1', 8, 1],
         ['ascIronbarkCap', 'dmg cap', 10],
       ]),
-      capstone('C3', 'Tree Grab', 'Hold the tree from +{ascTreeGrab} grown; throwing it costs only {ascTreeGrabCost} grown and gives every card +{ascTreeGrabDmg} dmg.', 'Your Field holds at most {ascTreeGrabField} cards all match.', [
-        ['ascTreeGrab', 'hold line (grown)', 40],
-        ['ascTreeGrabCost', 'throw cost (grown)', 30],
-        ['ascTreeGrabDmg', 'throw dmg per card', 10],
+      capstone('C3', 'Titan\'s Rise', 'Become a Colossus from +{ascTreeGrab} grown. A Colossus Slam costs only {ascTreeGrabCost} grown and gives every card +{ascTreeGrabDmg} dmg.', 'Your Field holds at most {ascTreeGrabField} cards all match.', [
+        ['ascTreeGrab', 'Colossus line (grown)', 40],
+        ['ascTreeGrabCost', 'Colossus Slam cost (grown)', 30],
+        ['ascTreeGrabDmg', 'Colossus Slam dmg per card', 10],
         ['ascTreeGrabField', 'Cost: Field max cards', 4, 1, 5],
       ]),
       node('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} more Max HP per debuff stack (end of turn).', 'ascLivingBark', 'per debuff stack +', 3),
