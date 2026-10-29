@@ -1,6 +1,7 @@
 // v0 AI: weighted random by situation (see vault "AI Opponent"). Always keeps some randomness.
 import { legalActions, resolveTurn } from './engine'
 import { COMBOS } from './combos'
+import { classesOf } from './classes'
 import { overdriveAdd } from './styles'
 import { handMaxOf } from './state'
 import type { Action, CardType, GameState, Side, StatusKind } from './types'
@@ -79,7 +80,7 @@ const STATUS_VALUE: Partial<Record<StatusKind, number>> = {
  */
 export function comboPotential(state: GameState, side: Side): number {
   const p = state.players[side]
-  const combos = COMBOS[p.championId] ?? []
+  const combos = classesOf(p).flatMap((c) => COMBOS[c] ?? [])
   if (!combos.length) return 0
   const free = handMaxOf(state, side) - p.hand.length
   const deckShare = (t: CardType) => (p.deck.length ? p.deck.filter((c) => c.def.type === t).length / p.deck.length : 0)

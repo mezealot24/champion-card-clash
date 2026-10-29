@@ -108,7 +108,15 @@ export type PlayerState = {
   costMod?: { pct: number; flat: number; hpPct?: number; addHpPct?: number }
   /** Loadout bookkeeping (once-per-match pieces and the like). */
   perkData?: Record<string, number>
+  /** Arcade final boss (engine/boss.ts): one HP bar, the side turns into the next form each time its HP drops past a line. */
+  boss?: BossState
 }
+
+/**
+ * Arcade boss (engine/boss.ts): plays every class at once. classes[0] = the Champion it looks like (its shadow).
+ * styles = the Style of each class (all on), res = each class's bar (the live one is in PlayerState.res, see classes.ts).
+ */
+export type BossState = { name: string; classes: string[]; styles: Record<string, string>; res: Record<string, number> }
 
 export type RulesConfig = {
   handMax: number
@@ -148,7 +156,7 @@ export type TurnEvent =
   | { k: 'draw'; side: Side; card: CardInst; slot?: number } // slot = index it went to, when not the end of the Field
   | { k: 'discard'; side: Side; uid: string; reason: string }
   | { k: 'sweep'; side: Side; uids: string[] }
-  | { k: 'combo'; side: Side; name: string }
+  | { k: 'combo'; side: Side; name: string; champ?: string }
 
 export type GameState = {
   turn: number

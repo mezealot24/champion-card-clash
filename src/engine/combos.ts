@@ -4,6 +4,7 @@
 // Kept free of state.ts imports (like styles.ts).
 import type { Action, CardType, GameState, Side } from './types'
 import { tuningOf } from './tuning'
+import { classesOf, inClass } from './classes'
 
 const foe = (side: Side): Side => (side === 'p1' ? 'p2' : 'p1')
 
@@ -139,7 +140,10 @@ const sameTypes = (three: ComboHit[], pattern: CardType[]) => {
 /** Fire this side's combos for one timing if any 3 cards of its chain match the pattern (once each). */
 export function checkCombos(state: GameState, side: Side, hits: ComboHit[], when: 'before' | 'after') {
   const ok = (c: ComboDef, three: ComboHit[]) => (c.ok ?? (() => true))(three)
-  for (const combo of COMBOS[state.players[side].championId] ?? []) {
+  // the Arcade boss has every class's combos, each fired as its class
+  const p = state.players[side]
+  for (const champ of classesOf(p))
+  for (const combo of COMBOS[champ] ?? []) {
     if ((combo.when ?? 'after') !== when) continue
     let found = false
     for (let i = 0; i < hits.length && !found; i++)
@@ -149,8 +153,8 @@ export function checkCombos(state: GameState, side: Side, hits: ComboHit[], when
           if (sameTypes(three, combo.pattern) && ok(combo, three)) found = true
         }
     if (found) {
-      combo.fire(state, side)
-      ;(state.events ??= []).push({ k: 'combo', side, name: combo.name })
+      inClass(p, champ, () => combo.fire(state, side))
+      ;(state.events ??= []).push({ k: 'combo', side, name: combo.name, champ })
     }
   }
 }
