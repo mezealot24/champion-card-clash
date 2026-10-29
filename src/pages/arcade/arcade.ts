@@ -2,6 +2,7 @@
 // no pair twice in a run, and the AI gets tougher every stage. The run is kept on this device so a closed tab resumes.
 // Ties to the AI Ladder idea in design/customization-options-2026-10-18.md (5 tiers).
 
+/** Random stages before the boss. A run is ARCADE_STAGES + 1 fights (the boss is the last). */
 export const ARCADE_STAGES = 5
 
 /** AI strength per stage: depth = turns looked ahead, noise = share of random picks (AI v2 default is depth 2, 0.08). */
@@ -13,8 +14,17 @@ export const TIERS = [
   { name: 'Legend', depth: 2, noise: 0.02 },
 ] as const
 
-export type Tier = (typeof TIERS)[number]
+export type Tier = { name: string; depth: number; noise: number }
 export type Foe = { champ: string; style: string }
+
+/**
+ * Final boss (Q 2026-10-29, "like Seth in Street Fighter 4"): Chimera, a mash-up of every Champion. One HP bar cut into
+ * one part per Champion; it fights as each in turn (random order, random Style) and shifts at each line (engine/boss.ts).
+ * hp and shiftDraw are starting numbers for playtest.
+ */
+export const BOSS = { id: 'BOSS', name: 'Chimera', hp: 240, shiftDraw: 2 } as const
+export const BOSS_TIER: Tier = { name: 'Boss', depth: 2, noise: 0.02 }
+export const isBoss = (f?: Foe) => f?.champ === BOSS.id
 
 export type ArcadeRun = {
   /** the player's Champion and Style for the whole run */
@@ -27,7 +37,7 @@ export type ArcadeRun = {
   continues: number
 }
 
-export const tierOf = (stage: number): Tier => TIERS[Math.min(stage, TIERS.length - 1)]
+export const tierOf = (stage: number, run?: ArcadeRun): Tier => (isBoss(run?.stages[stage]) ? BOSS_TIER : TIERS[Math.min(stage, TIERS.length - 1)])
 export const cleared = (run: ArcadeRun) => run.at >= run.stages.length
 
 /**
@@ -56,7 +66,21 @@ export function rollStages(pool: Foe[], n = ARCADE_STAGES, rand: () => number = 
 }
 
 export function newRun(champ: string, style: string, pool: Foe[], rand?: () => number): ArcadeRun {
-  return { champ, style, stages: rollStages(pool, ARCADE_STAGES, rand), at: 0, continues: 0 }
+  const stages = rollStages(pool, ARCADE_STAGES, rand)
+  return { champ, style, stages: stages.length ? [...stages, { champ: BOSS.id, style: '' }] : [], at: 0, continues: 0 }
+}
+
+/** The boss's forms for one fight: every Champion in the pool once, in random order, each with one of its Styles. */
+export function rollBossForms(pool: Foe[], rand: () => number = Math.random): Foe[] {
+  const champs = [...new Set(pool.map((f) => f.champ))]
+  for (let i = champs.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    ;[champs[i], champs[j]] = [champs[j], champs[i]]
+  }
+  return champs.map((c) => {
+    const styles = pool.filter((f) => f.champ === c)
+    return styles[Math.floor(rand() * styles.length)]
+  })
 }
 
 // ---- saved on this device ----

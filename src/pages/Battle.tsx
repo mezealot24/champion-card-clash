@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
+import { bossSetup, buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
 import { t, useLang } from '../i18n'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
-import { addClear, ARCADE_STAGES, cleared, loadRun, newRun, randomFoe, saveRun, tierOf, type ArcadeRun, type Foe as FoePick, type Tier } from './arcade/arcade'
+import { addClear, BOSS, cleared, isBoss, loadRun, newRun, randomFoe, rollBossForms, saveRun, tierOf, type ArcadeRun, type Foe as FoePick, type Tier } from './arcade/arcade'
 import { ArcadeLadder } from './arcade/ArcadeLadder'
 import { TitleMenu, type Mode } from './menu/TitleMenu'
 import { DeckBuilder } from './deck/DeckBuilder'
@@ -151,15 +151,19 @@ export function Battle({ data }: { data: BattleData }) {
     launch(picks.p1, myStyle, p2, p2Style, null)
   }
 
-  function launch(me: string, myStyle: string | undefined, them: string, theirStyle: string | undefined, aiTier: Tier | null, banner = '') {
+  /** bossForms = the Arcade boss: it plays these forms in order instead of `them` (no loadout, see arcade.ts BOSS) */
+  function launch(me: string, myStyle: string | undefined, them: string, theirStyle: string | undefined, aiTier: Tier | null, banner = '', bossForms?: FoePick[]) {
     setTurn(null)
     setLine(banner)
     setHistory([])
     setMatch((m) => m + 1)
     setTier(aiTier)
-    const foeL = randomLoadout(them, theirStyle, ascPoints)
+    const foeL = bossForms ? undefined : randomLoadout(them, theirStyle, ascPoints)
     setFoeLoadout(foeL)
-    setGame(createGame({ ...setup(me), deck: buildDeck(myDeck(me, myStyle).rows), style: myStyle, loadout: loadoutFor(me, myStyle, ascPoints) }, { ...setup(them), style: theirStyle, loadout: foeL }, gameOpts))
+    const foeSeat = bossForms
+      ? bossSetup(t(BOSS.name), bossForms.map((f) => ({ championId: f.champ, style: f.style, deck: deckOf(f.champ) })), BOSS.hp, BOSS.shiftDraw)
+      : { ...setup(them), style: theirStyle, loadout: foeL }
+    setGame(createGame({ ...setup(me), deck: buildDeck(myDeck(me, myStyle).rows), style: myStyle, loadout: loadoutFor(me, myStyle, ascPoints) }, foeSeat, gameOpts))
   }
 
   /** Fight the run's next Arcade stage (again, after a Continue). */
@@ -174,10 +178,19 @@ export function Battle({ data }: { data: BattleData }) {
       setGame(null)
       return setStep(open)
     }
+    const aiTier = tierOf(r.at, r)
+    const banner = t('Stage {n}/{total} · {tier}', { n: r.at + 1, total: r.stages.length, tier: t(aiTier.name) })
+    if (isBoss(foeAt)) {
+      // a new set of forms every try; the Versus picks never hold the boss id
+      const forms = rollBossForms(pool)
+      if (!forms.length) return
+      setPicks({ p1: r.champ, p2: forms[0].champ })
+      setFoeStyle(forms[0].style)
+      return launch(r.champ, r.style, forms[0].champ, forms[0].style, aiTier, `${banner} · ${t('Final boss: {name}', { name: t(BOSS.name) })}`, forms)
+    }
     setPicks({ p1: r.champ, p2: foeAt.champ })
     setFoeStyle(foeAt.style)
-    const aiTier = tierOf(r.at)
-    launch(r.champ, r.style, foeAt.champ, foeAt.style, aiTier, t('Stage {n}/{total} · {tier}', { n: r.at + 1, total: ARCADE_STAGES, tier: t(aiTier.name) }))
+    launch(r.champ, r.style, foeAt.champ, foeAt.style, aiTier, banner)
   }
 
   function pickMode(m: Mode) {
@@ -332,10 +345,13 @@ export function Battle({ data }: { data: BattleData }) {
     )
   }
 
-  const champName = (side: Side) => data.champions.find((c) => c.id === game.players[side].championId)?.name ?? game.players[side].championId
+  // the Arcade boss shows its own name; its Style line names the form it is in
+  const champName = (side: Side) => game.players[side].boss?.name ?? champTitle(game.players[side].championId)
   const styleOf = (side: Side) => {
-    const key = game.players[side].style
-    return key ? (STYLES[key]?.name ?? key) : ''
+    const p = game.players[side]
+    const key = p.style
+    const name = key ? (STYLES[key]?.name ?? key) : ''
+    return p.boss ? `${t('{champ} form', { champ: champTitle(p.championId) })} ${p.boss.at + 1}/${p.boss.forms.length}${name ? ` · ${name}` : ''}` : name
   }
 
   // Arcade result buttons: a win goes back to the ladder; a loss can Continue the same stage or give up the run
@@ -370,7 +386,7 @@ export function Battle({ data }: { data: BattleData }) {
         restart: won ? (run && cleared(run) ? t('Arcade clear!') : t('Next stage')) : t('Continue'),
         quit: won ? t('Menu') : lost ? t('Give up') : undefined,
         quitMenu: t('Quit to the ladder (progress kept)'),
-        note: t('Stage {n}/{total} · {tier}', { n: Math.min(run!.at + (won ? 0 : 1), ARCADE_STAGES), total: ARCADE_STAGES, tier: t(tier!.name) }),
+        note: t('Stage {n}/{total} · {tier}', { n: Math.min(run!.at + (won ? 0 : 1), run!.stages.length), total: run!.stages.length, tier: t(tier!.name) }),
       }
     : undefined
 
@@ -396,6 +412,7 @@ export function Battle({ data }: { data: BattleData }) {
         settingsExtra={<TimerSetting />}
         onAction={play}
         foe={mode === 'versus' && foe === 'tuktah' ? t('Tuktah') : t('AI')}
+        champName={champTitle}
         labels={arcadeLabels}
         busy={thinking}
         banner={thinking ? t('Tuktah is thinking…') : line || undefined}

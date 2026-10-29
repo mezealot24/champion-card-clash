@@ -28,7 +28,7 @@ export function TitleMenu(props: {
     {
       id: 'arcade',
       label: t('Arcade'),
-      sub: run ? t('Resume · Stage {n}/{total}', { n: run.at + 1, total: ARCADE_STAGES }) : t('Fight {n} stages in a row', { n: ARCADE_STAGES }),
+      sub: run ? t('Resume · Stage {n}/{total}', { n: run.at + 1, total: run.stages.length }) : t('Fight {n} stages, then the final boss', { n: ARCADE_STAGES }),
     },
     { id: 'versus', label: t('Versus'), sub: t('Pick your opponent, or leave it random') },
     { id: 'multi', label: t('Multiplayer'), sub: props.canOnline ? t('Online 1v1 vs a real player') : t('Coming soon'), off: !props.canOnline },

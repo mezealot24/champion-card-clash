@@ -109,6 +109,8 @@ export function Arena(props: {
   bannerFades?: boolean
   /** action buttons stay disabled while true (waiting on the opponent's pick) */
   busy?: boolean
+  /** Arcade boss form shift banner: the Champion's name for an id (default the id) */
+  champName?: (id: string) => string
 }) {
   useLang()
   const { game, turn, names, styleNames } = props
@@ -411,7 +413,9 @@ export function Arena(props: {
         const nx = events[i + 1]
         await discard(ev.side, ev.uid, ev.reason, nx?.k === 'draw' && nx.side === ev.side && nx.slot != null)
       } else if (ev.k === 'draw') await draw(ev.side, ev.card, ev.slot)
-      else if (ev.k === 'combo') await combo(ev.side, ev.name, next)
+      // the combo belongs to the form that struck (a boss may have shifted by the end of the turn)
+      else if (ev.k === 'combo') await combo(ev.side, ev.name, prev)
+      else if (ev.k === 'shift') await shift(ev.side, ev.championId, ev.style)
     }
     await tail
     await home
@@ -594,6 +598,20 @@ export function Arena(props: {
     setGlow({})
   }
 
+  /** Arcade boss turns into its next form. */
+  async function shift(side: Side, champ: string, style?: string) {
+    const f = fighter(side)
+    anim(f, [{ filter: 'brightness(1)' }, { filter: 'brightness(4) blur(2px)' }, { filter: 'brightness(1)' }], 700)
+    const b = add(`<div class="banner shift"><span>${t('Form shift')}</span><b>${props.champName?.(champ) ?? champ}</b><span>${style ? (STYLES[style]?.name ?? style) : ''}</span></div>`)
+    await anim(b, [
+      { transform: 'skewY(-4deg) translateX(-110%)' },
+      { transform: 'skewY(-4deg) translateX(0)', offset: 0.12 },
+      { transform: 'skewY(-4deg) translateX(2%)', offset: 0.88 },
+      { transform: 'skewY(-4deg) translateX(110%)' },
+    ], BANNER_MS * 0.7)
+    b.remove()
+  }
+
   useEffect(() => {
     if (turn) playback(turn)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -686,11 +704,11 @@ export function Arena(props: {
               <ComboTracker game={game} side="p1" cards={view.p1.field.filter((v) => !v.gone).map((v) => v.card)} />
             </div>
             <div className="vs">
-              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${lowHp('p2') ? ' low' : ''}${down && down !== 'p2' ? ' pose-win' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
+              <div className={`fighter p2${game.players.p2.boss ? ' boss' : ''}${down === 'p2' ? ' down' : ''}${lowHp('p2') ? ' low' : ''}${down && down !== 'p2' ? ' pose-win' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
               <TokenView side="p2" tok={tok} playing={playing} foe={foe} />
               <div className="verdict">{hits || tok.verdict}</div>
               <TokenView side="p1" tok={tok} playing={playing} locked={locked} foe={foe} />
-              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${lowHp('p1') ? ' low' : ''}${down && down !== 'p1' ? ' pose-win' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
+              <div className={`fighter me p1${game.players.p1.boss ? ' boss' : ''}${down === 'p1' ? ' down' : ''}${lowHp('p1') ? ' low' : ''}${down && down !== 'p1' ? ' pose-win' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
             </div>
           </div>
           <div className="side">

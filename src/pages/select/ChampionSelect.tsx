@@ -270,7 +270,7 @@ export function ChampionSelect(props: {
           {mode === 'arcade' ? (
             <section className="box match">
               <h2>
-                {t('Arcade')} <span>{t('{n} stages · random opponents', { n: ARCADE_STAGES })}</span>
+                {t('Arcade')} <span>{t('{n} stages · random opponents · final boss', { n: ARCADE_STAGES + 1 })}</span>
               </h2>
               <p className="lo-note">{t('Each stage the AI gets tougher, from Rookie to Legend. Lose and you can Continue from the same stage.')}</p>
               <TimerSetting />

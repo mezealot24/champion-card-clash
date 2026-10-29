@@ -1,4 +1,5 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
+import { bossShift } from './boss'
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { cardHeal, chillCut, getStyle, hooksOf, igniteBurn, igniteStacks } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
@@ -240,6 +241,8 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const dead = SIDES.filter((s) => state.players[s].hp <= 0)
   if (dead.length === 2) state.winner = 'draw'
   else if (dead.length === 1) state.winner = other(dead[0])
+  // Arcade boss: a new form once its HP drops past the next line
+  if (!state.winner) for (const side of SIDES) bossShift(state, side)
   state.turn++
   return state
 }

@@ -1,6 +1,6 @@
 // Small state helpers shared by the clash resolver and effect primitives.
 // They mutate the draft GameState passed in (resolveTurn clones first).
-import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, TurnEvent } from './types'
+import type { BossState, CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, TurnEvent } from './types'
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
 import { healAfterIgnite, hooksOf, overhealShield } from './styles'
@@ -16,7 +16,7 @@ export function nextRandom(state: GameState): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
-function shuffle<T>(state: GameState, items: T[]): T[] {
+export function shuffle<T>(state: GameState, items: T[]): T[] {
   const a = [...items]
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(nextRandom(state) * (i + 1))
@@ -32,6 +32,8 @@ export type ChampionSetup = {
   deck: CardDef[] // already expanded by copies (see buildDeck)
   style?: string // "CHAMP:slot", see engine/styles.ts
   loadout?: Loadout // Sigils + Ascendancy nodes, see engine/loadout.ts
+  /** Arcade boss: championId / style / deck are its first form (engine/boss.ts bossSetup builds it) */
+  boss?: Omit<BossState, 'at'>
 }
 
 export function createGame(
@@ -82,6 +84,7 @@ function emptyPlayer(setup: ChampionSetup, side: Side, t: Tuning): PlayerState {
     statuses: [],
     style: setup.style,
     res: resourceOf(setup.championId, t)?.start ?? 0,
+    ...(setup.boss ? { boss: { ...setup.boss, at: 0 } } : {}),
   }
 }
 
