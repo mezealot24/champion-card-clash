@@ -94,3 +94,12 @@
   .ld-stages .ld-foe { width: 34px; }
   .ld-me { width: 90px; }
 }
+
+/* Arcade boss on the ladder (ArcadeLadder BossPortrait): every Champion's shadow fading in turn, violet rim */
+.ld-stages li.ld-boss { --c: #9b3dff; border-color: #7a3dc4; background: linear-gradient(90deg, #2a0846, var(--s-panel)); }
+.ld-stages li.ld-boss.next { border-color: #d46bff; box-shadow: 0 0 22px rgba(170,70,255,.55); }
+.ld-stages li.ld-boss > i { color: #d46bff; }
+.portrait.boss .face { filter: brightness(0) drop-shadow(0 0 3px #d46bff); opacity: 0; animation: boss-face calc(var(--n) * 1.2s) linear infinite; animation-delay: calc(var(--k) * 1.2s); }
+@keyframes boss-face { 0%, 22% { opacity: 1; } 28%, 100% { opacity: 0; } }
+.ld-stages li.ld-boss:not(.won):not(.next) .ld-foe .face { filter: brightness(0) drop-shadow(0 0 3px #d46bff); }
+@media (prefers-reduced-motion: reduce) { .portrait.boss .face { animation: none; } .portrait.boss .face:first-child { opacity: 1; } }

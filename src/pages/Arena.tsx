@@ -7,6 +7,8 @@ import {
   isEffectMissing,
   legalActions,
   overdriveAdd,
+  allRes,
+  classOf,
   resourceOf,
   tuningOf,
   STYLES,
@@ -411,7 +413,7 @@ export function Arena(props: {
         const nx = events[i + 1]
         await discard(ev.side, ev.uid, ev.reason, nx?.k === 'draw' && nx.side === ev.side && nx.slot != null)
       } else if (ev.k === 'draw') await draw(ev.side, ev.card, ev.slot)
-      else if (ev.k === 'combo') await combo(ev.side, ev.name, next)
+      else if (ev.k === 'combo') await combo(ev.side, ev.name, ev.champ ?? next.players[ev.side].championId)
     }
     await tail
     await home
@@ -560,8 +562,8 @@ export function Arena(props: {
     await anim(el, [{ transform: 'rotateY(-90deg)' }, { transform: 'rotateY(0)' }], 120, { easing: 'ease-out' })
   }
 
-  async function combo(side: Side, name: string, next: GameState) {
-    const champ = next.players[side].championId
+  /** champ = the class whose combo it is (the Arcade boss has every class's) */
+  async function combo(side: Side, name: string, champ: string) {
     const [title, sub] = COMBO_TEXT[`${champ}:${name}`]?.map((s) => t(s)) ?? [t('COMBO'), name]
     const types = name.split(/[^PKS]+/).filter(Boolean)
     // light up 3 chain cards of the combo's types
@@ -686,11 +688,11 @@ export function Arena(props: {
               <ComboTracker game={game} side="p1" cards={view.p1.field.filter((v) => !v.gone).map((v) => v.card)} />
             </div>
             <div className="vs">
-              <div className={`fighter p2${down === 'p2' ? ' down' : ''}${lowHp('p2') ? ' low' : ''}${down && down !== 'p2' ? ' pose-win' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
+              <div className={`fighter p2${game.players.p2.boss ? ' boss' : ''}${down === 'p2' ? ' down' : ''}${lowHp('p2') ? ' low' : ''}${down && down !== 'p2' ? ' pose-win' : ''}${conqMax(game, 'p2') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p2.championId, game.players.p2.style) }} />
               <TokenView side="p2" tok={tok} playing={playing} foe={foe} />
               <div className="verdict">{hits || tok.verdict}</div>
               <TokenView side="p1" tok={tok} playing={playing} locked={locked} foe={foe} />
-              <div className={`fighter me p1${down === 'p1' ? ' down' : ''}${lowHp('p1') ? ' low' : ''}${down && down !== 'p1' ? ' pose-win' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
+              <div className={`fighter me p1${game.players.p1.boss ? ' boss' : ''}${down === 'p1' ? ' down' : ''}${lowHp('p1') ? ' low' : ''}${down && down !== 'p1' ? ' pose-win' : ''}${conqMax(game, 'p1') ? ' conq-max' : ''}`} dangerouslySetInnerHTML={{ __html: fighterHTML(game.players.p1.championId, game.players.p1.style) }} />
             </div>
           </div>
           <div className="side">
@@ -886,6 +888,7 @@ function statusChip(s: Status, frozen: boolean): Chip {
     : s.kind === 'venom' ? [`🐍 Venom ${n}`, 'debuff', pl(n, 'Poisoned ({n} stack): you lose 1 HP per stack at the end of every turn.', 'Poisoned ({n} stacks): you lose 1 HP per stack at the end of every turn.')]
     : s.kind === 'cutGuard' ? ['✂ Cut guard', 'buff', t("You just lost Field cards to Cut, so your Field can't be Cut again for now.")]
     : s.kind === 'woundUp' ? ['🥊 Wound Up', 'buff', t('Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left as extra damage.')]
+    : s.kind === 'holdMomentum' ? ['🛡 Momentum hold', 'buff', t("Your Block this turn doesn't cost Momentum.")]
     : s.kind === 'chill' ? [`❄ Chill ${n}`, 'debuff', pl(n, 'Chilled ({n} stack): your damage is cut for each stack.', 'Chilled ({n} stacks): your damage is cut for each stack.')]
     // Q 2026-10-28: these two fell through to a red "▼ EMPOWER" / "▼ REGEN" chip with no number
     : s.kind === 'empower' ? [`⚔ Empower +${n}`, 'buff', t('Your next Strike: every chain card +{n} dmg.', { n })]
@@ -923,7 +926,17 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
   // chips and badges sit on the stage, whose click skips playback, so taps stop there
   const tap = (t: Tip) => (e: React.MouseEvent) => (e.stopPropagation(), onTip(t))
   const resTip = res && { title: res.payWithHp ? t('Pays with HP') : `${res.name} ${p.res ?? 0}/${res.cap}`, body: RESOURCE_TIP[p.championId] ? t(RESOURCE_TIP[p.championId]) : res.name }
-  const resView = !res ? null : res.payWithHp ? (
+  // the Arcade boss has every class's bar: one short line each
+  const bossRes = p.boss && game.rules.resources ? allRes(p) : undefined
+  const resView = bossRes ? (
+    <button type="button" className="res boss-res" onClick={tap({ title: t('Every class resource'), body: t('The boss pays each card with its own class: Tank cards with HP, Bruiser with Rage, Assassin with Energy, Mage with Mana.') })}>
+      {p.boss!.classes.map((c) => {
+        const r = resourceOf(c, tuningOf(game, side))
+        // short: "R 2/20 E 3/3 M 4/7" (Tank pays HP, no bar)
+        return r && !r.payWithHp ? <span key={c} title={r.name}>{r.name[0]} {bossRes[c] ?? 0}/{r.cap}</span> : null
+      })}
+    </button>
+  ) : !res ? null : res.payWithHp ? (
     <button type="button" className="res" onClick={tap(resTip!)}>
       S = HP
     </button>
@@ -1052,9 +1065,11 @@ function cardRule(rule: string): { timing: string; cond: string; act: string } {
 function cardFacts(game: GameState, side: Side, card: CardInst) {
   const p = game.players[side]
   const { id, type, dmg, effectText, effectSpec } = card.def
-  const res = game.rules.resources ? resourceOf(p.championId, tuningOf(game, side)) : undefined
+  // the Arcade boss pays each card with its own class's bar
+  const cls = classOf(p, card)
+  const res = game.rules.resources ? resourceOf(cls, tuningOf(game, side)) : undefined
   const cost = res ? costNow(game, side, card) : 0
-  const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (p.res ?? 0) ? res.unpaidDmgPct : undefined
+  const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (allRes(p)[cls] ?? 0) ? res.unpaidDmgPct : undefined
   const grow = (card.grow ?? 0) + (card.growNext ?? 0)
   const base = short != null ? Math.floor((dmg * short) / 100) : dmg
   const text = effectSpec?.length ? describeSpec(effectSpec, t, res?.name) : effectText

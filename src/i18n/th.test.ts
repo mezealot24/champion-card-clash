@@ -8,8 +8,9 @@ import { ENDURANCE_TEXT, OATHS, TREES } from '../engine/loadoutData'
 import { PER, STATUS_SHORT } from '../pages/learnText'
 import { CHAMP_INFO, STYLE_SUMMARY } from '../pages/select/info'
 import { TUTORIAL } from '../pages/tutorial/script'
-import { TIERS } from '../pages/arcade/arcade'
+import { BOSS, BOSS_TIER, TIERS } from '../pages/arcade/arcade'
 import { TH } from './th'
+import { PRESETS } from '../pages/deck/presets'
 
 const LIT = String.raw`(?:'((?:\\.|[^'\\])*)'|"((?:\\.|[^"\\])*)")`
 // t('…'), t(cond ? '…' : '…'), tr(…), and pl(n, '…', '…')
@@ -54,6 +55,10 @@ const dataKeys = [
   ...Object.values(TREES).flatMap((tree) => tree.nodes.flatMap((n) => [n.text, ...(n.cost ? [n.cost] : [])])),
   ...Object.values(OATHS).flatMap((os) => os.map((o) => o.text)),
   ENDURANCE_TEXT,
+  BOSS_TIER.name, BOSS.name,
+  // stat names (StatBars table) and preset pitches
+  ...['HP', 'Defend', 'ATK', 'Technique', 'Speed'],
+  ...Object.values(PRESETS).flatMap((ps) => ps.map((p) => p.pitch)),
 ]
 
 const slots = (s: string) => (s.match(/\{[\w.|]+\}/g) ?? []).sort()

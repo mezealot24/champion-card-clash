@@ -44,7 +44,8 @@ export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: nu
  */
 /** ignite = burning (Pyromancer, Q 2026-10-17): n = stacks; see IGNITE_* in styles.ts. chill = Cryomancer's slow (n = stacks, CHILL_*).
  * frozen = marker for "can't Strike this turn" (lasts 1 turn longer than its noStrike so cards can read it). skillSilence = Skill cards' effects off (Bitter Cold). subZero = next Strike: every clean hit gives 1 Chill (Arcane Sub-Zero). thaw = can't be Frozen (after a Freeze, Cryomancer) */
-export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'thaw' | 'venom' | 'woundUp' | 'cutGuard' | 'regen' | 'empower'
+export type StatusKind = 'noStrike' | 'noBlock' | 'noCharge' | 'blockPlus' | 'trueDmg' | 'guardBreak' | 'silence' | 'shield' | 'parry' | 'vulnerable' | 'deathMark' | 'ignite' | 'chill' | 'frozen' | 'skillSilence' | 'subZero' | 'frozenTomb' | 'thaw' | 'venom' | 'woundUp' | 'cutGuard' | 'regen' | 'empower' | 'holdMomentum'
+/** holdMomentum = Juggernaut: a Block this turn doesn't cost Momentum (BR-033 Iron Stance, 2026-10-29). */
 /** regen = end of every turn, heal n% of missing HP (Tank Blood Price). empower = your next Strike: every chain card +n dmg, then it's gone (Deep Breath). */
 /** n = size: blockPlus (Block stops n more hits; negative = fewer), shield (points left), parry (hits left) */
 /** A side loses at most this many Field cards to Cut effects per turn (Claude default 2026-10-16). Charge break doesn't count. */
@@ -107,7 +108,15 @@ export type PlayerState = {
   costMod?: { pct: number; flat: number; hpPct?: number; addHpPct?: number }
   /** Loadout bookkeeping (once-per-match pieces and the like). */
   perkData?: Record<string, number>
+  /** Arcade final boss (engine/boss.ts): one HP bar, the side turns into the next form each time its HP drops past a line. */
+  boss?: BossState
 }
+
+/**
+ * Arcade boss (engine/boss.ts): plays every class at once. classes[0] = the Champion it looks like (its shadow).
+ * styles = the Style of each class (all on), res = each class's bar (the live one is in PlayerState.res, see classes.ts).
+ */
+export type BossState = { name: string; classes: string[]; styles: Record<string, string>; res: Record<string, number> }
 
 export type RulesConfig = {
   handMax: number
@@ -147,7 +156,7 @@ export type TurnEvent =
   | { k: 'draw'; side: Side; card: CardInst; slot?: number } // slot = index it went to, when not the end of the Field
   | { k: 'discard'; side: Side; uid: string; reason: string }
   | { k: 'sweep'; side: Side; uids: string[] }
-  | { k: 'combo'; side: Side; name: string }
+  | { k: 'combo'; side: Side; name: string; champ?: string }
 
 export type GameState = {
   turn: number

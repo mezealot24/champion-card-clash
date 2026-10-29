@@ -21,7 +21,7 @@ export const HOOK_LABEL: Record<Hook, string> = {
 export const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 export const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-export const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero (each clean hit next Strike gives 1 Chill)', frozenTomb: 'Frozen Tomb', thaw: 'Thaw (can\'t be Frozen)', venom: 'Venom', woundUp: 'Wound Up', cutGuard: "Cut guard (can't be Cut)", regen: 'Regen', empower: 'Empower' }
+export const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero (each clean hit next Strike gives 1 Chill)', frozenTomb: 'Frozen Tomb', thaw: 'Thaw (can\'t be Frozen)', venom: 'Venom', woundUp: 'Wound Up', cutGuard: "Cut guard (can't be Cut)", regen: 'Regen', empower: 'Empower', holdMomentum: 'Momentum hold' }
 export const PER_LABEL: Record<Per, string> = {
   hitBlocked: 'hit you blocked this turn',
   chainCard: 'card in your chain',
@@ -137,6 +137,7 @@ export function describeAct(a: ActSpec, now = false, tr: Tr = EN, res = 'resourc
       }
       if (a.kind === 'parry') return tr(self ? 'gain Parry {n} {turns} (the first {n} {hits} past Block are parried: 0 dmg)' : '{who} gains Parry {n} {turns} (the first {n} {hits} past Block are parried: 0 dmg)', { n, turns, hits: tr(n === 1 ? 'hit' : 'hits'), who })
       if (a.kind === 'regen') return tr(self ? 'you regain {n}% of missing HP at the end of every turn, {t} {turnWord}' : '{who} regains {n}% of missing HP at the end of every turn, {t} {turnWord}', { n, t: a.turns, turnWord: tr(a.turns === 1 ? 'turn' : 'turns'), who })
+      if (a.kind === 'holdMomentum') return tr(self ? "your Block doesn't cost Momentum {turns}" : "{who}'s Block doesn't cost Momentum {turns}", { turns, who })
       if (a.kind === 'empower') return tr(self ? 'your next Strike: every chain card +{n} dmg' : "{who}'s next Strike: every chain card +{n} dmg", { n, who })
       if (a.kind === 'vulnerable') return tr(self ? 'you take {n}% more dmg from hits {turns}' : '{who} takes {n}% more dmg from hits {turns}', { n, turns, who })
       return tr('{who} {status} {turns}', { who, status: tr(STATUS[a.kind]), turns })
@@ -162,6 +163,7 @@ export function describeAct(a: ActSpec, now = false, tr: Tr = EN, res = 'resourc
       const which = tr(a.which)
       return tr(a.n === 1 ? 'opponent discards their {which} card from the Field to the bottom of their deck (Cut)' : 'opponent discards their {n} {which} cards from the Field to the bottom of their deck (Cut)', { n: a.n, which })
     }
+    case 'critCounter': return tr('Critical counter {n} (Fatal Rhythm)', { n: signed(a.n) })
     // a negative gain is a payment (BR-029 "Pay 5 Rage" read "Gain -5 resource")
     case 'gainRes': return (a.n < 0 ? tr(self ? 'lose {n} {res}' : '{who} lose {n} {res}', { n: -a.n, who, res: tr(res) }) : tr(self ? 'gain {n} {res}' : '{who} gain {n} {res}', { n: a.n, who, res: tr(res) })) + per(tr, a.per)
     case 'ignite':

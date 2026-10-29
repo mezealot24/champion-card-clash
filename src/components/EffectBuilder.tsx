@@ -95,6 +95,7 @@ const ACT_DEFAULTS: Record<string, ActSpec> = {
   consumeIgnite: { a: 'consumeIgnite', who: 'enemy' },
   infuse: { a: 'infuse', who: 'enemy', n: 1 },
   shatter: { a: 'shatter', n: 5 },
+  critCounter: { a: 'critCounter', n: 1 },
 }
 const ACT_LABEL: Record<string, string> = {
   draw: 'Draw', heal: 'Gain HP', loseHp: 'Lose HP', maxHp: 'Max HP', status: 'Status', addDmg: 'Change dmg (this chain)', mulDmg: 'Dmg × % (this chain)', grow: 'Gain dmg (later attacks)', blockNow: 'Block ±N hits (this turn)',
@@ -102,6 +103,7 @@ const ACT_LABEL: Record<string, string> = {
   ignite: 'Ignite (0 = reset timer)', consumeIgnite: 'Clear / explode Ignite', chill: 'Chill (4 = Frozen)',
   infuse: '⟡ Infuse (Mage Style element: Ignite / Chill)',
   shatter: "Shatter: remove opponent's Shield / Parry, +dmg each (Before action)",
+  critCounter: 'Critical counter +N (Fatal Rhythm, Before action)',
 }
 
 const replaceAt = <T,>(list: T[], i: number, v: T) => list.map((x, j) => (j === i ? v : x))
@@ -361,7 +363,7 @@ function ActEditor({ value, onChange }: { value: ActSpec; onChange: (v: ActSpec)
         </label>
       )}
       {value.a === 'mulDmg' && <><Num value={value.pct} min={0} onChange={(pct) => onChange({ ...value, pct })} />%</>}
-      {'n' in value && value.a !== 'status' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' || value.a === 'blockNow' || value.a === 'gainRes' ? undefined : value.a === 'cut' ? 1 : 0} onChange={(n) => onChange({ ...value, n })} />}
+      {'n' in value && value.a !== 'status' && <Num value={value.n} min={value.a === 'addDmg' || value.a === 'maxHp' || value.a === 'grow' || value.a === 'blockNow' || value.a === 'gainRes' || value.a === 'critCounter' ? undefined : value.a === 'cut' ? 1 : 0} onChange={(n) => onChange({ ...value, n })} />}
       {(value.a === 'draw' || value.a === 'heal' || value.a === 'loseHp' || value.a === 'addDmg' || value.a === 'gainRes' || value.a === 'ignite' || value.a === 'chill') && (
         <select value={value.per ?? ''} onChange={(e) => onChange({ ...value, per: (e.target.value || undefined) as typeof value.per })} title="Multiply by a count">
           <option value="">(flat)</option>

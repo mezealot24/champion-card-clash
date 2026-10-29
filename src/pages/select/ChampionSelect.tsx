@@ -14,6 +14,9 @@ import { TimerSetting } from '../timer/TurnTimer'
 import { ComboLine } from '../tutorial/Tutorial'
 import { ARCADE_STAGES } from '../arcade/arcade'
 import type { Mode } from '../menu/TitleMenu'
+import type { DeckStats } from '../../engine/deckStats'
+import type { Preset, PresetView } from '../deck/presets'
+import { StatBars } from '../deck/StatBars'
 import { CHAMP_INFO, comboPattern, STYLE_SUMMARY } from './info'
 import { Portrait } from './Portrait'
 import './select.css'
@@ -63,6 +66,13 @@ export function ChampionSelect(props: {
   foeRandom: boolean
   setFoeRandom: (r: boolean) => void
   onMenu: () => void
+  /** ready-made builds for the picked Champion (deck/presets) */
+  presets: PresetView[]
+  /** the preset the player's picks match now */
+  activePreset?: string
+  onPreset: (p: Preset) => void
+  /** overview of the player's current build (null until a Style is picked) */
+  myStats: DeckStats | null
 }) {
   useLang()
   const { champions, picks, foe, step, setStep, mode } = props
@@ -160,6 +170,32 @@ export function ChampionSelect(props: {
               </button>
             ))}
           </div>
+
+          {champ && props.presets.length > 0 && (
+            <section className="box presets">
+              <h2>
+                {t('Presets')} <span>{t('a full build in one tap · change anything later')}</span>
+              </h2>
+              <div className="preset-opts">
+                {props.presets.map(({ preset: p, stats, problems }) => {
+                  const on = props.activePreset === p.id
+                  return (
+                    <div key={p.id} className={`preset${on ? ' on' : ''}`}>
+                      <div className="preset-head">
+                        <b>{p.name}</b>
+                        <span>{STYLES[p.style]?.name ?? p.style}</span>
+                      </div>
+                      <p className="preset-pitch">{t(p.pitch)}</p>
+                      <StatBars stats={stats} compact />
+                      <button type="button" className="preset-use" disabled={problems.length > 0 || on} title={problems.join(' · ') || undefined} onClick={() => props.onPreset(p)}>
+                        {problems.length ? t('Out of date') : on ? t('In use') : t('Use this build')}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            </section>
+          )}
 
           {champ && info && (
             <details className="box how">
@@ -267,12 +303,21 @@ export function ChampionSelect(props: {
             ))}
           </section>
 
+          {props.myStats && (
+            <section className="box build-stats">
+              <h2>
+                {t('Build overview')} <span>{props.presets.find((v) => v.preset.id === props.activePreset)?.preset.name ?? t('from your cards, Path and Oath')}</span>
+              </h2>
+              <StatBars stats={props.myStats} />
+            </section>
+          )}
+
           {mode === 'arcade' ? (
             <section className="box match">
               <h2>
-                {t('Arcade')} <span>{t('{n} stages · random opponents', { n: ARCADE_STAGES })}</span>
+                {t('Arcade')} <span>{t('{n} stages · random opponents · final boss', { n: ARCADE_STAGES + 1 })}</span>
               </h2>
-              <p className="lo-note">{t('Each stage the AI gets tougher, from Rookie to Legend. Lose and you can Continue from the same stage.')}</p>
+              <p className="lo-note">{t('Each stage the AI gets tougher, from Rookie to Legend. Lose and you can Continue from the same stage, with a reworked Ascendancy and Oath if you like.')}</p>
               <TimerSetting />
             </section>
           ) : mode === 'multi' ? (

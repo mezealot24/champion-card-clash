@@ -18,7 +18,7 @@ const OP = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' }
 export const STATUS_SHORT: Partial<Record<string, string>> = {
   noStrike: 'no Strike', noBlock: 'no Block', noCharge: 'no Charge', silence: 'Silenced', skillSilence: 'S effects off',
   trueDmg: 'True Dmg', guardBreak: 'Guard Crush', vulnerable: 'Vulnerable', deathMark: 'Marked', shield: 'Shield',
-  parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: 'Cut guard', regen: 'Regen', empower: 'Empower',
+  parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: 'Cut guard', regen: 'Regen', empower: 'Empower', holdMomentum: 'Momentum hold',
 }
 const status = (k: string) => (STATUS_SHORT[k] ? tr(STATUS_SHORT[k]!) : k)
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
@@ -121,6 +121,7 @@ export function shortAct(a: ActSpec, res = 'res'): string {
     case 'shatter': return tr('Shatter Shield/Parry, +{n} dmg each', { n: a.n })
     case 'steal': return tr('Steal facing card')
     case 'cut': return a.which === 'facing' ? tr('Cut facing card') : tr(a.which === 'oldest' ? 'Cut {n} oldest' : 'Cut {n} newest', { n: a.n })
+    case 'critCounter': return tr('Crit count {n}', { n: signed(a.n) })
     case 'gainRes': return `${a.who === 'enemy' ? head('enemy') : ''}${signed(a.n)} ${tr(res)}${per(a)}`
     case 'ignite': return `${a.who === 'self' ? '' : head('enemy')}${a.n === 0 ? tr('Ignite refresh') : tr('Ignite {n}', { n: a.n })}${a.n === 0 ? '' : per(a)}`
     case 'chill': return `${a.who === 'self' ? '' : head('enemy')}${tr('Chill {n}', { n: a.n })}${per(a)}`
