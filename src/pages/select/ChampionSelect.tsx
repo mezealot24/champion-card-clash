@@ -317,7 +317,7 @@ export function ChampionSelect(props: {
               <h2>
                 {t('Arcade')} <span>{t('{n} stages · random opponents · final boss', { n: ARCADE_STAGES + 1 })}</span>
               </h2>
-              <p className="lo-note">{t('Each stage the AI gets tougher, from Rookie to Legend. Lose and you can Continue from the same stage.')}</p>
+              <p className="lo-note">{t('Each stage the AI gets tougher, from Rookie to Legend. Lose and you can Continue from the same stage, with a reworked Ascendancy and Oath if you like.')}</p>
               <TimerSetting />
             </section>
           ) : mode === 'multi' ? (
