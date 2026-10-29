@@ -210,11 +210,11 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
         log(state, `${side} Acceleration (Dual Strike): ${fill ? 'Energy full, ' : ''}draws ${n}`)
       })
   }
-  // end-of-turn draws from Styles/pieces (Cryomancer Flash Freeze)
+  // end-of-turn draws from Styles/pieces (Cryomancer Flash Freeze, Grasp of the Undying)
   for (const side of SIDES) {
     if (state.players[side].hp <= 0) continue
     const want = hooksOf(state.players[side]).reduce((t, h) => t + (h.endDraw?.(state, side) ?? 0), 0)
-    if (want > 0) log(state, `${side} ❄ Flash Freeze: draws ${drawCards(state, side, want)}`)
+    if (want > 0) log(state, `${side} ${state.players[side].style === 'MG:2' ? '❄ Flash Freeze' : '💀 Undying'}: draws ${drawCards(state, side, want)}`)
   }
   // Regen (Tank Blood Price): heal n% of missing HP at the end of every turn it's on; a card heal (Titan Bloom gets less)
   for (const side of SIDES) {
@@ -545,6 +545,7 @@ function resolveStrikes(
       skills: chains[side]!.filter((c) => c.def.type === 'S').length,
       paidSkills: chains[side]!.filter((c) => c.def.type === 'S' && !state.players[side].unpaid?.includes(c.uid)).length,
       criticalHits: crit[side].size,
+      blocked: chains[side]!.reduce((n, c) => n + (hitResults.get(c.uid)?.blocked ? 1 : 0), 0),
       criticalBlocked: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && hitResults.get(c.uid)?.blocked ? 1 : 0), 0),
       criticalClean: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && hitResults.get(c.uid)?.clean ? 1 : 0), 0),
       criticalParried: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && outcome.get(c.uid)?.parried ? 1 : 0), 0),

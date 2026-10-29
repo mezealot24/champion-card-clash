@@ -104,6 +104,7 @@ export type ChainReport = {
   paidSkills: number // Skill cards in the chain whose cost was paid, hit clean or Blocked (⟡ Infuse)
   skills: number // Skill cards in the chain
   criticalHits: number // Critical cards in this chain
+  blocked: number // chain cards stopped by Block
   criticalBlocked: number // Critical cards stopped by Block
   criticalClean: number // Critical cards that dealt HP damage
   criticalParried: number // Critical cards deflected by Parry
@@ -197,7 +198,7 @@ const pctHp = (p: PlayerState) => (p.hp * 100) / p.maxHp
 /** state.heal without the state.ts import: Ignite cuts it, capped at Max HP, nothing for a side at 0 HP. Returns HP gained. */
 export const styleHeal = (state: GameState, side: Side, n: number) => {
   const p = state.players[side]
-  if (p.hp <= 0) return 0
+  if (p.hp <= 0 || noHealing(state, side)) return 0
   const before = p.hp
   const got = healAfterIgnite(p, n, tuningOf(state, other(side)))
   overhealShield(p, got)
@@ -348,13 +349,16 @@ export const STYLES: Record<string, StyleDef> = {
   },
 }
 
-/** Titan Bloom: grow Max HP by n (up to the cap); meat = current HP grows too. Returns what it grew. */
+/** Grasp of the Undying (Titan Bloom D3): no healing of any kind while Undying (perkData.undyingUntil). */
+export const noHealing = (state: GameState, side: Side) => (state.players[side].perkData?.undyingUntil ?? 0) >= state.turn
+
+/** Titan Bloom: grow Max HP by n (up to the cap); meat = current HP grows too (not while Undying). Returns what it grew. */
 export function bloom(state: GameState, side: Side, n: number, meat: boolean): number {
   const p = state.players[side]
   const gain = Math.min(tuningOf(state, side)['TK:2'].maxHpCap - p.maxHp, n)
   if (gain <= 0) return 0
   p.maxHp += gain
-  if (meat && p.hp > 0) {
+  if (meat && p.hp > 0 && !noHealing(state, side)) {
     p.hp += gain
     ;(state.events ??= []).push({ k: 'hp', side, delta: gain })
   }

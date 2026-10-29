@@ -968,7 +968,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
       ? [{ label: '🛡️ Colossus', tone: 'buff' as const, tip: t('Colossus: every card +{n} dmg, Field max {field}. A {cards}-card Strike is a Colossus Slam: every card +{throw} dmg, lose {cost} grown Max HP.', { n: tuningOf(game, side)['TK:2'].treeDmg, field: tuningOf(game, side)['TK:2'].treeField, cards: tuningOf(game, side)['TK:2'].throwCards, throw: tuningOf(game, side)['TK:2'].throwDmg, cost: tuningOf(game, side)['TK:2'].throwCost }) }]
       : []),
     ...((p.perkData?.undyingUntil ?? 0) >= game.turn
-      ? [{ label: '💀 Undying', tone: 'buff' as const, tip: t("Your HP can't drop below 1 until turn {turn}, and every chain card deals bonus dmg. When it ends you heal the bonus dmg that landed.", { turn: p.perkData!.undyingUntil! }) }]
+      ? [{ label: '💀 Undying', tone: 'buff' as const, tip: t("Undying until turn {turn}: your HP can't drop below 1 and nothing can heal you. Every chain card deals +{n} dmg (half when Blocked).", { turn: p.perkData!.undyingUntil!, n: Math.floor((p.maxHp * ((tuningOf(game, side)['TK:2'] as Record<string, number>).ascUndyingPct ?? 0)) / 100) }) }]
       : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
     ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: t('If this side Strikes now with no S card, every chain card gets +{n} dmg and all Energy is spent.', { n: overdriveAdd(game, side) }) }] : []),

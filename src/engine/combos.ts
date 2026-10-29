@@ -62,7 +62,8 @@ export const COMBOS: Record<string, ComboDef[]> = {
         const p = state.players[side]
         const pct = tuningOf(state, side).TK.comboHealPct
         const n = Math.floor((p.hp * pct) / 100)
-        if (p.hp <= 0 || n <= 0) return // a side at 0 HP stays down
+        // a side at 0 HP stays down; no heals while Undying (Grasp of the Undying, styles.noHealing)
+        if (p.hp <= 0 || n <= 0 || (p.perkData?.undyingUntil ?? 0) >= state.turn) return
         const before = p.hp
         p.hp = Math.min(p.maxHp, p.hp + n)
         if (p.hp !== before) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - before })

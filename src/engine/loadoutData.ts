@@ -155,7 +155,7 @@ export const TREES: Record<string, TreeData> = {
     branches: ['Bloom', 'Butcher', 'Timber', 'Time of Need'],
     depth: 3,
     bonusPoints: 1,
-    rev: 3,
+    rev: 4,
     nodes: [
       node('A1', 'Taproot', 'Facing pairs give +{ascTaproot} more Vigor each.', 'ascTaproot', 'Vigor per facing +', 1),
       node('A2', 'Seedling', 'Start the match with {ascSeedling} Max HP already grown.', 'ascSeedling', 'Max HP grown at start', 20),
@@ -182,12 +182,22 @@ export const TREES: Record<string, TreeData> = {
         ['ascTreeGrabDmg', 'Colossus Slam dmg per card', 10],
         ['ascTreeGrabField', 'Cost: Field max cards', 4, 1, 5],
       ]),
-      node('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} more Max HP per debuff stack (end of turn).', 'ascLivingBark', 'per debuff stack +', 3),
-      node('D2', 'Rooted', 'While you have 3+ debuff stacks, hits that reach you deal {ascRooted} less dmg.', 'ascRooted', 'dmg cut per hit', 2),
-      capstone('D3', 'Time of Need', 'Every {ascTimeOfNeed} turns, at the end of the turn, remove every debuff on you and heal {ascTimeOfNeedPct}% of your missing HP.', 'Titan Bloom cap −{ascTimeOfNeedCost}.', [
+      // Time of Need branch (Q 2026-10-29): Living Bark + Rooted are one node, Time of Need moves up to T2 (no Cost),
+      // the new keystone is Grasp of the Undying
+      multi('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} more Max HP per debuff stack (end of turn). While you have 3+ debuff stacks, hits that reach you deal {ascRooted} less dmg.', [
+        ['ascLivingBark', 'per debuff stack +', 3],
+        ['ascRooted', 'dmg cut per hit at 3+ debuff stacks', 2],
+      ]),
+      multi('D2', 'Time of Need', 'Every {ascTimeOfNeed} turns, at the end of the turn, remove every debuff on you and heal {ascTimeOfNeedPct}% of your missing HP.', [
         ['ascTimeOfNeed', 'every N turns', 5, 1],
         ['ascTimeOfNeedPct', 'heal % of missing HP', 3, 0, 100],
-        ['ascTimeOfNeedCost', 'Cost: cap −', 100],
+      ]),
+      capstone('D3', 'Grasp of the Undying', 'Once per match, when your HP would drop below 1: you are Undying for {ascUndyingTurns} turns and draw {ascUndyingDraw}. While Undying you can\'t die and can\'t be healed by anything, and every chain card deals +{ascUndyingPct}% of your Max HP dmg ({ascUndyingBlockedPct}% of that when Blocked).', 'Titan Bloom cap −{ascUndyingCost}.', [
+        ['ascUndyingTurns', 'Undying turns', 3, 1],
+        ['ascUndyingDraw', 'cards drawn', 2, 0, 5],
+        ['ascUndyingPct', 'dmg per card, % of your Max HP', 10, 0, 100],
+        ['ascUndyingBlockedPct', 'share of that dmg when Blocked %', 50, 0, 100],
+        ['ascUndyingCost', 'Cost: Titan Bloom cap −', 100],
       ]),
     ],
   },

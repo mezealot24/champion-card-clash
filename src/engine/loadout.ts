@@ -5,7 +5,7 @@
 import { MINORS, OATHS, TREES } from './loadoutData'
 import { addRes, resourceOf } from './resources'
 import { inClass } from './classes'
-import { addIgnite, bloom, chillStacks, counterSpin, debuffStacks, endurance, gainEndurance, hooksOf, igniteStacks, isDebuff, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
+import { addIgnite, bloom, chillStacks, counterSpin, debuffStacks, endurance, gainEndurance, hooksOf, igniteStacks, isDebuff, noHealing, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
 import { fieldsOf, tuningOf, type Tuning, type TuningGroup } from './tuning'
 import type { GameState, PlayerState, Side } from './types'
 import { CUT_CAP, cutGuarded, guardAfterCut, other } from './types'
@@ -51,6 +51,8 @@ function hurt(state: GameState, side: Side, n: number) {
   p.otherDmg.foe++
 }
 /** Once per match: the first call returns true. */
+/** Grasp of the Undying is on this turn (Titan Bloom D3) */
+const undyingOn = noHealing
 const once = (p: PlayerState, key: string) => {
   if (p.perkData?.[key]) return false
   p.perkData = { ...p.perkData, [key]: 1 }
@@ -480,10 +482,11 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
   // Titan Bloom · Time of Need
-  'TK:2:D1': (_, k) => ({ tune: (t, v) => add(t, 'TK:2', 'perDebuff', v(k)) }),
-  'TK:2:D2': (amt) => ({ hooks: { hitCut: (state, side) => (debuffStacks(state.players[side]) >= 3 ? amt(state, side) : 0) } }),
-  'TK:2:D3': (amt) => ({
-    tune: (t, v) => add(t, 'TK:2', 'maxHpCap', -v('ascTimeOfNeedCost')),
+  'TK:2:D1': (_, k) => ({
+    tune: (t, v) => add(t, 'TK:2', 'perDebuff', v(k)),
+    hooks: { hitCut: (state, side) => (debuffStacks(state.players[side]) >= 3 ? num(state, side, 'TK:2', 'ascRooted') : 0) },
+  }),
+  'TK:2:D2': (amt) => ({
     hooks: {
       endTurn: (state, side) => {
         const p = state.players[side]
@@ -492,6 +495,42 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
         p.statuses = p.statuses.filter((s) => !isDebuff(s))
         const got = styleHeal(state, side, Math.floor(((p.maxHp - p.hp) * num(state, side, 'TK:2', 'ascTimeOfNeedPct')) / 100))
         say(state, side, `Time of Need: ${n} debuff stack${n === 1 ? '' : 's'} removed, heals ${got}`)
+      },
+    },
+  }),
+  // Grasp of the Undying (Q 2026-10-29): perkData.undyingUntil = last Undying turn; heal() / styleHeal / Vigor skip healing then
+  'TK:2:D3': (amt) => ({
+    tune: (t, v) => add(t, 'TK:2', 'maxHpCap', -v('ascUndyingCost')),
+    hooks: {
+      onHpLoss: (state, side) => {
+        const p = state.players[side]
+        if (p.hp > 0) return
+        if (undyingOn(state, side)) return void (p.hp = 1)
+        if (!once(p, 'undying')) return
+        p.hp = 1
+        p.perkData = { ...p.perkData, undyingUntil: state.turn + amt(state, side), undyingFrom: state.turn }
+        say(state, side, `💀 Grasp of the Undying: can't die until turn ${state.turn + amt(state, side)}`)
+      },
+      // the draw lands with this turn's end draws (Flash Freeze timing)
+      endDraw: (state, side) => (state.players[side].perkData?.undyingFrom === state.turn ? num(state, side, 'TK:2', 'ascUndyingDraw') : 0),
+      beforeHits: (state, side, bonus) => {
+        if (!undyingOn(state, side) || !bonus.length) return
+        const p = state.players[side]
+        const n = Math.floor((p.maxHp * num(state, side, 'TK:2', 'ascUndyingPct')) / 100)
+        if (n <= 0) return
+        for (let i = 0; i < bonus.length; i++) bonus[i] += n
+        p.perkData = { ...p.perkData, undyingHit: n, undyingHitTurn: state.turn }
+        say(state, side, `💀 Undying: every chain card +${n} dmg`)
+      },
+      // Blocked cards still deal their share of the Undying dmg
+      afterChain: (state, side, r) => {
+        const p = state.players[side]
+        if (p.perkData?.undyingHitTurn !== state.turn || !r.blocked) return 0
+        const n = Math.floor((r.blocked * (p.perkData.undyingHit ?? 0) * num(state, side, 'TK:2', 'ascUndyingBlockedPct')) / 100)
+        if (n <= 0 || state.players[other(side)].hp <= 0) return 0
+        hurt(state, other(side), n)
+        say(state, side, `💀 Undying: ${r.blocked} Blocked card${r.blocked === 1 ? '' : 's'} still deal ${n}`)
+        return 0
       },
     },
   }),
