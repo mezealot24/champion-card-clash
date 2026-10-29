@@ -1,6 +1,7 @@
 // Champion Styles (passives). Code registry keyed by "CHAMP:slot" (champion_styles.slot).
 // Kept free of state.ts imports so createGame can call setup without an import cycle.
 import { freeze } from './combos'
+import { resIn, styleOn, wrapInClass } from './classes'
 export { freeze }
 import { tuningOf, type Tuning } from './tuning'
 import type { Action, CardInst, GameState, PlayerState, Side } from './types'
@@ -61,7 +62,7 @@ export const healAfterIgnite = (p: PlayerState, n: number, t: Tuning) =>
 
 /** Card heals on this side: Titan Bloom gets only TK:2 cardHealPct % of them (Tank v3, Q 2026-10-27). */
 export const cardHeal = (state: GameState, side: Side, n: number) =>
-  state.players[side].style === 'TK:2' ? Math.floor((n * tuningOf(state, side)['TK:2'].cardHealPct) / 100) : n
+  styleOn(state.players[side], 'TK:2') ? Math.floor((n * tuningOf(state, side)['TK:2'].cardHealPct) / 100) : n
 
 /** Lifeline Resolve (C2): healing past Max HP becomes Shield, up to perkData.overShield in all. n = the heal after cuts. */
 export function overhealShield(p: PlayerState, n: number) {
@@ -176,6 +177,14 @@ export const PERK_HOOKS: Record<string, StyleDef> = {}
 
 /** Everything that hooks into a side's turn: its Style, then its loadout pieces in order. */
 export function hooksOf(p: PlayerState): StyleDef[] {
+  // the boss: every class's Style and capstone, each run as its class
+  if (p.boss) {
+    const b = p.boss
+    return [
+      ...b.classes.flatMap((c) => (STYLES[b.styles[c]] ? [wrapInClass(p, c, STYLES[b.styles[c]])] : [])),
+      ...(p.perks ?? []).flatMap((k) => (PERK_HOOKS[k] ? [wrapInClass(p, k.split(':')[1], PERK_HOOKS[k])] : [])),
+    ]
+  }
   const out: StyleDef[] = []
   const style = p.style ? STYLES[p.style] : undefined
   if (style) out.push(style)
@@ -375,7 +384,7 @@ export function styleHurt(state: GameState, side: Side, n: number) {
 /** Lifeline: gain Endurance (once a turn per source). Reaching the cap on a turn this side didn't Strike: counter-spin. */
 export function gainEndurance(state: GameState, side: Side, why: string, src: string, by = 1) {
   const p = state.players[side]
-  if (p.style !== 'TK:1' || p.hp <= 0) return
+  if (!styleOn(p, 'TK:1') || p.hp <= 0) return
   const at = `endAt_${src}`
   if (p.perkData?.[at] === state.turn) return
   const max = tuningOf(state, side)['TK:1'].endMax
@@ -707,10 +716,10 @@ Object.assign(STYLES, {
  */
 export function overdriveAdd(state: GameState, side: Side, chain: CardInst[] = state.players[side].hand): number {
   const p = state.players[side]
-  if (p.style !== 'AS:1' || !state.rules.resources || (p.res ?? 0) <= 0) return 0
+  if (!styleOn(p, 'AS:1') || !state.rules.resources || resIn(p, 'AS') <= 0) return 0
   const f = tuningOf(state, side)['AS:1']
   if (chain.length < f.minChain || chain.some((c) => c.def.type === 'S')) return 0
-  return (p.res ?? 0) * f.dmgPerEnergy
+  return resIn(p, 'AS') * f.dmgPerEnergy
 }
 
 export const getStyle = (key?: string | null) => (key ? STYLES[key] : undefined)

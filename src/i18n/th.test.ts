@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { t, withLang } from '.'
 import { CHAMP_INFO, STYLE_SUMMARY } from '../pages/select/info'
 import { TUTORIAL } from '../pages/tutorial/script'
-import { TIERS } from '../pages/arcade/arcade'
+import { BOSS, BOSS_TIER, TIERS } from '../pages/arcade/arcade'
 import { TH } from './th'
 import { PRESETS } from '../pages/deck/presets'
 
@@ -44,6 +44,7 @@ const dataKeys = [
   ...['SECOND HELPING', 'Heal 10% of your HP', 'DEATH MARK', 'Every later Strike bursts +50%', 'SEALED', "Enemy can't Block next turn", 'GUARD CRUSH', 'Next Strike breaks through Block'],
   ...['Tank pays for S cards with HP.'],
   ...TIERS.map((x) => x.name),
+  BOSS_TIER.name, BOSS.name,
   // stat names (StatBars table) and preset pitches
   ...['HP', 'Defend', 'ATK', 'Technique', 'Speed'],
   ...Object.values(PRESETS).flatMap((ps) => ps.map((p) => p.pitch)),

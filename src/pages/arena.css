@@ -232,3 +232,10 @@
 .arena .banner.fades { animation: banner-out 4s forwards; }
 @keyframes banner-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 .arena .slot.closed { border-style: solid; border-color: rgba(255,122,107,.45); color: rgba(255,122,107,.7); background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(255,122,107,.12) 6px 12px); }
+
+/* Arcade boss (Chimera, arcade.ts BOSS): the black shadow of one Champion, a violet rim and a dark aura under it */
+.arena .fighter.boss .sprite, .arena .fighter.boss svg { filter: brightness(0) drop-shadow(0 0 2px #d46bff) drop-shadow(0 0 10px rgba(150,50,255,.8)); }
+.arena .fighter.boss::after { content: ''; position: absolute; inset: -14px -18px -6px; border-radius: 50%; background: radial-gradient(circle at 50% 80%, rgba(170,70,255,.55), rgba(60,10,110,.35) 45%, transparent 70%); animation: boss-aura 1.4s ease-in-out infinite; pointer-events: none; }
+@keyframes boss-aura { 50% { opacity: .55; transform: scale(1.08); } }
+.arena .res.boss-res { display: flex; gap: 6px; font-size: 11px; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .arena .fighter.boss::after { animation: none; } }

@@ -6,7 +6,7 @@ import { firstOpenStep, type SavedLoadout } from '../loadout/loadout'
 import { AscTree, OathPicker } from '../loadout/LoadoutParts'
 import { Portrait } from '../select/Portrait'
 import '../select/select.css'
-import { ARCADE_STAGES, tierOf, type ArcadeRun } from './arcade'
+import { isBoss, tierOf, type ArcadeRun } from './arcade'
 
 export function ArcadeContinue(props: {
   run: ArcadeRun
@@ -34,9 +34,9 @@ export function ArcadeContinue(props: {
           <small>
             {t('Continue?')} · {props.champName} · {props.styleName}
           </small>
-          <h1>{t('Stage {n}/{total} · {tier}', { n: run.at + 1, total: ARCADE_STAGES, tier: t(tierOf(run.at).name) })}</h1>
+          <h1>{t('Stage {n}/{total} · {tier}', { n: run.at + 1, total: run.stages.length, tier: t(tierOf(run.at, run).name) })}</h1>
         </div>
-        {foe && <Portrait champ={foe.champ} style={foe.style} bust className="foe-art" />}
+        {foe && !isBoss(foe) && <Portrait champ={foe.champ} style={foe.style} bust className="foe-art" />}
       </header>
       <p className="lo-note">
         {t('Rework your Ascendancy and Oath, then retry against {foe}.', { foe: props.foeName })}

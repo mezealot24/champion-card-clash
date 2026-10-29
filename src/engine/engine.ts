@@ -1,4 +1,5 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
+import { classesOf, inClass } from './classes'
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { cardHeal, chillCut, getStyle, hooksOf, igniteBurn, igniteStacks } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
@@ -74,14 +75,18 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
   const surge: Record<Side, number> = { p1: 0, p2: 0 }
   for (const side of SIDES) {
     const p = state.players[side]
-    const def = resourceOf(p.championId, tuningOf(state, side))
-    if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) continue
-    const mode = actions[side] === 'block' ? 'A' : actions[side] === 'charge' ? 'B' : 'C'
-    if (!SURGE_MODES.includes(mode)) continue
-    surge[side] = p.res ?? 0
-    p.res = 0
-    const what = mode === 'A' ? 'Wraith Step (hits through Block deal only 1)' : mode === 'B' ? 'Shroud (no charge break, half dmg)' : 'Elusive (enemy Block stops 1 less)'
-    log(state, `${side} Energy Surge: spends all ${surge[side]} Energy → ${what}`)
+    // the Arcade boss has an Assassin bar too
+    if (!classesOf(p).includes(SURGE_CHAMPION)) continue
+    inClass(p, SURGE_CHAMPION, () => {
+      const def = resourceOf(p.championId, tuningOf(state, side))
+      if (!state.rules.resources || p.championId !== SURGE_CHAMPION || !def || (p.res ?? 0) < def.cap) return
+      const mode = actions[side] === 'block' ? 'A' : actions[side] === 'charge' ? 'B' : 'C'
+      if (!SURGE_MODES.includes(mode)) return
+      surge[side] = p.res ?? 0
+      p.res = 0
+      const what = mode === 'A' ? 'Wraith Step (hits through Block deal only 1)' : mode === 'B' ? 'Shroud (no charge break, half dmg)' : 'Elusive (enemy Block stops 1 less)'
+      log(state, `${side} Energy Surge: spends all ${surge[side]} Energy → ${what}`)
+    })
   }
   const surgeOn = (side: Side, a: Action) => surge[side] > 0 && actions[side] === a
   const env = { handAtStart, hitsBlocked, hitsParried, hitDmgTaken, blockNow, hitsTaken, shieldHits, vulnPct, chillPct, wraith: { p1: surgeOn('p1', 'block'), p2: surgeOn('p2', 'block') }, shroud: { p1: surgeOn('p1', 'charge'), p2: surgeOn('p2', 'charge') }, elusive: { p1: surgeOn('p1', 'strike'), p2: surgeOn('p2', 'strike') }, cleanPK: { p1: 0, p2: 0 }, hitsIn }
@@ -192,14 +197,18 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       continue
     }
     if (enemy !== 'strike') continue
-    const ds = getStyle(state.players[side].style)?.dualStrike
-    if (!ds) continue
-    const fill = ds.fillRes
-    const cap = resourceOf(state.players[side].championId, tuningOf(state, side))?.cap ?? 0
-    if (fill && state.rules.resources) addRes(state, side, cap)
-    const draw = ds.draw?.(tuningOf(state, side)) ?? 0
-    const n = draw ? drawCards(state, side, draw) : 0
-    log(state, `${side} Acceleration (Dual Strike): ${fill ? 'Energy full, ' : ''}draws ${n}`)
+    const p = state.players[side]
+    for (const cls of classesOf(p))
+      inClass(p, cls, () => {
+        const ds = getStyle(p.style)?.dualStrike
+        if (!ds) return
+        const fill = ds.fillRes
+        const cap = resourceOf(p.championId, tuningOf(state, side))?.cap ?? 0
+        if (fill && state.rules.resources) addRes(state, side, cap)
+        const draw = ds.draw?.(tuningOf(state, side)) ?? 0
+        const n = draw ? drawCards(state, side, draw) : 0
+        log(state, `${side} Acceleration (Dual Strike): ${fill ? 'Energy full, ' : ''}draws ${n}`)
+      })
   }
   // end-of-turn draws from Styles/pieces (Cryomancer Flash Freeze)
   for (const side of SIDES) {

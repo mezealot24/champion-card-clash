@@ -4,6 +4,7 @@
 // into the turn like a Style (StyleDef hooks, registered in PERK_HOOKS). Pieces never touch the other player's numbers.
 import { MINORS, OATHS, TREES } from './loadoutData'
 import { addRes, resourceOf } from './resources'
+import { inClass } from './classes'
 import { addIgnite, bloom, chillStacks, counterSpin, debuffStacks, endurance, gainEndurance, hooksOf, igniteStacks, isDebuff, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
 import { fieldsOf, tuningOf, type Tuning, type TuningGroup } from './tuning'
 import type { GameState, PlayerState, Side } from './types'
@@ -1422,17 +1423,39 @@ export function perkKeys(champ: string, style: string | undefined, l: Loadout | 
 export function applyLoadout(p: PlayerState, l: Loadout | undefined, gameTuning: Tuning) {
   const keys = perkKeys(p.championId, p.style, l)
   if (!keys.length) return
+  applyPerks(p, keys, gameTuning)
+  const res = resourceOf(p.championId, p.tuning)
+  if (res && !res.payWithHp) p.res = Math.min(res.cap, res.start)
+}
+
+/** Class of a piece key ("asc:TK:1:A3" → TK, "oath:BR:o1" → BR). */
+const pieceClass = (k: string) => k.split(':')[1]
+
+function applyPerks(p: PlayerState, keys: string[], gameTuning: Tuning) {
   p.perks = keys
   const t = structuredClone(gameTuning)
   const at = (tun: Tuning, group: string) => (key: string) => (tun as Record<string, Record<string, number>>)[group]?.[key] ?? 0
   // numbers first (read from the game's numbers so pieces don't feed each other), then the start
-  for (const k of keys) PIECES[k].tune?.(t, at(gameTuning, PIECES[k].group), p.championId)
-  for (const k of keys) PIECES[k].lastTune?.(t, at(gameTuning, PIECES[k].group), p.championId)
+  for (const k of keys) PIECES[k].tune?.(t, at(gameTuning, PIECES[k].group), p.boss ? pieceClass(k) : p.championId)
+  for (const k of keys) PIECES[k].lastTune?.(t, at(gameTuning, PIECES[k].group), p.boss ? pieceClass(k) : p.championId)
   p.tuning = t
-  for (const k of keys) PIECES[k].setup?.(p, at(t, PIECES[k].group))
-  const res = resourceOf(p.championId, t)
-  if (res && !res.payWithHp) p.res = Math.min(res.cap, res.start)
+  for (const k of keys) inClass(p, pieceClass(k), () => PIECES[k].setup?.(p, at(t, PIECES[k].group)))
 }
+
+/** createGame: the Arcade boss's capstones (one per class, engine/boss.ts), then every class's bar at its start. */
+export function applyBoss(p: PlayerState, perks: string[], gameTuning: Tuning) {
+  const keys = perks.filter((k) => PIECES[k])
+  if (keys.length) applyPerks(p, keys, gameTuning)
+  const t = p.tuning ?? gameTuning
+  for (const cls of p.boss?.classes ?? []) {
+    const res = resourceOf(cls, t)
+    p.boss!.res[cls] = res && !res.payWithHp ? Math.min(res.cap, res.start) : 0
+  }
+  p.res = p.boss?.res[p.championId] ?? p.res
+}
+
+/** Capstone ids of a Style's tree (the nodes with a Cost). */
+export const capstonesOf = (style: string) => (TREES[style]?.nodes ?? []).filter((n) => n.cost).map((n) => n.id)
 
 /** A random full loadout for the AI: any Oath (no Minor: Sigil II is off, Q 2026-10-25), and all points spent down random branches of its Style's tree. */
 export function randomLoadout(champ: string, style: string | undefined, points: number, rand: () => number = Math.random): Loadout {

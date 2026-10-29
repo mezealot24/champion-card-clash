@@ -4,7 +4,8 @@ import type { CardDef, CardInst, GameState, PlayerState, RulesConfig, Side, Turn
 import { DEFAULT_RULES } from './types'
 import { getEffect } from './effects/registry'
 import { healAfterIgnite, hooksOf, overhealShield } from './styles'
-import { applyLoadout, type Loadout } from './loadout'
+import { applyBoss, applyLoadout, type Loadout } from './loadout'
+import { classOf, wrapInClass } from './classes'
 import { resourceOf } from './resources'
 import { resolveTuning, tuningOf, type Tuning, type TuningOverrides } from './tuning'
 
@@ -16,7 +17,7 @@ export function nextRandom(state: GameState): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296
 }
 
-function shuffle<T>(state: GameState, items: T[]): T[] {
+export function shuffle<T>(state: GameState, items: T[]): T[] {
   const a = [...items]
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(nextRandom(state) * (i + 1))
@@ -32,6 +33,8 @@ export type ChampionSetup = {
   deck: CardDef[] // already expanded by copies (see buildDeck)
   style?: string // "CHAMP:slot", see engine/styles.ts
   loadout?: Loadout // Sigils + Ascendancy nodes, see engine/loadout.ts
+  /** Arcade boss (engine/boss.ts bossSetup): every class at once; championId = the class it looks like */
+  boss?: { name: string; classes: string[]; styles: Record<string, string>; perks: string[] }
 }
 
 export function createGame(
@@ -53,7 +56,9 @@ export function createGame(
   }
   for (const side of ['p1', 'p2'] as const) {
     const p = state.players[side]
-    applyLoadout(p, (side === 'p1' ? p1 : p2).loadout, tuning)
+    const seat = side === 'p1' ? p1 : p2
+    applyLoadout(p, seat.loadout, tuning)
+    if (seat.boss) applyBoss(p, seat.boss.perks, tuning)
     const t = tuningOf(state, side)
     for (const h of hooksOf(p)) h.setup?.(p, t)
     p.deck = shuffle(state, p.deck) // shuffle once; afterwards order is learnable
@@ -78,10 +83,12 @@ function emptyPlayer(setup: ChampionSetup, side: Side, t: Tuning): PlayerState {
     hp: setup.hpStart,
     maxHp: setup.hpMax,
     hand: [],
-    deck: setup.deck.filter((def) => inStyleDeck(def, setup.style)).map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
+    // the boss's deck is already matched to each class's Style (engine/boss.ts)
+    deck: setup.deck.filter((def) => setup.boss || inStyleDeck(def, setup.style)).map((def, i) => ({ uid: `${side}-${def.id}-${i}`, def })),
     statuses: [],
     style: setup.style,
     res: resourceOf(setup.championId, t)?.start ?? 0,
+    ...(setup.boss ? { boss: { name: setup.boss.name, classes: setup.boss.classes, styles: setup.boss.styles, res: {} } } : {}),
   }
 }
 
@@ -89,7 +96,9 @@ function emptyPlayer(setup: ChampionSetup, side: Side, t: Tuning): PlayerState {
 /** A chain card whose resource cost couldn't be paid this turn keeps only its drawbacks (Q 2026-10-15). */
 export function effectOf(state: GameState, side: Side, card: CardInst) {
   const p = state.players[side]
-  return p.silenced || (p.skillSilenced && card.def.type === 'S') ? undefined : getEffect(card.def, !!p.unpaid?.includes(card.uid))
+  const fx = p.silenced || (p.skillSilenced && card.def.type === 'S') ? undefined : getEffect(card.def, !!p.unpaid?.includes(card.uid))
+  // the boss plays each card as its class (a Mage card spends Mana, reads Pyromancer...)
+  return fx && p.boss ? wrapInClass(p, classOf(p, card), fx) : fx
 }
 
 /**

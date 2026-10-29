@@ -1,7 +1,9 @@
 // Arcade (Q 2026-10-28): fight a ladder of stages like a fighting game. Opponents are random (Champion + Style),
 // no pair twice in a run, and the AI gets tougher every stage. The run is kept on this device so a closed tab resumes.
 // Ties to the AI Ladder idea in design/customization-options-2026-10-18.md (5 tiers).
+import { capstonesOf, type BossClass } from '../../engine'
 
+/** Random stages before the boss. A run is ARCADE_STAGES + 1 fights (the boss is the last). */
 export const ARCADE_STAGES = 5
 
 /** AI strength per stage: depth = turns looked ahead, noise = share of random picks (AI v2 default is depth 2, 0.08). */
@@ -13,8 +15,17 @@ export const TIERS = [
   { name: 'Legend', depth: 2, noise: 0.02 },
 ] as const
 
-export type Tier = (typeof TIERS)[number]
+export type Tier = { name: string; depth: number; noise: number }
 export type Foe = { champ: string; style: string }
+
+/**
+ * Final boss (Q 2026-10-29, "like Seth in Street Fighter 4"): Chimera, the black shadow of one Champion that plays every
+ * class at once: a random Style per class (all on), one capstone of each, perClass cards of each and every resource bar
+ * (engine/boss.ts). hp 111 (Q nerf 2026-10-29, was 240); perClass is a starting number for playtest.
+ */
+export const BOSS = { id: 'BOSS', name: 'Chimera', hp: 111, perClass: 10 } as const
+export const BOSS_TIER: Tier = { name: 'Boss', depth: 2, noise: 0.02 }
+export const isBoss = (f?: Foe) => f?.champ === BOSS.id
 
 export type ArcadeRun = {
   /** the player's Champion and Style for the whole run */
@@ -27,7 +38,7 @@ export type ArcadeRun = {
   continues: number
 }
 
-export const tierOf = (stage: number): Tier => TIERS[Math.min(stage, TIERS.length - 1)]
+export const tierOf = (stage: number, run?: ArcadeRun): Tier => (isBoss(run?.stages[stage]) ? BOSS_TIER : TIERS[Math.min(stage, TIERS.length - 1)])
 export const cleared = (run: ArcadeRun) => run.at >= run.stages.length
 
 /**
@@ -56,7 +67,19 @@ export function rollStages(pool: Foe[], n = ARCADE_STAGES, rand: () => number = 
 }
 
 export function newRun(champ: string, style: string, pool: Foe[], rand?: () => number): ArcadeRun {
-  return { champ, style, stages: rollStages(pool, ARCADE_STAGES, rand), at: 0, continues: 0 }
+  const stages = rollStages(pool, ARCADE_STAGES, rand)
+  return { champ, style, stages: stages.length ? [...stages, { champ: BOSS.id, style: '' }] : [], at: 0, continues: 0 }
+}
+
+/** The boss's kit for one fight: per Champion a random Style and one of its capstones; the first is the shadow it wears. */
+export function rollBossKit(pool: Foe[], rand: () => number = Math.random): BossClass[] {
+  const pick = <T,>(xs: T[]): T | undefined => xs[Math.floor(rand() * xs.length)]
+  const champs = [...new Set(pool.map((f) => f.champ))]
+  const shadow = Math.floor(rand() * champs.length)
+  return [...champs.slice(shadow), ...champs.slice(0, shadow)].map((champ) => {
+    const style = pick(pool.filter((f) => f.champ === champ))!.style
+    return { champ, style, capstone: pick(capstonesOf(style)) }
+  })
 }
 
 // ---- saved on this device ----
