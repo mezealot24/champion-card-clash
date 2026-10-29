@@ -118,6 +118,8 @@ export const TH: Record<string, string> = {
 
   // ---- Deck builder ----
   'Presets': 'บิลด์สำเร็จรูป',
+  'Draw fast, Strike with no Skill, and let Overdrive turn every Energy into dmg.': 'จั่วไว ตีโดยไม่มี Skill ใน chain แล้วให้ Overdrive แปลง Energy ทุกหน่วยเป็นดาเมจ',
+  'Count to the Critical, land it on a big Skill, and finish them under the line.': 'นับจังหวะ Critical ให้ลงบน Skill ใบใหญ่ แล้วปิดเกมเมื่อเลือดศัตรูต่ำกว่าเส้น',
   'Bleed yourself into Fury, then end it with huge hits and Lifesteal.': 'ยอมเสียเลือดเข้าโหมด Fury แล้วปิดเกมด้วยหมัดหนักและ Lifesteal',
   'Long chains build Momentum; Shields and Lifesteal let you trade blows.': 'ต่อ chain ยาวสะสม Momentum ใช้ Shield และ Lifesteal ยืนแลกหมัด',
   "Your Block this turn doesn't cost Momentum.": 'Block เทิร์นนี้ไม่เสีย Momentum',
