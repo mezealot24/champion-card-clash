@@ -73,6 +73,6 @@ describe('Tank heal conditions', () => {
 
   it('reads as card text', () => {
     expect(describeSpec([{ hook: 'onHit', if: [{ c: 'enteredAt', n: 1 }, { c: 'hitBy', n: 2, type: 'K' }], do: heal10 }]))
-      .toBe("On hit, if this card was drawn into slot 1 and you've been hit by 2+ Kicks this turn: Gain 10 HP")
+      .toBe("After action, if you play Strike and this card was drawn into slot 1 and you've been hit by 2+ Kicks this turn: Gain 10 HP")
   })
 })

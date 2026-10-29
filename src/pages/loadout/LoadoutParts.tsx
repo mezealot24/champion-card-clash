@@ -72,11 +72,11 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
                         {n.name}
                         <i>{cap ? t('Capstone') : `T${n.id[1]}`}</i>
                       </b>
-                      <span>{fill(n.text, style)}</span>
+                      <span>{fill(t(n.text), style)}</span>
                       {n.cost && (
                         <span className="lo-cost">
                           <i>{t('Cost')}</i>
-                          {fill(n.cost, style)}
+                          {fill(t(n.cost), style)}
                         </span>
                       )}
                     </button>
@@ -117,12 +117,12 @@ export function OathPicker({ champ, champName, saved, onChange, fill }: Props & 
               </b>
               <span className="lo-line up">
                 <i>{t('Boon')}</i>
-                {fill(o.text, champ)}
+                {fill(t(o.text), champ)}
               </span>
               {o.cost && (
                 <span className="lo-line down">
                   <i>{t('Cost')}</i>
-                  {fill(o.cost, champ)}
+                  {fill(t(o.cost), champ)}
                 </span>
               )}
             </button>

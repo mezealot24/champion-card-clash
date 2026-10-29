@@ -302,6 +302,8 @@ export const STYLES: Record<string, StyleDef> = {
       const grew = bloom(state, side, r.hitsTaken * f.perHitTaken + r.hitsBlocked * f.perHitBlocked, false)
       const meat = p.hp > 0 ? bloom(state, side, r.facing * f.perFacing, true) : 0
       if (grew + meat) say(state, side, `Titan Bloom: Max HP +${grew + meat}${meat ? ` (meat +${meat} HP)` : ''} → ${p.maxHp}`)
+      // growing past the tree line shrinks the Field now, before this turn's Charge draw fills it
+      treeField(state, side)
     },
     afterChain: (state, side, r) => {
       const p = state.players[side]
@@ -330,8 +332,11 @@ export const STYLES: Record<string, StyleDef> = {
       if (grown > f.treeAt && bonus.length >= f.throwCards) {
         n += f.throwDmg
         const lose = Math.min(grown, f.throwCost)
+        const hpWas = p.hp
         p.maxHp = Math.max(1, p.maxHp - lose)
         p.hp = Math.min(p.hp, p.maxHp)
+        // the HP bar plays events back: without one it showed the old HP until the turn ended
+        if (p.hp < hpWas) (state.events ??= []).push({ k: 'hp', side, delta: p.hp - hpWas })
         p.styleData = { ...p.styleData, grown: grown - lose }
         treeField(state, side)
         say(state, side, `🌳 Throws the tree: every card +${f.throwDmg} dmg, Max HP −${lose}`)

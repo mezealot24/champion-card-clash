@@ -703,9 +703,9 @@ export function Arena(props: {
               {game.rules.suddenDeathTurn > 0 && game.turn > game.rules.suddenDeathTurn - 5 && (
                 <div
                   className="sudden"
-                  title={`After turn ${game.rules.suddenDeathTurn}: both sides lose ${game.rules.suddenDeathDmg} HP more every turn, heals −${game.rules.suddenDeathHealCut}%`}
+                  title={t('After turn {turn}: both sides lose {n} HP more every turn, heals −{cut}%', { turn: game.rules.suddenDeathTurn, n: game.rules.suddenDeathDmg, cut: game.rules.suddenDeathHealCut })}
                 >
-                  {game.turn > game.rules.suddenDeathTurn ? '☠ Sudden death' : `☠ in ${game.rules.suddenDeathTurn + 1 - game.turn}`}
+                  {game.turn > game.rules.suddenDeathTurn ? t('☠ Sudden death') : t('☠ in {n}', { n: game.rules.suddenDeathTurn + 1 - game.turn })}
                 </div>
               )}
               <div className="tools">
@@ -890,8 +890,26 @@ function statusChip(s: Status, frozen: boolean): Chip {
     : s.kind === 'woundUp' ? ['🥊 Wound Up', 'buff', t('Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left as extra damage.')]
     : s.kind === 'holdMomentum' ? ['🛡 Momentum hold', 'buff', t("Your Block this turn doesn't cost Momentum.")]
     : s.kind === 'chill' ? [`❄ Chill ${n}`, 'debuff', pl(n, 'Chilled ({n} stack): your damage is cut for each stack.', 'Chilled ({n} stacks): your damage is cut for each stack.')]
+    // Q 2026-10-28: these two fell through to a red "▼ EMPOWER" / "▼ REGEN" chip with no number
+    : s.kind === 'empower' ? [`⚔ Empower +${n}`, 'buff', t('Your next Strike: every chain card +{n} dmg.', { n })]
+    : s.kind === 'regen' ? [`✚ Regen ${n}%`, 'buff', t('At the end of every turn you heal {n}% of your missing HP.', { n })]
     : [s.kind, 'debuff', s.kind]
   return { label, tone, tip: tip + turnsLeft(s) }
+}
+
+/** One chip per kind for statuses that pile up: Empower counts its biggest (engine.ts), Regen adds up. */
+function mergeStacking(list: Status[]): Status[] {
+  const out: Status[] = []
+  for (const s of list) {
+    const was = s.kind === 'empower' || s.kind === 'regen' ? out.find((x) => x.kind === s.kind) : undefined
+    if (!was) out.push({ ...s })
+    else if (s.kind === 'empower') was.n = Math.max(was.n ?? 0, s.n ?? 0)
+    else {
+      was.n = (was.n ?? 0) + (s.n ?? 0)
+      was.turns = Math.max(was.turns, s.turns)
+    }
+  }
+  return out
 }
 
 const RESOURCE_TIP: Record<string, string> = {
@@ -937,7 +955,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
   const conqMaxN = tuningOf(game, side)['BR:2'].conquerorMax
   const chips: Chip[] = [
     // frozen is only a marker for cards (the No Strike chip shows the freeze); Frozen Tomb's chip stands for its No Strike / No Charge
-    ...p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb'))).map((s) => statusChip(s, frozen)),
+    ...mergeStacking(p.statuses.filter((s) => s.kind !== 'frozen' && !(['noStrike', 'noCharge'].includes(s.kind) && p.statuses.some((x) => x.kind === 'frozenTomb')))).map((s) => statusChip(s, frozen)),
     ...(p.comboData?.conqueror
       ? [{ label: conqMax(game, side) ? '🔥 Momentum MAX' : `Momentum ${p.comboData.conqueror}/${conqMaxN}`, tone: 'buff' as const, tip: t('Juggernaut stacks: +1 dmg per stack on every chain card. At {max}: Lifesteal and Tenacity for a few turns. Blocking loses a stack.', { max: conqMaxN }) }]
       : []),
@@ -1007,12 +1025,14 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
   return <aside className={`hud ${side} ${side === 'p1' ? 'me' : 'enemy'}`}>{side === 'p2' ? [who, bar, meta] : [meta, bar, who]}</aside>
 }
 
+// older card text (no effect_json): its timings read as the 3 the card face uses (learnText.ts)
 const TIMING: [string, string][] = [
-  ['Before action', 'BEFORE'],
-  ['On hit', 'ON HIT'],
-  ['After action', 'AFTER'],
-  ['Every turn (Hold)', 'HOLD'],
-  ['Comes into play', 'ON DRAW'],
+  ['Before action', 'Before action'],
+  ['On hit', 'After action'],
+  ['After action', 'After action'],
+  ['Every turn (Hold)', 'After action'],
+  ['When appear', 'When appear'],
+  ['Comes into play', 'When appear'],
 ]
 const SHORT: [RegExp, string][] = [
   [/you play (Strike|Block|Charge)/g, 'you $1'],
@@ -1052,7 +1072,7 @@ function cardFacts(game: GameState, side: Side, card: CardInst) {
   const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (allRes(p)[cls] ?? 0) ? res.unpaidDmgPct : undefined
   const grow = (card.grow ?? 0) + (card.growNext ?? 0)
   const base = short != null ? Math.floor((dmg * short) / 100) : dmg
-  const text = effectSpec?.length ? describeSpec(effectSpec) : effectText
+  const text = effectSpec?.length ? describeSpec(effectSpec, t, res?.name) : effectText
   const missing = isEffectMissing(id, effectText, effectSpec)
   const costName = res?.payWithHp ? 'HP' : (res?.name ?? '')
   // why this card's effect won't fire if it's played now (same rules as effectOf in engine/state.ts)
@@ -1095,7 +1115,7 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
             const r = cardRule(rule)
             return (
               <span className="rule" key={i}>
-                {r.timing && <span className="tim">{r.timing}</span>}
+                {r.timing && <span className="tim">{t(r.timing)}</span>}
                 {r.cond && <span className="when"> {r.cond}</span>}
                 <span className="do">{r.act}</span>
               </span>

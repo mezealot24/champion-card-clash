@@ -5,26 +5,41 @@ import { comboInfo, comboSteps, compactRules, shortAct, shortCond } from '../lea
 import { STYLE_SUMMARY } from '../select/info'
 
 describe('compact card text', () => {
-  it('splits a rule into when · gain · cost', () => {
+  it('splits a rule into timing, one line per condition, gain and cost', () => {
     // BR-014: Before, you Strike + HP < 30% → +20 dmg; After, you Strike → Max HP −20
     const spec: EffectSpec = [
       { hook: 'modify', if: [{ c: 'selfAction', a: 'strike' }, { c: 'hp', who: 'self', op: '<', n: 30, pct: true }], do: [{ a: 'addDmg', target: 'this', n: 20 }] },
       { hook: 'onResolve', if: [{ c: 'selfAction', a: 'strike' }], do: [{ a: 'maxHp', who: 'self', n: -20 }] },
     ]
     expect(compactRules(spec)).toEqual([
-      { tag: 'BEFORE STRIKE', when: 'HP < 30%', gain: ['+20 dmg'], cost: [] },
-      { tag: 'AFTER STRIKE', when: '', gain: [], cost: ['Max HP −20'] },
+      { tag: 'Before action', when: ['You play Strike', 'HP < 30%'], gain: ['+20 dmg'], cost: [] },
+      { tag: 'After action', when: ['You play Strike'], gain: [], cost: ['Max HP −20'] },
     ])
   })
 
-  it('reads legacy onClean as AFTER + Clean hit, and names the resource', () => {
+  it('reads legacy onClean as After action + Clean hit, and names the resource', () => {
     const spec: EffectSpec = [{ hook: 'onClean', do: [{ a: 'draw', who: 'self', n: 1 }, { a: 'gainRes', who: 'self', n: 1 }] }]
-    expect(compactRules(spec, 'Mana')).toEqual([{ tag: 'AFTER', when: 'Clean hit', gain: ['Draw 1', '+1 Mana'], cost: [] }])
+    expect(compactRules(spec, 'Mana')).toEqual([{ tag: 'After action', when: ['Clean hit'], gain: ['Draw 1', '+1 Mana'], cost: [] }])
   })
 
   it('counts hurting the foe as a gain and helping the foe as a cost', () => {
     const spec: EffectSpec = [{ hook: 'onHeld', if: [{ c: 'enemyAction', a: 'strike' }], do: [{ a: 'status', who: 'enemy', kind: 'silence', turns: 1 }, { a: 'draw', who: 'enemy', n: 1 }] }]
-    expect(compactRules(spec)[0]).toMatchObject({ tag: 'HOLD', when: 'Foe Strikes', gain: ['Foe Silenced'], cost: ['Foe Draw 1'] })
+    expect(compactRules(spec)[0]).toMatchObject({ tag: 'After action', when: ["You don't Strike", 'Foe plays Strike'], gain: ['Foe Silenced'], cost: ['Foe Draw 1'] })
+  })
+})
+
+describe('3 timings (Q 2026-10-28)', () => {
+  it("Q's example: Before action / You play Strike / Foe can't Block", () => {
+    const spec: EffectSpec = [{ hook: 'modify', if: [{ c: 'selfAction', a: 'strike' }], do: [{ a: 'status', who: 'enemy', kind: 'noBlock', turns: 1 }] }]
+    expect(compactRules(spec)).toEqual([{ tag: 'Before action', when: ['You play Strike'], gain: ["Foe can't Block"], cost: [] }])
+  })
+
+  it('reads On hit as After action on a Strike, a draw as When appear, Hold at turn start as Before action', () => {
+    const heal = [{ a: 'heal', who: 'self', n: 10 }] as EffectSpec[number]['do']
+    expect(compactRules([{ hook: 'onHit', if: [{ c: 'enteredAt', n: 1 }], do: heal }])[0]).toMatchObject({ tag: 'After action', when: ['You play Strike', 'Drawn into slot 1'] })
+    expect(compactRules([{ hook: 'onDraw', if: [{ c: 'enteredAt', n: 1 }], do: heal }])[0]).toMatchObject({ tag: 'When appear', when: ['Drawn into slot 1'], gain: ['Heal 10'] })
+    expect(compactRules([{ hook: 'onHeld', at: 'before', do: heal }])[0]).toMatchObject({ tag: 'Before action', when: ["You don't Strike"] })
+    expect(compactRules([{ hook: 'onHeld', if: [{ c: 'selfAction', a: 'charge' }], do: heal }])[0].when).toEqual(['You play Charge'])
   })
 })
 

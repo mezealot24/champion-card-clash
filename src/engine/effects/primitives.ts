@@ -114,8 +114,16 @@ export const status =
     const n = base === undefined ? undefined : Math.floor(base * perCount(ctx, per))
     if (n !== undefined && per && n <= 0) return
     for (const s of sides(ctx, who)) {
-      if (kind === 'shield' && ctx.state.players[s].perkData?.noShield) continue
-      ctx.state.players[s].statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
+      const p = ctx.state.players[s]
+      if (kind === 'shield' && p.perkData?.noShield) continue
+      // Empower doesn't stack (engine.ts uses the biggest): keep one, at the bigger size
+      const had = kind === 'empower' ? p.statuses.find((x) => x.kind === 'empower') : undefined
+      if (had) {
+        had.n = Math.max(had.n ?? 0, n ?? 0)
+        had.turns = Math.max(had.turns, turns)
+        continue
+      }
+      p.statuses.push(n === undefined ? { kind, turns } : { kind, turns, n })
     }
     log(ctx.state, `${ctx.card.def.id}: ${who} gets ${kind}${n === undefined ? '' : ` ${n}`} for ${turns} turns`)
   }

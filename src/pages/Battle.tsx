@@ -37,7 +37,7 @@ const missLine = (code: string) =>
 
 /** The game screen. Data comes from Supabase (BattlePage) or a bundled snapshot (play.tsx). */
 export function Battle({ data }: { data: BattleData }) {
-  useLang()
+  const lang = useLang()
   const [picks, setPicks] = useState({ p1: 'BR', p2: 'BR' })
   // A Style is required (Q 2026-10-25). The player's is saved with their loadout ('' until picked, e.g. a save from
   // before the rule); the AI's defaults to slot 1 when it works in the engine.
@@ -112,19 +112,24 @@ export function Battle({ data }: { data: BattleData }) {
   const seatSetup = useCallback((s: Seat) => ({ ...setup(s.champ), style: s.style || undefined }), [data])
   // Style text with its {numbers} filled from the tuning (Admin), as players see it
   const tuning = useMemo(() => resolveTuning(gameOpts.tuning), [gameOpts])
-  const styleText: Record<string, string> = useMemo(
-    () =>
+  const styleTextIn = useCallback(
+    (tr: (en: string) => string): Record<string, string> =>
       Object.fromEntries(
         (data.styles ?? []).map((s) => {
           const c = data.champions.find((x) => x.id === s.champion_id)
           const key = `${s.champion_id}:${s.slot}`
-          const text = fillText(s.effect, key, tuning, c ? { hpStart: c.hp_start, hpMax: c.hp_max } : {})
+          // the DB text is the English key (th.ts); a Style text edited in Admin shows in English until it has a Thai line
+          const text = fillText(tr(s.effect), key, tuning, c ? { hpStart: c.hp_start, hpMax: c.hp_max } : {})
           // Lifeline plays with Endurance: explain it next to the passive
-          return [key, key === 'TK:1' ? `${text}\n\n${fillText(ENDURANCE_TEXT, key, tuning)}` : text]
+          return [key, key === 'TK:1' ? `${text}\n\n${fillText(tr(ENDURANCE_TEXT), key, tuning)}` : text]
         }),
       ),
     [data, tuning],
   )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const styleText = useMemo(() => styleTextIn(t), [styleTextIn, lang])
+  // Tuktah (the Claude opponent) reads the rules in English
+  const styleTextEn = useMemo(() => styleTextIn((en) => en), [styleTextIn])
 
   // every (Champion, Style) the engine can play: Arcade stages and Versus' Random pick from it
   const pool: FoePick[] = data.champions.flatMap((c) => playable(c.id).map((style) => ({ champ: c.id, style })))
@@ -227,7 +232,7 @@ export function Battle({ data }: { data: BattleData }) {
     if (mode === 'versus' && foe === 'tuktah' && sample) {
       // Claude picks from the board alone; the player's pick stays here until both are locked
       setThinking(true)
-      const move = await askTuktah(sample, game, 'p2', history, styleText)
+      const move = await askTuktah(sample, game, 'p2', history, styleTextEn)
       setThinking(false)
       if ('action' in move) p2 = move.action
       else console.warn('Tuktah pick failed:', move.miss)

@@ -52,6 +52,6 @@ describe('On hit', () => {
   })
 
   it('reads as "On hit" in card text', () => {
-    expect(describeSpec(healOnHit)).toBe('On hit: Gain 8 HP')
+    expect(describeSpec(healOnHit)).toBe('After action, if you play Strike: Gain 8 HP')
   })
 })

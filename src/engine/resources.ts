@@ -3,6 +3,7 @@
 // except its drawbacks (lose HP etc., Q 2026-10-15).
 // Spec: /mnt/project-files/plans/s-card-resource-system.md. Numbers are starting values for playtest.
 import type { Action, CardInst, GameState, Side } from './types'
+import { hooksOf } from './styles'
 import { DEFAULT_TUNING, tuningOf, type Tuning } from './tuning'
 import { classesOf, classOf, inClass } from './classes'
 
@@ -140,6 +141,8 @@ export function costNow(state: GameState, side: Side, card: CardInst): number {
 export function payChain(state: GameState, side: Side, chain: CardInst[]) {
   const p = state.players[side]
   p.unpaid = []
+  // paidHp is this turn's only: a copy paid for on an earlier turn would read as paid again (Lifeline Endurance)
+  for (const card of chain) card.paidHp = undefined
   if (p.silenced || !state.rules.resources) return // Silenced: effects are off anyway, nothing to pay for
   // the boss pays each card as its class (Mana for a Mage card, HP for a Tank card...)
   for (const card of chain) inClass(p, classOf(p, card), () => payCard(state, side, card))
@@ -149,7 +152,6 @@ function payCard(state: GameState, side: Side, card: CardInst) {
   const p = state.players[side]
   const def = resourceOf(p.championId, tuningOf(state, side))
   if (!def) return
-  card.paidHp = undefined
   const cost = costNow(state, side, card)
   // Bitter Cold: Skill effects are off, nothing to pay for
   if (cost <= 0 || (p.skillSilenced && card.def.type === 'S')) return
@@ -164,6 +166,8 @@ function payCard(state: GameState, side: Side, card: CardInst) {
       p.hp -= cost
       card.paidHp = cost
       ;(state.events ??= []).push({ k: 'hp', side, delta: -cost })
+      // paying HP is losing HP: Bloodied (Lifeline B3) starts when a cost drops you into the red
+      for (const h of hooksOf(p)) h.onHpLoss?.(state, side)
     }
     else p.res = (p.res ?? 0) - cost
     log(state, `${side} pays ${cost} ${def.name} for ${card.def.id}`)
