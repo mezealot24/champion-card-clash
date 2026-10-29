@@ -123,6 +123,9 @@ export const TH: Record<string, string> = {
   'In use': 'ใช้อยู่',
   'Out of date': 'ล้าสมัย',
   'Build overview': 'ภาพรวมบิลด์',
+  // Tank presets
+  'Outgrow them: Block to grow Max HP, heal off it, win late with a heavy Punch chain.': 'โตให้ไวกว่า: Block ให้ Max HP โต ฮีลจาก Max HP ที่โตแล้ว ปิดเกมท้ายด้วย chain Punch หนักๆ',
+  'Guard and hit back: stack Shield and Parry, spin on big Blocks, cash in Endurance with Duel.': 'ตั้งการ์ดแล้วสวน: ซ้อน Shield กับ Parry, Block ได้หลายฮิตก็หมุนสวน แล้วเก็บ Endurance ปิดด้วย Duel',
   'from your cards, Path and Oath': 'คิดจากการ์ด, Path และ Oath ของคุณ',
   'HP': 'HP',
   'Defend': 'Defend',
