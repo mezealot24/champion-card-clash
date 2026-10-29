@@ -118,6 +118,9 @@ export const TH: Record<string, string> = {
 
   // ---- Deck builder ----
   'Presets': 'บิลด์สำเร็จรูป',
+  'Bleed yourself into Fury, then end it with huge hits and Lifesteal.': 'ยอมเสียเลือดเข้าโหมด Fury แล้วปิดเกมด้วยหมัดหนักและ Lifesteal',
+  'Long chains build Momentum; Shields and Lifesteal let you trade blows.': 'ต่อ chain ยาวสะสม Momentum ใช้ Shield และ Lifesteal ยืนแลกหมัด',
+  "Your Block this turn doesn't cost Momentum.": 'Block เทิร์นนี้ไม่เสีย Momentum',
   'a full build in one tap · change anything later': 'จัดครบในแตะเดียว · แก้ทีหลังได้ทุกอย่าง',
   'Use this build': 'ใช้บิลด์นี้',
   'In use': 'ใช้อยู่',

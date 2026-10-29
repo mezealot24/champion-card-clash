@@ -15,7 +15,7 @@ export const HOOK_LABEL: Record<Hook, string> = {
 const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero (each clean hit next Strike gives 1 Chill)', frozenTomb: 'Frozen Tomb', thaw: 'Thaw (can\'t be Frozen)', venom: 'Venom', woundUp: 'Wound Up', cutGuard: "Cut guard (can't be Cut)", regen: 'Regen', empower: 'Empower' }
+const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero (each clean hit next Strike gives 1 Chill)', frozenTomb: 'Frozen Tomb', thaw: 'Thaw (can\'t be Frozen)', venom: 'Venom', woundUp: 'Wound Up', cutGuard: "Cut guard (can't be Cut)", regen: 'Regen', empower: 'Empower', holdMomentum: 'Momentum hold' }
 export const PER_LABEL: Record<Per, string> = {
   hitBlocked: 'hit you blocked this turn',
   chainCard: 'card in your chain',
@@ -100,6 +100,7 @@ export function describeAct(a: ActSpec, now = false): string {
       if (a.kind === 'shield') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Shield ${a.n ?? 1}${per(a.per)} (absorbs hit dmg, lasts ${turns === 'this turn' || turns === 'this turn only' ? turns : turns === 'next turn' ? 'through next turn' : turns})`
       if (a.kind === 'parry') return `${a.who === 'self' ? 'gain' : `${WHO[a.who]} gains`} Parry ${a.n ?? 1} ${turns} (the first ${a.n ?? 1} hit${(a.n ?? 1) === 1 ? '' : 's'} past Block are parried: 0 dmg)`
       if (a.kind === 'regen') return `${a.who === 'self' ? 'you regain' : `${WHO[a.who]} regains`} ${a.n ?? 1}% of missing HP at the end of every turn, ${a.turns} turn${a.turns === 1 ? '' : 's'}`
+      if (a.kind === 'holdMomentum') return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} Block doesn't cost Momentum ${turns}`
       if (a.kind === 'empower') return `${a.who === 'self' ? 'your' : `${WHO[a.who]}'s`} next Strike: every chain card +${a.n ?? 1} dmg`
       if (a.kind === 'vulnerable') return `${a.who === 'self' ? 'you take' : `${WHO[a.who]} takes`} ${a.n ?? 1}% more dmg from hits ${turns}`
       return `${WHO[a.who]} ${STATUS[a.kind]} ${turns}`
