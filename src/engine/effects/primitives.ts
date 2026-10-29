@@ -215,6 +215,19 @@ export const steal: Act = (ctx) => {
   log(ctx.state, `${ctx.card.def.id}: ${ctx.self} steals ${taken.def.id} onto its Field`)
 }
 
+/**
+ * Critical counter (Assassin Counting Steps, Q 2026-10-29): the owner's Fatal Rhythm count moves n attacks ahead.
+ * As a Before action rule it runs before the Style marks this chain's Critical, so it can move the Critical here.
+ */
+export const critCounter =
+  (n: number): Act<BaseCtx> =>
+  (ctx) => {
+    const p = ctx.state.players[ctx.self]
+    const attacks = Math.max(0, (p.styleData?.attacks ?? 0) + n)
+    p.styleData = { ...p.styleData, attacks }
+    log(ctx.state, `${ctx.card.def.id}: Critical counter ${n >= 0 ? '+' : ''}${n} (now ${attacks})`)
+  }
+
 /** Which opponent Field card a Cut takes: oldest (slot 1), newest (last slot), or the one in this card's slot. */
 export type CutWhich = 'oldest' | 'newest' | 'facing'
 export { CUT_CAP } from '../types'

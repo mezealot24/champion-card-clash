@@ -11,6 +11,7 @@ import { ArcadeLadder } from './arcade/ArcadeLadder'
 import { TitleMenu, type Mode } from './menu/TitleMenu'
 import { DeckBuilder } from './deck/DeckBuilder'
 import { deckRows, deckRulesFromConfig, loadDeck } from './deck/deck'
+import { activePreset, applyPreset, presetViews, statsOf } from './deck/presets'
 import { ascPointsFromConfig, firstOpenStep, loadLoadout, loadoutFor, saveLoadout, savedStyle, type SavedLoadout, type Step } from './loadout/loadout'
 import { Online } from './Online'
 import { ChampionSelect, type FoeKind } from './select/ChampionSelect'
@@ -325,6 +326,11 @@ export function Battle({ data }: { data: BattleData }) {
   }
 
   if (!game || !mode) {
+    const meChamp = data.champions.find((c) => c.id === picks.p1)
+    const myRows = data.cards.filter((c) => c.champion_id === picks.p1)
+    const myStyle = styleKey('p1') || undefined
+    const presets = meChamp ? presetViews(meChamp, myRows, playable(picks.p1), ascPoints, deckRules) : []
+    const active = activePreset(picks.p1, saved, myRows, deckRules)
     return (
       <ChampionSelect
         mode={mode ?? 'versus'}
@@ -359,6 +365,14 @@ export function Battle({ data }: { data: BattleData }) {
         missing={missingOf}
         onStart={start}
         onTutorial={() => setTutorial(true)}
+        presets={presets}
+        activePreset={active?.id}
+        onPreset={(p) => {
+          setSaved(applyPreset(picks.p1, p, myRows, saved))
+          setStep('fight')
+        }}
+        // a build that is exactly a preset shows the preset's numbers, so the two screens agree
+        myStats={active ? (presets.find((v) => v.preset.id === active.id)?.stats ?? null) : meChamp && myStyle ? statsOf(meChamp, myRows, loadDeck(picks.p1), myStyle, saved.oath, loadoutFor(picks.p1, myStyle, ascPoints)?.asc ?? [], deckRules) : null}
       />
     )
   }

@@ -17,7 +17,7 @@ const OP = { '<': '<', '<=': '≤', '>': '>', '>=': '≥' }
 const STATUS_SHORT: Partial<Record<string, string>> = {
   noStrike: 'no Strike', noBlock: 'no Block', noCharge: 'no Charge', silence: 'Silenced', skillSilence: 'S effects off',
   trueDmg: 'True Dmg', guardBreak: 'Guard Crush', vulnerable: 'Vulnerable', deathMark: 'Marked', shield: 'Shield',
-  parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: 'Cut guard', regen: 'Regen', empower: 'Empower',
+  parry: 'Parry', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: 'Cut guard', regen: 'Regen', empower: 'Empower', holdMomentum: 'Momentum hold',
 }
 const who = (w: 'self' | 'enemy') => (w === 'self' ? 'You' : 'Foe')
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`)
@@ -108,6 +108,7 @@ export function shortAct(a: ActSpec, res = 'res'): string {
     case 'shatter': return `Shatter Shield/Parry, +${a.n} dmg each`
     case 'steal': return 'Steal facing card'
     case 'cut': return a.which === 'facing' ? 'Cut facing card' : `Cut ${a.n} ${a.which}`
+    case 'critCounter': return `Crit count ${signed(a.n)}`
     case 'gainRes': return `${a.who === 'enemy' ? 'Foe ' : ''}${signed(a.n)} ${res}${per(a)}`
     case 'ignite': return a.n === 0 ? `${a.who === 'self' ? '' : 'Foe '}Ignite refresh` : `${a.who === 'self' ? '' : 'Foe '}Ignite ${a.n}${per(a)}`
     case 'chill': return `${a.who === 'self' ? '' : 'Foe '}Chill ${a.n}${per(a)}`
