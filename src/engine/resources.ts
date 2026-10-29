@@ -4,6 +4,7 @@
 // Spec: /mnt/project-files/plans/s-card-resource-system.md. Numbers are starting values for playtest.
 import type { Action, CardInst, GameState, Side } from './types'
 import { DEFAULT_TUNING, tuningOf, type Tuning } from './tuning'
+import { classesOf, classOf, inClass } from './classes'
 
 /** What a resource can react to at the end of a turn. */
 export type TurnSummary = {
@@ -124,44 +125,51 @@ export function addRes(state: GameState, side: Side, n: number) {
  */
 export function costNow(state: GameState, side: Side, card: CardInst): number {
   const p = state.players[side]
-  const def = resourceOf(p.championId, tuningOf(state, side))
+  // the boss pays each card with its own class's resource
+  const cls = classOf(p, card)
+  const def = resourceOf(cls, tuningOf(state, side))
   if (!def) return 0
   if (p.costMod?.hpPct && card.def.type === 'S' && def.payWithHp) return Math.max(1, Math.floor((p.hp * p.costMod.hpPct) / 100))
   const pct = def.payWithHp ? (card.def.costPct ?? 0) + (card.def.type === 'S' ? (p.costMod?.addHpPct ?? 0) : 0) : 0
   // a % cost with no flat part costs only the %
-  const flat = card.def.costPct && card.def.cost == null ? 0 : costOf(p.championId, card, tuningOf(state, side), p.costMod)
+  const flat = card.def.costPct && card.def.cost == null ? 0 : costOf(cls, card, tuningOf(state, side), p.costMod)
   return flat + (pct > 0 ? Math.floor((p.hp * pct) / 100) : 0)
 }
 
 /** Pay for every card in the chain, in order. Cards that can't be paid go into p.unpaid (only drawbacks fire this turn). */
 export function payChain(state: GameState, side: Side, chain: CardInst[]) {
   const p = state.players[side]
-  const def = resourceOf(p.championId, tuningOf(state, side))
   p.unpaid = []
-  if (!def || p.silenced || !state.rules.resources) return // Silenced: effects are off anyway, nothing to pay for
-  for (const card of chain) {
-    card.paidHp = undefined
-    const cost = costNow(state, side, card)
-    // Bitter Cold: Skill effects are off, nothing to pay for
-    if (cost <= 0 || (p.skillSilenced && card.def.type === 'S')) continue
-    // Lifeline in the red (Tank v3, Q 2026-10-27): an S card is paid with 1 Endurance instead of HP
-    if (def.payWithHp && card.def.type === 'S' && p.style === 'TK:1' && (p.perkData?.endurance ?? 0) > 0 && (p.hp * 100) / Math.max(1, p.maxHp) < tuningOf(state, side)['TK:1'].hpPct) {
-      p.perkData = { ...p.perkData, endurance: (p.perkData?.endurance ?? 0) - 1 }
-      log(state, `${side} pays 1 Endurance for ${card.def.id} (HP in the red)`)
-      continue
+  if (p.silenced || !state.rules.resources) return // Silenced: effects are off anyway, nothing to pay for
+  // the boss pays each card as its class (Mana for a Mage card, HP for a Tank card...)
+  for (const card of chain) inClass(p, classOf(p, card), () => payCard(state, side, card))
+}
+
+function payCard(state: GameState, side: Side, card: CardInst) {
+  const p = state.players[side]
+  const def = resourceOf(p.championId, tuningOf(state, side))
+  if (!def) return
+  card.paidHp = undefined
+  const cost = costNow(state, side, card)
+  // Bitter Cold: Skill effects are off, nothing to pay for
+  if (cost <= 0 || (p.skillSilenced && card.def.type === 'S')) return
+  // Lifeline in the red (Tank v3, Q 2026-10-27): an S card is paid with 1 Endurance instead of HP
+  if (def.payWithHp && card.def.type === 'S' && p.style === 'TK:1' && (p.perkData?.endurance ?? 0) > 0 && (p.hp * 100) / Math.max(1, p.maxHp) < tuningOf(state, side)['TK:1'].hpPct) {
+    p.perkData = { ...p.perkData, endurance: (p.perkData?.endurance ?? 0) - 1 }
+    log(state, `${side} pays 1 Endurance for ${card.def.id} (HP in the red)`)
+    return
+  }
+  if (def.payWithHp ? p.hp > cost : (p.res ?? 0) >= cost) {
+    if (def.payWithHp) {
+      p.hp -= cost
+      card.paidHp = cost
+      ;(state.events ??= []).push({ k: 'hp', side, delta: -cost })
     }
-    if (def.payWithHp ? p.hp > cost : (p.res ?? 0) >= cost) {
-      if (def.payWithHp) {
-        p.hp -= cost
-        card.paidHp = cost
-        ;(state.events ??= []).push({ k: 'hp', side, delta: -cost })
-      }
-      else p.res = (p.res ?? 0) - cost
-      log(state, `${side} pays ${cost} ${def.name} for ${card.def.id}`)
-    } else {
-      p.unpaid.push(card.uid)
-      log(state, `${side} not enough ${def.name} for ${card.def.id} (needs ${cost}): ${def.unpaidStays ? 'can\'t play, stays on Field' : def.unpaidDmgPct != null ? `hits for ${def.unpaidDmgPct}% base dmg, drawbacks only` : 'hits, drawbacks only'}`)
-    }
+    else p.res = (p.res ?? 0) - cost
+    log(state, `${side} pays ${cost} ${def.name} for ${card.def.id}`)
+  } else {
+    ;(p.unpaid ??= []).push(card.uid)
+    log(state, `${side} not enough ${def.name} for ${card.def.id} (needs ${cost}): ${def.unpaidStays ? 'can\'t play, stays on Field' : def.unpaidDmgPct != null ? `hits for ${def.unpaidDmgPct}% base dmg, drawbacks only` : 'hits, drawbacks only'}`)
   }
 }
 
@@ -180,14 +188,18 @@ export function holdUnpaid(state: GameState, side: Side, chain: CardInst[]): Car
 /** End of turn: each class fills (or drains) its bar. */
 export function gainRes(state: GameState, side: Side, t: TurnSummary) {
   if (!state.rules.resources) return
-  const def = resourceOf(state.players[side].championId, tuningOf(state, side))
-  const n = def?.gain?.(t) ?? 0
-  if (n) addRes(state, side, n)
+  const p = state.players[side]
+  // the boss fills every class's bar
+  for (const cls of classesOf(p))
+    inClass(p, cls, () => {
+      const n = resourceOf(cls, tuningOf(state, side))?.gain?.(t) ?? 0
+      if (n) addRes(state, side, n)
+    })
 }
 
 /** Base dmg of a card this turn: halved (or whatever the class says) when it went unpaid. */
 export function baseDmgOf(state: GameState, side: Side, card: CardInst): number {
   const p = state.players[side]
-  const pct = resourceOf(p.championId, tuningOf(state, side))?.unpaidDmgPct
+  const pct = resourceOf(classOf(p, card), tuningOf(state, side))?.unpaidDmgPct
   return pct != null && p.unpaid?.includes(card.uid) ? Math.floor((card.def.dmg * pct) / 100) : card.def.dmg
 }

@@ -7,6 +7,8 @@ import {
   isEffectMissing,
   legalActions,
   overdriveAdd,
+  allRes,
+  classOf,
   resourceOf,
   tuningOf,
   STYLES,
@@ -109,8 +111,6 @@ export function Arena(props: {
   bannerFades?: boolean
   /** action buttons stay disabled while true (waiting on the opponent's pick) */
   busy?: boolean
-  /** Arcade boss form shift banner: the Champion's name for an id (default the id) */
-  champName?: (id: string) => string
 }) {
   useLang()
   const { game, turn, names, styleNames } = props
@@ -413,9 +413,7 @@ export function Arena(props: {
         const nx = events[i + 1]
         await discard(ev.side, ev.uid, ev.reason, nx?.k === 'draw' && nx.side === ev.side && nx.slot != null)
       } else if (ev.k === 'draw') await draw(ev.side, ev.card, ev.slot)
-      // the combo belongs to the form that struck (a boss may have shifted by the end of the turn)
-      else if (ev.k === 'combo') await combo(ev.side, ev.name, prev)
-      else if (ev.k === 'shift') await shift(ev.side, ev.championId, ev.style)
+      else if (ev.k === 'combo') await combo(ev.side, ev.name, ev.champ ?? next.players[ev.side].championId)
     }
     await tail
     await home
@@ -564,8 +562,8 @@ export function Arena(props: {
     await anim(el, [{ transform: 'rotateY(-90deg)' }, { transform: 'rotateY(0)' }], 120, { easing: 'ease-out' })
   }
 
-  async function combo(side: Side, name: string, next: GameState) {
-    const champ = next.players[side].championId
+  /** champ = the class whose combo it is (the Arcade boss has every class's) */
+  async function combo(side: Side, name: string, champ: string) {
     const [title, sub] = COMBO_TEXT[`${champ}:${name}`]?.map((s) => t(s)) ?? [t('COMBO'), name]
     const types = name.split(/[^PKS]+/).filter(Boolean)
     // light up 3 chain cards of the combo's types
@@ -596,20 +594,6 @@ export function Arena(props: {
     ], BANNER_MS)
     b.remove()
     setGlow({})
-  }
-
-  /** Arcade boss turns into its next form. */
-  async function shift(side: Side, champ: string, style?: string) {
-    const f = fighter(side)
-    anim(f, [{ filter: 'brightness(1)' }, { filter: 'brightness(4) blur(2px)' }, { filter: 'brightness(1)' }], 700)
-    const b = add(`<div class="banner shift"><span>${t('Form shift')}</span><b>${props.champName?.(champ) ?? champ}</b><span>${style ? (STYLES[style]?.name ?? style) : ''}</span></div>`)
-    await anim(b, [
-      { transform: 'skewY(-4deg) translateX(-110%)' },
-      { transform: 'skewY(-4deg) translateX(0)', offset: 0.12 },
-      { transform: 'skewY(-4deg) translateX(2%)', offset: 0.88 },
-      { transform: 'skewY(-4deg) translateX(110%)' },
-    ], BANNER_MS * 0.7)
-    b.remove()
   }
 
   useEffect(() => {
@@ -923,7 +907,17 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
   // chips and badges sit on the stage, whose click skips playback, so taps stop there
   const tap = (t: Tip) => (e: React.MouseEvent) => (e.stopPropagation(), onTip(t))
   const resTip = res && { title: res.payWithHp ? t('Pays with HP') : `${res.name} ${p.res ?? 0}/${res.cap}`, body: RESOURCE_TIP[p.championId] ? t(RESOURCE_TIP[p.championId]) : res.name }
-  const resView = !res ? null : res.payWithHp ? (
+  // the Arcade boss has every class's bar: one short line each
+  const bossRes = p.boss && game.rules.resources ? allRes(p) : undefined
+  const resView = bossRes ? (
+    <button type="button" className="res boss-res" onClick={tap({ title: t('Every class resource'), body: t('The boss pays each card with its own class: Tank cards with HP, Bruiser with Rage, Assassin with Energy, Mage with Mana.') })}>
+      {p.boss!.classes.map((c) => {
+        const r = resourceOf(c, tuningOf(game, side))
+        // short: "R 2/20 E 3/3 M 4/7" (Tank pays HP, no bar)
+        return r && !r.payWithHp ? <span key={c} title={r.name}>{r.name[0]} {bossRes[c] ?? 0}/{r.cap}</span> : null
+      })}
+    </button>
+  ) : !res ? null : res.payWithHp ? (
     <button type="button" className="res" onClick={tap(resTip!)}>
       S = HP
     </button>
@@ -1050,9 +1044,11 @@ function cardRule(rule: string): { timing: string; cond: string; act: string } {
 function cardFacts(game: GameState, side: Side, card: CardInst) {
   const p = game.players[side]
   const { id, type, dmg, effectText, effectSpec } = card.def
-  const res = game.rules.resources ? resourceOf(p.championId, tuningOf(game, side)) : undefined
+  // the Arcade boss pays each card with its own class's bar
+  const cls = classOf(p, card)
+  const res = game.rules.resources ? resourceOf(cls, tuningOf(game, side)) : undefined
   const cost = res ? costNow(game, side, card) : 0
-  const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (p.res ?? 0) ? res.unpaidDmgPct : undefined
+  const short = !!res && !res.payWithHp && res.unpaidDmgPct != null && cost > (allRes(p)[cls] ?? 0) ? res.unpaidDmgPct : undefined
   const grow = (card.grow ?? 0) + (card.growNext ?? 0)
   const base = short != null ? Math.floor((dmg * short) / 100) : dmg
   const text = effectSpec?.length ? describeSpec(effectSpec) : effectText

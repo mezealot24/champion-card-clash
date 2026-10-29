@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { bossSetup, buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
+import { bossSetup, type BossClass, buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
 import { t, useLang } from '../i18n'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
-import { addClear, BOSS, cleared, isBoss, loadRun, newRun, randomFoe, rollBossForms, saveRun, tierOf, type ArcadeRun, type Foe as FoePick, type Tier } from './arcade/arcade'
+import { addClear, BOSS, cleared, isBoss, loadRun, newRun, randomFoe, rollBossKit, saveRun, tierOf, type ArcadeRun, type Foe as FoePick, type Tier } from './arcade/arcade'
 import { ArcadeLadder } from './arcade/ArcadeLadder'
 import { TitleMenu, type Mode } from './menu/TitleMenu'
 import { DeckBuilder } from './deck/DeckBuilder'
@@ -151,17 +151,17 @@ export function Battle({ data }: { data: BattleData }) {
     launch(picks.p1, myStyle, p2, p2Style, null)
   }
 
-  /** bossForms = the Arcade boss: it plays these forms in order instead of `them` (no loadout, see arcade.ts BOSS) */
-  function launch(me: string, myStyle: string | undefined, them: string, theirStyle: string | undefined, aiTier: Tier | null, banner = '', bossForms?: FoePick[]) {
+  /** bossKit = the Arcade boss plays every class instead of `them` (no Oath, see arcade.ts BOSS) */
+  function launch(me: string, myStyle: string | undefined, them: string, theirStyle: string | undefined, aiTier: Tier | null, banner = '', bossKit?: BossClass[]) {
     setTurn(null)
     setLine(banner)
     setHistory([])
     setMatch((m) => m + 1)
     setTier(aiTier)
-    const foeL = bossForms ? undefined : randomLoadout(them, theirStyle, ascPoints)
+    const foeL = bossKit ? undefined : randomLoadout(them, theirStyle, ascPoints)
     setFoeLoadout(foeL)
-    const foeSeat = bossForms
-      ? bossSetup(t(BOSS.name), bossForms.map((f) => ({ championId: f.champ, style: f.style, deck: deckOf(f.champ) })), BOSS.hp, BOSS.shiftDraw)
+    const foeSeat = bossKit
+      ? bossSetup(t(BOSS.name), BOSS.hp, bossKit, Object.fromEntries(bossKit.map((c) => [c.champ, deckOf(c.champ)])), BOSS.perClass)
       : { ...setup(them), style: theirStyle, loadout: foeL }
     setGame(createGame({ ...setup(me), deck: buildDeck(myDeck(me, myStyle).rows), style: myStyle, loadout: loadoutFor(me, myStyle, ascPoints) }, foeSeat, gameOpts))
   }
@@ -181,12 +181,12 @@ export function Battle({ data }: { data: BattleData }) {
     const aiTier = tierOf(r.at, r)
     const banner = t('Stage {n}/{total} · {tier}', { n: r.at + 1, total: r.stages.length, tier: t(aiTier.name) })
     if (isBoss(foeAt)) {
-      // a new set of forms every try; the Versus picks never hold the boss id
-      const forms = rollBossForms(pool)
-      if (!forms.length) return
-      setPicks({ p1: r.champ, p2: forms[0].champ })
-      setFoeStyle(forms[0].style)
-      return launch(r.champ, r.style, forms[0].champ, forms[0].style, aiTier, `${banner} · ${t('Final boss: {name}', { name: t(BOSS.name) })}`, forms)
+      // a new kit every try; the Versus picks never hold the boss id
+      const kit = rollBossKit(pool)
+      if (!kit.length) return
+      setPicks({ p1: r.champ, p2: kit[0].champ })
+      setFoeStyle(kit[0].style)
+      return launch(r.champ, r.style, kit[0].champ, kit[0].style, aiTier, `${banner} · ${t('Final boss: {name}', { name: t(BOSS.name) })}`, kit)
     }
     setPicks({ p1: r.champ, p2: foeAt.champ })
     setFoeStyle(foeAt.style)
@@ -345,13 +345,26 @@ export function Battle({ data }: { data: BattleData }) {
     )
   }
 
-  // the Arcade boss shows its own name; its Style line names the form it is in
+  // the Arcade boss shows its own name; its Style line says it plays every class
   const champName = (side: Side) => game.players[side].boss?.name ?? champTitle(game.players[side].championId)
   const styleOf = (side: Side) => {
     const p = game.players[side]
+    if (p.boss) return t('Every class · {n} Styles', { n: p.boss.classes.length })
     const key = p.style
-    const name = key ? (STYLES[key]?.name ?? key) : ''
-    return p.boss ? `${t('{champ} form', { champ: champTitle(p.championId) })} ${p.boss.at + 1}/${p.boss.forms.length}${name ? ` · ${name}` : ''}` : name
+    return key ? (STYLES[key]?.name ?? key) : ''
+  }
+  // the boss's Style sheet: each class's Style and capstone
+  const bossText = (side: Side) => {
+    const p = game.players[side]
+    if (!p.boss) return undefined
+    return p.boss.classes
+      .map((c) => {
+        const key = p.boss!.styles[c]
+        const cap = (p.perks ?? []).find((k) => k.startsWith(`asc:${key}:`))?.split(':')[3]
+        const node = cap ? TREES[key]?.nodes.find((n) => n.id === cap) : undefined
+        return `${champTitle(c)} · ${STYLES[key]?.name ?? key}: ${styleText[key] ?? ''}${node ? ` ${t('Capstone')} ${node.name}: ${fill(node.text, key)} ${t('Cost')}: ${fill(node.cost ?? '', key)}` : ''}`
+      })
+      .join('\n\n')
   }
 
   // Arcade result buttons: a win goes back to the ladder; a loss can Continue the same stage or give up the run
@@ -407,12 +420,11 @@ export function Battle({ data }: { data: BattleData }) {
         styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
         styleTexts={{
           p1: [styleText[game.players.p1.style ?? ''] ?? '', ...loadoutLines(game.players.p1.championId, game.players.p1.style, myLoadout).map((l) => `${t(l.label)}: ${l.value}.`)].filter(Boolean).join(' '),
-          p2: [styleText[game.players.p2.style ?? ''] ?? '', ...loadoutLines(game.players.p2.championId, game.players.p2.style, foeLoadout).map((l) => `${t(l.label)}: ${l.value}.`)].filter(Boolean).join(' '),
+          p2: bossText('p2') ?? [styleText[game.players.p2.style ?? ''] ?? '', ...loadoutLines(game.players.p2.championId, game.players.p2.style, foeLoadout).map((l) => `${t(l.label)}: ${l.value}.`)].filter(Boolean).join(' '),
         }}
         settingsExtra={<TimerSetting />}
         onAction={play}
         foe={mode === 'versus' && foe === 'tuktah' ? t('Tuktah') : t('AI')}
-        champName={champTitle}
         labels={arcadeLabels}
         busy={thinking}
         banner={thinking ? t('Tuktah is thinking…') : line || undefined}

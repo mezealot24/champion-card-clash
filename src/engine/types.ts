@@ -111,10 +111,11 @@ export type PlayerState = {
   boss?: BossState
 }
 
-/** One form of the Arcade boss: a Champion, its Style and its deck. */
-export type BossForm = { championId: string; style?: string; deck: CardDef[] }
-/** name = shown instead of the Champion's; at = form in play; hpBase = the HP the form lines are cut from; shiftDraw = cards drawn on a shift. */
-export type BossState = { name: string; forms: BossForm[]; at: number; hpBase: number; shiftDraw: number }
+/**
+ * Arcade boss (engine/boss.ts): plays every class at once. classes[0] = the Champion it looks like (its shadow).
+ * styles = the Style of each class (all on), res = each class's bar (the live one is in PlayerState.res, see classes.ts).
+ */
+export type BossState = { name: string; classes: string[]; styles: Record<string, string>; res: Record<string, number> }
 
 export type RulesConfig = {
   handMax: number
@@ -154,8 +155,7 @@ export type TurnEvent =
   | { k: 'draw'; side: Side; card: CardInst; slot?: number } // slot = index it went to, when not the end of the Field
   | { k: 'discard'; side: Side; uid: string; reason: string }
   | { k: 'sweep'; side: Side; uids: string[] }
-  | { k: 'combo'; side: Side; name: string }
-  | { k: 'shift'; side: Side; championId: string; style?: string; form: number }
+  | { k: 'combo'; side: Side; name: string; champ?: string }
 
 export type GameState = {
   turn: number

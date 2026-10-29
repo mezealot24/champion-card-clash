@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ARCADE_STAGES, BOSS, BOSS_TIER, cleared, isBoss, newRun, randomFoe, rollBossForms, rollStages, tierOf, TIERS } from '../arcade/arcade'
+import { ARCADE_STAGES, BOSS, BOSS_TIER, cleared, isBoss, newRun, randomFoe, rollBossKit, rollStages, tierOf, TIERS } from '../arcade/arcade'
 
 const POOL = ['TK', 'BR', 'AS', 'MG'].flatMap((c) => [1, 2].map((n) => ({ champ: c, style: `${c}:${n}` })))
 const seq = (seed: number) => () => ((seed = (seed * 9301 + 49297) % 233280) / 233280)
@@ -44,13 +44,14 @@ describe('Arcade ladder', () => {
     expect(r.stages[ARCADE_STAGES].champ).toBe(BOSS.id)
   })
 
-  it('the boss plays every Champion once, each with one of its Styles', () => {
+  it('the boss plays every Champion once, each with one of its Styles and a capstone of it', () => {
     for (let s = 1; s < 50; s++) {
-      const forms = rollBossForms(POOL, seq(s))
-      expect(forms.map((f) => f.champ).sort()).toEqual(['AS', 'BR', 'MG', 'TK'])
-      for (const f of forms) expect(POOL).toContainEqual(f)
+      const kit = rollBossKit(POOL, seq(s))
+      expect(kit.map((f) => f.champ).sort()).toEqual(['AS', 'BR', 'MG', 'TK'])
+      for (const k of kit) expect(POOL).toContainEqual({ champ: k.champ, style: k.style })
     }
   })
+
 
   it('Versus random picks from the pool', () => {
     expect(POOL).toContainEqual(randomFoe(POOL, seq(3)))

@@ -5,7 +5,7 @@ import { champColor, spriteClassOf } from '../fighters'
 import { Portrait } from '../select/Portrait'
 import { BOSS, cleared, isBoss, tierOf, type ArcadeRun } from './arcade'
 
-/** The boss's ladder face: every Champion's art in turn, violet (arcade.ts BOSS). */
+/** The boss's ladder face: every Champion's black shadow in turn (arcade.ts BOSS). */
 const BOSS_FACES: [string, string][] = [['TK', 'TK:1'], ['BR', 'BR:1'], ['AS', 'AS:1'], ['MG', 'MG:1'], ['MG', 'MG:2']]
 export function BossPortrait({ className = '' }: { className?: string }) {
   return (

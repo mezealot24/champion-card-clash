@@ -358,6 +358,7 @@ export const TH: Record<string, string> = {
   'Final boss': 'บอสด่านสุดท้าย',
   'Final boss: {name}': 'บอสด่านสุดท้าย: {name}',
   'Every Champion in one': 'รวมทุก Champion ในร่างเดียว',
-  'Form shift': 'เปลี่ยนร่าง',
-  '{champ} form': 'ร่าง {champ}',
+  'Every class · {n} Styles': 'ทุกคลาส · {n} Style',
+  'Every class resource': 'resource ของทุกคลาส',
+  'The boss pays each card with its own class: Tank cards with HP, Bruiser with Rage, Assassin with Energy, Mage with Mana.': 'บอสจ่ายการ์ดแต่ละใบด้วย resource ของคลาสนั้น: การ์ด Tank จ่าย HP, Bruiser จ่าย Rage, Assassin จ่าย Energy, Mage จ่าย Mana',
 }

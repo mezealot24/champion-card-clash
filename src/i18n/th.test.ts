@@ -43,7 +43,7 @@ const dataKeys = [
   ...['SECOND HELPING', 'Heal 10% of your HP', 'DEATH MARK', 'Every later Strike bursts +50%', 'SEALED', "Enemy can't Block next turn", 'GUARD CRUSH', 'Next Strike breaks through Block'],
   ...['Tank pays for S cards with HP.'],
   ...TIERS.map((x) => x.name),
-  BOSS_TIER.name, BOSS.name, 'Form shift',
+  BOSS_TIER.name, BOSS.name,
 ]
 
 const slots = (s: string) => (s.match(/\{[\w.|]+\}/g) ?? []).sort()

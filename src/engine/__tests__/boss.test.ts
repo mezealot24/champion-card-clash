@@ -1,71 +1,79 @@
-// Arcade final boss (engine/boss.ts): one HP bar, a new form at each line.
+// Arcade final boss (engine/boss.ts): every class at once (Styles, capstones, cards, resource bars).
 import { describe, expect, it } from 'vitest'
-import { bossSetup, createGame, resolveTurn, shiftLine } from '../index'
-import type { CardDef, CardInst, GameState } from '../index'
+import { bossSetup, capstonesOf, costNow, createGame, pickCards, resolveTurn } from '../index'
+import type { BossClass, CardDef, CardInst, GameState } from '../index'
 
 let uid = 0
 const hit = (dmg: number): CardInst => ({ uid: `h${uid++}`, def: { id: 'XX-000', type: 'P', dmg, effectText: '' } })
-const deckOf = (c: string) => Array.from({ length: 10 }, (_, i): CardDef => ({ id: `${c}-${i}`, type: 'P', dmg: 1, effectText: '' }))
-const FORMS = ['TK', 'BR', 'AS', 'MG'].map((c, i) => ({ championId: c, style: i === 3 ? 'MG:1' : undefined, deck: deckOf(c) }))
+const pool = (c: string): CardDef[] => [
+  ...Array.from({ length: 12 }, (_, i): CardDef => ({ id: `${c}-${i}`, type: 'P', dmg: 1, effectText: '' })),
+  { id: `${c}-S`, type: 'S', dmg: 5, effectText: '' },
+  { id: `${c}-F`, type: 'S', dmg: 5, effectText: '', styleOnly: `${c}:9` },
+]
+const KIT: BossClass[] = [
+  { champ: 'BR', style: 'BR:1', capstone: capstonesOf('BR:1')[0] },
+  { champ: 'TK', style: 'TK:1', capstone: capstonesOf('TK:1')[0] },
+  { champ: 'AS', style: 'AS:1' },
+  { champ: 'MG', style: 'MG:1' },
+]
+const POOLS = Object.fromEntries(['TK', 'BR', 'AS', 'MG'].map((c) => [c, pool(c)]))
 
-// p1 = a plain attacker, p2 = the boss at 200 HP (lines at 150 / 100 / 50)
 function game(): GameState {
-  const s = createGame({ championId: 'XX', hpStart: 100, hpMax: 100, deck: deckOf('XX') }, bossSetup('Chimera', FORMS, 200, 2), { seed: 1, rules: { resources: false } })
-  s.players.p2.hand = [hit(0)]
-  return s
+  return createGame({ championId: 'XX', hpStart: 100, hpMax: 100, deck: pool('XX') }, bossSetup('Chimera', 240, KIT, POOLS, 10, () => 0.5), { seed: 1 })
 }
 
 describe('Arcade boss', () => {
-  it('starts in its first form with one HP bar', () => {
-    const g = game()
-    expect(g.players.p2.championId).toBe('TK')
-    expect(g.players.p2.hp).toBe(200)
-    expect(g.players.p2.boss?.at).toBe(0)
-    expect([0, 1, 2].map((at) => shiftLine(200, 4, at))).toEqual([150, 100, 50])
+  it('looks like its first class and starts at the boss HP', () => {
+    const b = game().players.p2
+    expect(b.championId).toBe('BR')
+    expect(b.style).toBe('BR:1')
+    expect(b.hp).toBe(240)
+    expect(b.boss?.classes).toEqual(['BR', 'TK', 'AS', 'MG'])
   })
 
-  it('stays in form above the line', () => {
+  it('a deck of 10 cards per class, only cards its Style plays', () => {
+    const b = game().players.p2
+    const all = [...b.hand, ...b.deck] // Sonic Bliz starts with cards on the Field
+    expect(all).toHaveLength(40)
+    for (const c of ['TK', 'BR', 'AS', 'MG']) expect(all.filter((x) => x.def.id.startsWith(`${c}-`))).toHaveLength(10)
+    expect(all.some((x) => x.def.id.endsWith('-F'))).toBe(false)
+    expect(pickCards(pool('MG'), 'MG:9', 99).some((d) => d.id === 'MG-F')).toBe(true)
+  })
+
+  it('a capstone per class and every class bar', () => {
+    const b = game().players.p2
+    expect(b.perks).toEqual(KIT.filter((k) => k.capstone).map((k) => `asc:${k.style}:${k.capstone}`))
+    expect(Object.keys(b.boss!.res).sort()).toEqual(['AS', 'BR', 'MG', 'TK'])
+  })
+
+  it('pays each card with its own class: Tank with HP, Mage with Mana', () => {
     const g = game()
-    g.players.p1.hand = [hit(49)]
+    const b = g.players.p2
+    const tk: CardInst = { uid: 'tk-s', def: POOLS.TK.find((d) => d.id === 'TK-S')! }
+    const mg: CardInst = { uid: 'mg-s', def: POOLS.MG.find((d) => d.id === 'MG-S')! }
+    b.hand = [tk, mg]
+    b.boss!.res.MG = 5
+    const hp = b.hp
+    const s = resolveTurn(g, { p1: 'charge', p2: 'strike' })
+    const after = s.players.p2
+    expect(after.hp).toBe(hp - costNow(g, 'p2', tk))
+    expect(after.boss!.res.MG).toBeLessThan(5)
+    expect(after.championId).toBe('BR') // back to its own shadow after each class played
+  })
+
+  it('its classes work together: an Assassin Energy Surge guards the Bruiser-looking boss', () => {
+    const g = game()
+    g.players.p1.hand = [hit(40)]
     const s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
-    expect(s.players.p2.hp).toBe(151)
-    expect(s.players.p2.championId).toBe('TK')
+    expect(s.log.some((l) => l.includes('p2 Energy Surge'))).toBe(true)
+    expect(s.players.p2.hp).toBe(220) // Shroud: half dmg
   })
 
-  it('past the line: next form, a fresh deck, its old Field gone and 2 new cards drawn', () => {
+  it('a K.O. ends the match as usual', () => {
     const g = game()
     g.players.p1.hand = [hit(50)]
-    const s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
-    const b = s.players.p2
-    expect(b.hp).toBe(150)
-    expect(b.championId).toBe('BR')
-    expect(b.boss?.at).toBe(1)
-    expect(b.hand).toHaveLength(2)
-    expect([...b.hand, ...b.deck].every((c) => c.def.id.startsWith('BR-'))).toBe(true)
-    expect(s.events?.some((e) => e.k === 'shift' && e.championId === 'BR')).toBe(true)
-    expect(s.events?.some((e) => e.k === 'discard' && e.reason === 'Form shift')).toBe(true)
-  })
-
-  it('one shift a turn, even past two lines; the last form never shifts', () => {
-    const g = game()
-    g.players.p1.hand = [hit(120)]
-    let s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
-    expect(s.players.p2.championId).toBe('BR')
-    s = resolveTurn(s, { p1: 'charge', p2: 'block' })
-    expect(s.players.p2.championId).toBe('AS')
-    s.players.p2.hp = 10
-    s = resolveTurn(s, { p1: 'charge', p2: 'block' })
-    expect(s.players.p2.championId).toBe('MG')
-    expect(s.players.p2.style).toBe('MG:1')
-    s = resolveTurn(s, { p1: 'charge', p2: 'block' })
-    expect(s.players.p2.boss?.at).toBe(3)
-  })
-
-  it('a K.O. ends the match instead of shifting', () => {
-    const g = game()
-    g.players.p1.hand = [hit(250)]
+    g.players.p2.hp = 10
     const s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
     expect(s.winner).toBe('p1')
-    expect(s.players.p2.championId).toBe('TK')
   })
 })
