@@ -147,6 +147,7 @@ export function toDeckBottom(state: GameState, side: Side, cards: CardInst[]) {
 export function heal(state: GameState, side: Side, n: number): number {
   const p = state.players[side]
   if (p.hp <= 0 || noHealing(state, side)) return 0
+  if (p.boss) n = Math.floor((n * tuningOf(state).BOSS.healPct) / 100)
   n = healAfterIgnite(p, n, tuningOf(state, side === 'p1' ? 'p2' : 'p1'))
   overhealShield(p, n)
   const before = p.hp
@@ -155,9 +156,22 @@ export function heal(state: GameState, side: Side, n: number): number {
   return p.hp - before
 }
 
-/** from: 'hit' = a Strike chain card's hit; 'foe' / 'self' = any other HP loss, counted for Bruiser Rage (Q 2026-10-16). */
-export function loseHp(state: GameState, side: Side, n: number, from: 'hit' | 'foe' | 'self' = 'foe') {
+/** Arcade boss stat adjustment: dmg `from` deals to `to`, ×BOSS.dmgPct when the boss deals it, ×BOSS.takenPct when it takes it. */
+export function bossScaled(state: GameState, from: Side, to: Side, n: number): number {
+  const b = tuningOf(state).BOSS
+  if (state.players[from].boss && b.dmgPct !== 100) n = Math.floor((n * b.dmgPct) / 100)
+  if (state.players[to].boss && b.takenPct !== 100) n = Math.floor((n * b.takenPct) / 100)
+  return Math.max(0, n)
+}
+
+/**
+ * from: 'hit' = a Strike chain card's hit; 'foe' / 'self' = any other HP loss, counted for Bruiser Rage (Q 2026-10-16).
+ * bossScale: false when n is already scaled for the Arcade boss or comes from no one (Sudden death).
+ */
+export function loseHp(state: GameState, side: Side, n: number, from: 'hit' | 'foe' | 'self' = 'foe', bossScale = from === 'foe') {
   const p = state.players[side]
+  // chain hits were already scaled (engine.ts dmgOf); other dmg from the foe (Burn, card effects) is scaled here
+  if (bossScale) n = bossScaled(state, side === 'p1' ? 'p2' : 'p1', side, n)
   const before = p.hp
   p.hp = Math.max(0, p.hp - n)
   if (p.hp < before) for (const h of hooksOf(p)) h.onHpLoss?.(state, side)

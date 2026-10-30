@@ -3,7 +3,11 @@ import { supabase } from '../lib/supabase'
 import { must, useAsync } from '../lib/useAsync'
 import type { GameConfigRow, Json } from '../lib/database.types'
 import { SaveButton } from '../components/SaveButton'
-import { RULE_KEYS } from '../engine'
+import { bossConfigKey, cleanParams, RULE_KEYS, TUNING_FIELDS, tuningErrors, type TuningParams } from '../engine'
+import { TuningFields } from '../components/TuningFields'
+
+/** game_config keys of the Arcade boss numbers (edited in the Final boss panel, not the table) */
+const BOSS_KEYS = new Map(TUNING_FIELDS.BOSS.map((f) => [bossConfigKey(f.key), f.key]))
 
 type Draft = Omit<GameConfigRow, 'value' | 'updated_at'> & { raw: string }
 
@@ -22,7 +26,43 @@ export function ConfigPage() {
   )
   if (error) return <p className="error">{error}</p>
   if (!data) return <p className="muted">Loading…</p>
-  return <ConfigTable key={JSON.stringify(data)} rows={data} onSaved={reload} />
+  return (
+    <>
+      <BossPanel key={`boss-${JSON.stringify(data)}`} rows={data} onSaved={reload} />
+      <ConfigTable key={JSON.stringify(data)} rows={data.filter((r) => !BOSS_KEYS.has(r.key))} onSaved={reload} />
+    </>
+  )
+}
+
+/** Arcade final boss numbers (tuning group BOSS, engine/tuning.ts), stored as game_config boss_* rows; only values off the default are kept. */
+function BossPanel({ rows, onSaved }: { rows: GameConfigRow[]; onSaved: () => void }) {
+  const [params, setParams] = useState<TuningParams>(() =>
+    Object.fromEntries(rows.flatMap((r) => (BOSS_KEYS.has(r.key) && typeof r.value === 'number' ? [[BOSS_KEYS.get(r.key)!, r.value]] : []))),
+  )
+  const errors = tuningErrors('BOSS', params)
+
+  async function save() {
+    const keep = cleanParams('BOSS', params)
+    const fields = TUNING_FIELDS.BOSS
+    const upserts = fields.filter((f) => keep[f.key] !== undefined).map((f) => ({ key: bossConfigKey(f.key), value: keep[f.key] as Json, description: `Arcade boss: ${f.label}` }))
+    // a field back at its default: drop the row so the code default rules again
+    const drop = fields.filter((f) => keep[f.key] === undefined).map((f) => bossConfigKey(f.key)).filter((k) => rows.some((r) => r.key === k))
+    if (upserts.length) must(await supabase.from('game_config').upsert(upserts))
+    if (drop.length) must(await supabase.from('game_config').delete().in('key', drop))
+    onSaved()
+  }
+
+  return (
+    <div className="panel">
+      <h2>Final boss (Arcade)</h2>
+      <p className="muted">Chimera's stats for the next Arcade boss fight. Blank = code default.</p>
+      <TuningFields group="BOSS" params={params} onChange={setParams} />
+      {errors.length > 0 && <p className="error">{errors.join(' · ')}</p>}
+      <div className="actions">
+        <SaveButton onSave={save} disabled={errors.length > 0} />
+      </div>
+    </div>
+  )
 }
 
 function ConfigTable({ rows, onSaved }: { rows: GameConfigRow[]; onSaved: () => void }) {

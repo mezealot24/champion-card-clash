@@ -6,6 +6,7 @@
 // - every class's resource bar; each card is paid and played as its class (engine/classes.ts).
 import { inStyleDeck, type ChampionSetup } from './state'
 import type { CardDef } from './types'
+import type { Tuning } from './tuning'
 
 /** One class of the boss: its Champion, Style and capstone (Ascendancy node id, if the Style has a tree). */
 export type BossClass = { champ: string; style: string; capstone?: string }
@@ -36,6 +37,14 @@ export function bossSetup(
       perks: classes.flatMap((c) => (c.capstone ? [`asc:${c.style}:${c.capstone}`] : [])),
     },
   }
+}
+
+/**
+ * The kit with Admin's boss numbers (tuning BOSS, game_config boss_*): only the first `classes` classes
+ * (the shadow it wears stays first), capstones off when `capstones` is 0.
+ */
+export function tuneBossKit(kit: BossClass[], b: Tuning['BOSS']): BossClass[] {
+  return kit.slice(0, Math.max(1, b.classes)).map((c) => (b.capstones ? c : { champ: c.champ, style: c.style }))
 }
 
 /** n cards at random from a class's pool, only ones its Style plays (copies count as separate cards). */

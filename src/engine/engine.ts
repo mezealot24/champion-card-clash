@@ -6,7 +6,7 @@ import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE
 import type { EffectSpec } from './effects/spec'
 import { tuningOf } from './tuning'
 import type { ChainCtx, HitIn } from './effects/types'
-import { drawCards, effectOf, emit, heal, log, loseHp, markDiscarded, toDeckBottom } from './state'
+import { bossScaled, drawCards, effectOf, emit, heal, log, loseHp, markDiscarded, toDeckBottom } from './state'
 import type { Action, CardDef, CardInst, CardType, GameState, Side } from './types'
 import { other } from './types'
 
@@ -263,7 +263,7 @@ export function suddenDeath(state: GameState) {
     const p = state.players[side]
     if (past === 1 && cut > 0) p.perkData = { ...p.perkData, healPct: Math.floor(((p.perkData?.healPct ?? 100) * (100 - Math.min(100, cut))) / 100) }
     if (p.hp <= 0 || dmg <= 0) continue
-    loseHp(state, side, dmg * past)
+    loseHp(state, side, dmg * past, 'foe', false)
     log(state, `${side} ☠ Sudden death: lose ${dmg * past} HP`)
   }
 }
@@ -365,7 +365,9 @@ function resolveStrikes(
     const m = trueDmg[side] ? Math.max(1, mult[side]![i]) : mult[side]![i]
     const raw = baseDmgOf(state, side, card) + (card.grow ?? 0) + (card.growNext ?? 0) + b
     // Vulnerable: the side being hit takes N% more dmg from every hit; Chill: the striker's hits deal N% less
-    return Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)]) * (100 - env.chillPct[side])) / 10000))
+    const dmg = Math.max(0, Math.floor((raw * m * (100 + env.vulnPct[other(side)]) * (100 - env.chillPct[side])) / 10000))
+    // Arcade boss stat adjustment (Admin → Config → Final boss): its hits ×dmgPct, hits on it ×takenPct
+    return bossScaled(state, side, other(side), dmg)
   }
   // Before action combos (card types only), then Momentum stacks
   for (const side of strikers) checkCombos(state, side, chains[side]!.map((c) => ({ type: c.def.type, blocked: false, clean: false })), 'before')
@@ -512,7 +514,7 @@ function resolveStrikes(
     const total = chains[side]!.reduce((t, _, i) => t + dmgOf(side, i), 0)
     const burst = Math.floor((total * ts(side).AS.markBurstPct) / 100)
     if (burst <= 0) continue
-    loseHp(state, other(side), burst)
+    loseHp(state, other(side), burst, 'foe', false) // dmgOf already scaled it for the boss
     hitDmgTaken[other(side)] += burst
     log(state, `${side} 💀 Mark of Assassin bursts ${burst} (${ts(side).AS.markBurstPct}% of chain total ${total})`)
   }
