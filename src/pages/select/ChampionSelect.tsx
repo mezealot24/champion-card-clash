@@ -18,6 +18,7 @@ import type { Mode } from '../menu/TitleMenu'
 import type { DeckStats } from '../../engine/deckStats'
 import type { Preset, PresetView } from '../deck/presets'
 import { StatBars } from '../deck/StatBars'
+import { PresetPicker } from './PresetPicker'
 import { CHAMP_INFO, comboPattern, STYLE_SUMMARY } from './info'
 import { Portrait } from './Portrait'
 import './select.css'
@@ -83,6 +84,8 @@ export function ChampionSelect(props: {
   const champ = champions.find((c) => c.id === me)
   const myStyle = props.styleKey('p1')
   const [full, setFull] = useState<string | null>(null)
+  // the Ascendancy tree holds unsaved toggles: Next waits for Save
+  const [ascDirty, setAscDirty] = useState(false)
   const newPlayer = !tutorialDone()
   const foeName = foe === 'tuktah' ? t('Tuktah') : t('AI')
   const styles = props.stylesOf(me)
@@ -93,13 +96,13 @@ export function ChampionSelect(props: {
   const foeStyle = props.styleKey('p2')
 
   const gaps = loadoutGaps(me, myStyle || undefined, props.points, props.saved)
-  const done: Record<Step, boolean> = { champion: !!champ, path: !gaps.style && gaps.asc === 0, oath: !gaps.oath, deck: true, fight: true }
+  const done: Record<Step, boolean> = { champion: !!champ, path: !gaps.style && gaps.asc === 0 && !ascDirty,oath: !gaps.oath, deck: true, fight: true }
   const at = STEPS.indexOf(step)
   // a step opens when every step before it is done
   const open = (s: Step) => STEPS.slice(0, STEPS.indexOf(s)).every((p) => done[p])
   const next = STEPS[at + 1]
   const blocker =
-    step === 'path' ? (gaps.style ? t('Pick a Style') : gaps.asc > 0 ? t(gaps.asc > 1 ? 'Spend {n} more Ascendancy points' : 'Spend {n} more Ascendancy point', { n: gaps.asc }) : '')
+    step === 'path' ? (gaps.style ? t('Pick a Style') : ascDirty ? t('Save your Ascendancy first') : gaps.asc > 0 ?t(gaps.asc > 1 ? 'Spend {n} more Ascendancy points' : 'Spend {n} more Ascendancy point', { n: gaps.asc }) : '')
     : step === 'oath' && gaps.oath ? t('Pick an Oath')
     : ''
 
@@ -172,31 +175,7 @@ export function ChampionSelect(props: {
             ))}
           </div>
 
-          {champ && props.presets.length > 0 && (
-            <section className="box presets">
-              <h2>
-                {t('Presets')} <span>{t('a full build in one tap · change anything later')}</span>
-              </h2>
-              <div className="preset-opts">
-                {props.presets.map(({ preset: p, stats, problems }) => {
-                  const on = props.activePreset === p.id
-                  return (
-                    <div key={p.id} className={`preset${on ? ' on' : ''}`}>
-                      <div className="preset-head">
-                        <b>{p.name}</b>
-                        <span>{STYLES[p.style]?.name ?? p.style}</span>
-                      </div>
-                      <p className="preset-pitch">{t(p.pitch)}</p>
-                      <StatBars stats={stats} compact />
-                      <button type="button" className="preset-use" disabled={problems.length > 0 || on} title={problems.join(' · ') || undefined} onClick={() => props.onPreset(p)}>
-                        {problems.length ? t('Out of date') : on ? t('In use') : t('Use this build')}
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
-          )}
+          {champ && props.presets.length > 0 && <PresetPicker key={me} presets={props.presets} active={props.activePreset} onUse={props.onPreset} />}
 
           {champ && info && (
             <details className="box how">
@@ -256,7 +235,7 @@ export function ChampionSelect(props: {
             </div>
           </section>
           {myStyle ? (
-            <AscTree champ={me} style={myStyle} points={props.points} saved={props.saved} onChange={props.setSaved} fill={props.fill} />
+            <AscTree key={myStyle} champ={me} style={myStyle} points={props.points} saved={props.saved} onChange={props.setSaved} fill={props.fill} onDirty={setAscDirty} />
           ) : (
             <p className="lo-note">{t('Pick a Style to grow its Ascendancy tree.')}</p>
           )}
