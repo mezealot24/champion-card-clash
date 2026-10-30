@@ -44,7 +44,8 @@ export type ResourceDef = {
 /**
  * Assassin Energy Surge (Q 2026-10-17): with a full Energy bar at the start of the turn, the action you pick spends it all.
  * Block → Wraith Step: hits that get past your Block deal at most 1 dmg each.
- * Charge → Shroud: no Charge break this turn, and hits on you deal half (rounded down).
+ * Charge → Shroud: no Charge break this turn, hits land in full (Q 2026-10-30, was half), plus a Style payoff:
+ *   Sonic Bliz draws AS:1.shroudDraw more, Fatal Rhythm moves the Critical counter +AS:2.shroudCounter.
  * Strike → no Surge, the bar stays for Overdrive and S cards.
  * Works while Silenced (it's the class, not a card).
  */

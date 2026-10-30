@@ -67,7 +67,7 @@ describe('Arcade boss', () => {
     g.players.p1.hand = [hit(40)]
     const s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
     expect(s.log.some((l) => l.includes('p2 Energy Surge'))).toBe(true)
-    expect(s.players.p2.hp).toBe(220) // Shroud: half dmg
+    expect(s.players.p2.hp).toBe(200) // Shroud: no Charge break, hits land in full (Q 2026-10-30)
   })
 
   it('a K.O. ends the match as usual', () => {
@@ -94,8 +94,8 @@ describe('Arcade boss stats (tuning BOSS)', () => {
       g.players.p1.hand = [hit(40)]
       return 240 - resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp
     }
-    expect(run({})).toBe(20) // Shroud halves 40
-    expect(run({ takenPct: 50 })).toBe(10)
+    expect(run({})).toBe(40) // Shroud no longer halves (Q 2026-10-30)
+    expect(run({ takenPct: 50 })).toBe(20)
   })
 
   it('dmgPct scales its hits, takenPct leaves the player alone', () => {

@@ -96,6 +96,7 @@ export const TUNING_FIELDS = {
     { key: 'dmgPerEnergy', label: 'Overdrive dmg per Energy', def: 2 },
     { key: 'minChain', label: 'Overdrive min chain', def: 3, min: 1, max: 5 },
     { key: 'dualDraw', label: 'Acceleration draw', def: 2, min: 0 },
+    { key: 'shroudDraw', label: 'Shroud (Energy Surge Charge) extra draw', def: 1, min: 0, max: 5 },
   ],
   'AS:2': [
     { key: 'every', label: 'Critical every Nth attack', def: 4, min: 1 },
@@ -103,6 +104,7 @@ export const TUNING_FIELDS = {
     { key: 'redCritMult', label: 'Critical multiplier vs low HP', def: 4, min: 1, decimal: true },
     { key: 'redHpPct', label: 'Low HP line %', def: 30, min: 0, max: 100 },
     { key: 'blockedCritPct', label: 'Blocked Critical dmg %', def: 50, min: 0, max: 100 },
+    { key: 'shroudCounter', label: 'Shroud (Energy Surge Charge) Critical counter +', def: 2, min: 0, max: 5 },
   ],
   // ---- Mage ----
   MG: [

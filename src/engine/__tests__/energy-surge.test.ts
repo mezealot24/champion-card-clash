@@ -29,10 +29,27 @@ describe('Energy Surge', () => {
     expect(s.log.some((l) => l.includes('Energy Surge'))).toBe(false)
   })
 
-  it('Charge (Shroud): no Charge break, hits deal half, no extra draw', () => {
+  it('Charge (Shroud): no Charge break, hits land in full, draws the Style extra', () => {
     const s = resolveTurn(game([card(1), card(1)], [card(9), card(4)]), { p1: 'charge', p2: 'strike' })
-    expect(s.players.p1.hand).toHaveLength(3) // kept both, drew 1
-    expect(s.players.p1.hp).toBe(50 - 4 - 2)
+    expect(s.players.p1.hand).toHaveLength(3) // kept both, drew 1 (no Style)
+    expect(s.players.p1.hp).toBe(50 - 9 - 4)
+  })
+
+  it('Sonic Bliz Shroud draws more; Wraith Step does not', () => {
+    const charge = resolveTurn(game([card(1)], [card(9)], 3, 'AS:1'), { p1: 'charge', p2: 'strike' })
+    expect(charge.players.p1.hand).toHaveLength(1 + 1 + 1) // kept, Charge draw, Shroud draw
+    const block = resolveTurn(game([card(1)], [card(9)], 3, 'AS:1'), { p1: 'block', p2: 'strike' })
+    expect(block.players.p1.hand).toHaveLength(1)
+    expect(block.players.p1.hp).toBe(50) // Block stops it
+  })
+
+  it('Fatal Rhythm Shroud moves the Critical counter, never past the next Critical', () => {
+    const s = game([], [], 3, 'AS:2')
+    s.players.p1.styleData = { attacks: 0 }
+    expect(resolveTurn(s, { p1: 'charge', p2: 'charge' }).players.p1.styleData?.attacks).toBe(2)
+    const near = game([], [], 3, 'AS:2')
+    near.players.p1.styleData = { attacks: 2 }
+    expect(resolveTurn(near, { p1: 'charge', p2: 'charge' }).players.p1.styleData?.attacks).toBe(3) // next attack still crits
   })
 
   it('Strike: no Surge, Energy is kept', () => {
