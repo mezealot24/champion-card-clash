@@ -1,5 +1,5 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
-import { classesOf, inClass } from './classes'
+import { classesOf, inClass, styleOn } from './classes'
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { cardHeal, chillCut, getStyle, hooksOf, igniteBurn, igniteStacks } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
@@ -84,7 +84,20 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       if (!SURGE_MODES.includes(mode)) return
       surge[side] = p.res ?? 0
       p.res = 0
-      const what = mode === 'A' ? 'Wraith Step (hits through Block deal only 1)' : mode === 'B' ? 'Shroud (no charge break, half dmg)' : 'Elusive (enemy Block stops 1 less)'
+      // Shroud is the greedy pick (Q 2026-10-30): no Charge break and a Style payoff, but hits land in full.
+      // Sonic Bliz draws more (speed), Fatal Rhythm moves the Critical counter (rhythm). Wraith Step stays the safe pick.
+      const t = tuningOf(state, side)
+      let shroud = 'Shroud (no Charge break'
+      if (mode === 'B' && styleOn(p, 'AS:1') && t['AS:1'].shroudDraw > 0) shroud += `, draws ${t['AS:1'].shroudDraw} more`
+      if (mode === 'B' && styleOn(p, 'AS:2') && t['AS:2'].shroudCounter > 0) {
+        // never past the next Critical: the attack that would crit stays a Critical
+        const at = p.styleData?.attacks ?? 0
+        const every = Math.max(1, t['AS:2'].every)
+        const next = Math.min(at + t['AS:2'].shroudCounter, Math.ceil((at + 1) / every) * every - 1)
+        p.styleData = { ...p.styleData, attacks: Math.max(at, next) }
+        shroud += `, Critical counter +${Math.max(0, next - at)}`
+      }
+      const what = mode === 'A' ? 'Wraith Step (hits through Block deal only 1)' : mode === 'B' ? `${shroud})` : 'Elusive (enemy Block stops 1 less)'
       log(state, `${side} Energy Surge: spends all ${surge[side]} Energy → ${what}`)
     })
   }
@@ -160,6 +173,11 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     } else {
       const extra = hooksOf(p).reduce((t, h) => t + (h.chargeDraw ?? 0) + (h.extraChargeDraw?.(state, side) ?? 0), 0)
       drawCards(state, side, state.rules.chargeDraw + extra)
+    }
+    // Sonic Bliz Shroud: draws more on top, broken Charge or not (a Shroud is never broken)
+    if (env.shroud[side] && styleOn(p, 'AS:1')) {
+      const n = tuningOf(state, side)['AS:1'].shroudDraw
+      if (n > 0) log(state, `${side} Shroud: draws ${drawCards(state, side, n)} more`)
     }
   }
 
@@ -439,9 +457,8 @@ function resolveStrikes(
       if (!card) continue
       const enemy = other(side)
       let dealt = dealtOf(side, i)
-      // Energy Surge: Wraith Step caps hits past Block at 1, Shroud halves them
+      // Energy Surge: Wraith Step caps hits past Block at 1 (Shroud no longer cuts dmg, Q 2026-10-30)
       if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, 1)
-      if (env.shroud[enemy]) dealt = Math.floor(dealt / 2)
       if (critCut[enemy] && crit[side].has(i)) dealt = Math.floor((dealt * (100 - critCut[enemy])) / 100)
       if (hitCut[enemy] && !isBlocked(side, i) && dealt > 0 && cutSkip[enemy] > 0) cutSkip[enemy]--
       else if (hitCut[enemy] && !isBlocked(side, i) && dealt > 0 && cutLeft[enemy] > 0) {

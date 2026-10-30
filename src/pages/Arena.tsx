@@ -50,6 +50,15 @@ const surgeOf = (g: GameState, side: Side, action: Action) => {
   if (!s || !res || p.championId !== SURGE_CHAMPION || !SURGE_MODES.includes(s.mode) || (p.res ?? 0) < res.cap) return undefined
   return s.name
 }
+/** What the Surge does, for the button tooltip. Shroud's payoff depends on the Style (engine.ts). */
+const surgeRule = (g: GameState, side: Side, name: string) => {
+  if (name !== 'Shroud') return t('hits that get past your Block deal 1 each')
+  const p = g.players[side]
+  const tune = tuningOf(g, side)
+  if (p.style === 'AS:1' && tune['AS:1'].shroudDraw > 0) return t('no Charge break, draw {n} more', { n: tune['AS:1'].shroudDraw })
+  if (p.style === 'AS:2' && tune['AS:2'].shroudCounter > 0) return t('no Charge break, Critical counter +{n}', { n: tune['AS:2'].shroudCounter })
+  return t('no Charge break')
+}
 const SPEEDS = [1, 1.5, 2]
 /** Signature combo banner time at 1x speed (was 1.3 s, players couldn't read it) */
 const BANNER_MS = 3200
@@ -730,7 +739,7 @@ export function Arena(props: {
                   key={action}
                   type="button"
                   className={`act ${action}${locked === action ? ' locked' : ''}${surge ? ' surge' : ''}`}
-                  title={surge ? t('{name}: spends all your Energy this turn ({rule})', { name: surge, rule: t(surge === 'Shroud' ? 'no Charge break, hits on you deal half' : 'hits that get past your Block deal 1 each') }) : undefined}
+                  title={surge ? t('{name}: spends all your Energy this turn ({rule})', { name: surge, rule: surgeRule(game, 'p1', surge) }) : undefined}
                   disabled={playing || !!turn || !!game.winner || !!props.busy || !legal.includes(action)}
                   onClick={(e) => {
                     e.stopPropagation()

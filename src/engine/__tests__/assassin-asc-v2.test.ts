@@ -158,6 +158,7 @@ describe('Assassin v2 Ascendancy', () => {
     it('Crescendo: Primed starts at 2, Charge adds 1, and Off-Beat resets after a Critical', () => {
       let s = as('AS:2', ['B1', 'B2'])
       expect(s.players.p1.styleData?.attacks).toBe(2)
+      s.players.p1.res = 0 // no Energy Surge (Shroud moves the counter too)
       s = resolveTurn(s, { p1: 'charge', p2: 'charge' })
       expect(s.players.p1.styleData?.attacks).toBe(3)
 
