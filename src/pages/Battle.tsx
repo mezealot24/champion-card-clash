@@ -15,7 +15,7 @@ import { activePreset, applyPreset, presetViews, statsOf } from './deck/presets'
 import { ascPointsFromConfig, firstOpenStep, loadLoadout, loadoutFor, saveLoadout, savedStyle, type SavedLoadout, type Step } from './loadout/loadout'
 import { Online } from './Online'
 import { ChampionSelect, type FoeKind } from './select/ChampionSelect'
-import { CHAMP_INFO } from './select/info'
+import { CHAMP_INFO, STYLE_SUMMARY } from './select/info'
 import { useGameSettings } from './settings'
 import { TimerSetting, TurnTimer } from './timer/TurnTimer'
 import { Tutorial } from './tutorial/Tutorial'
@@ -405,18 +405,28 @@ export function Battle({ data }: { data: BattleData }) {
     const key = p.style
     return key ? (STYLES[key]?.name ?? key) : ''
   }
-  // the boss's Style sheet: each class's Style and capstone
-  const bossText = (side: Side) => {
+  // the Style sheet in the Arena: the one-line summary and the loadout first, the full rules folded under it
+  const styleTip = (champ: string, style: string | undefined, l: Loadout | undefined) => {
+    const key = style ?? ''
+    const sum = STYLE_SUMMARY[key]
+    const lines = loadoutLines(champ, style, l).map((x) => `${t(x.label)}: ${x.value}`)
+    const full = styleText[key] ?? ''
+    return sum ? { body: [fill(t(sum), key), ...lines].join('\n'), more: full } : { body: [full, ...lines].filter(Boolean).join('\n') }
+  }
+  // the boss's Style sheet: each class's Style summary and capstone; the full Style rules folded
+  const bossTip = (side: Side) => {
     const p = game.players[side]
     if (!p.boss) return undefined
-    return p.boss.classes
-      .map((c) => {
-        const key = p.boss!.styles[c]
-        const cap = (p.perks ?? []).find((k) => k.startsWith(`asc:${key}:`))?.split(':')[3]
-        const node = cap ? TREES[key]?.nodes.find((n) => n.id === cap) : undefined
-        return `${champTitle(c)} · ${STYLES[key]?.name ?? key}: ${styleText[key] ?? ''}${node ? ` ${t('Capstone')} ${node.name}: ${fill(node.text, key)} ${t('Cost')}: ${fill(node.cost ?? '', key)}` : ''}`
-      })
-      .join('\n\n')
+    const parts = p.boss.classes.map((c) => {
+      const key = p.boss!.styles[c]
+      const cap = (p.perks ?? []).find((k) => k.startsWith(`asc:${key}:`))?.split(':')[3]
+      const node = cap ? TREES[key]?.nodes.find((n) => n.id === cap) : undefined
+      const head = `${champTitle(c)} · ${STYLES[key]?.name ?? key}`
+      const sum = STYLE_SUMMARY[key] ? fill(t(STYLE_SUMMARY[key]), key) : (styleText[key] ?? '')
+      const capLine = node ? `${t('Capstone')} ${node.name}: ${fill(t(node.text), key)} ${t('Cost')}: ${fill(t(node.cost ?? ''), key)}` : ''
+      return { short: [`${head}: ${sum}`, capLine].filter(Boolean).join('\n'), full: `${head}\n${styleText[key] ?? ''}` }
+    })
+    return { body: parts.map((x) => x.short).join('\n'), more: parts.map((x) => x.full).join('\n') }
   }
 
   // Arcade result buttons: a win goes back to the ladder; a loss can Continue the same stage or give up the run
@@ -473,8 +483,8 @@ export function Battle({ data }: { data: BattleData }) {
         names={{ p1: champName('p1'), p2: champName('p2') }}
         styleNames={{ p1: styleOf('p1'), p2: styleOf('p2') }}
         styleTexts={{
-          p1: [styleText[game.players.p1.style ?? ''] ?? '', ...loadoutLines(game.players.p1.championId, game.players.p1.style, myLoadout).map((l) => `${t(l.label)}: ${l.value}.`)].filter(Boolean).join(' '),
-          p2: bossText('p2') ?? [styleText[game.players.p2.style ?? ''] ?? '', ...loadoutLines(game.players.p2.championId, game.players.p2.style, foeLoadout).map((l) => `${t(l.label)}: ${l.value}.`)].filter(Boolean).join(' '),
+          p1: styleTip(game.players.p1.championId, game.players.p1.style, myLoadout),
+          p2: bossTip('p2') ?? styleTip(game.players.p2.championId, game.players.p2.style, foeLoadout),
         }}
         settingsExtra={<TimerSetting />}
         onAction={play}

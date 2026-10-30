@@ -6,6 +6,7 @@ import { t, withLang } from '.'
 import { DMG_TARGET, HOOK_LABEL, PCT_OF, PER_LABEL, PIERCE_TARGET, STATUS, TIMING, TYPE, WHO } from '../engine/effects/describe'
 import { ENDURANCE_TEXT, OATHS, TREES } from '../engine/loadoutData'
 import { PER, STATUS_SHORT } from '../pages/learnText'
+import { KEYWORDS } from '../pages/keywords'
 import { CHAMP_INFO, STYLE_SUMMARY } from '../pages/select/info'
 import { TUTORIAL } from '../pages/tutorial/script'
 import { BOSS, BOSS_TIER, TIERS } from '../pages/arcade/arcade'
@@ -55,6 +56,7 @@ const dataKeys = [
   ...Object.values(TREES).flatMap((tree) => tree.nodes.flatMap((n) => [n.text, ...(n.cost ? [n.cost] : [])])),
   ...Object.values(OATHS).flatMap((os) => os.map((o) => o.text)),
   ENDURANCE_TEXT,
+  ...KEYWORDS.flat(),
   BOSS_TIER.name, BOSS.name,
   // stat names (StatBars table) and preset pitches
   ...['HP', 'Defend', 'ATK', 'Technique', 'Speed'],

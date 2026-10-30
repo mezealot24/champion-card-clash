@@ -21,7 +21,9 @@ import {
   type Status,
   type TurnEvent,
 } from '../engine'
-import { describeSpec } from '../engine/effects/describe'
+import { describeSpec, EN } from '../engine/effects/describe'
+import { keywordsIn } from './keywords'
+import { bullets } from './loadout/bullets'
 import { t, useLang } from '../i18n'
 import { LangToggle } from '../i18n/LangToggle'
 import { champColor, fighterHTML, type Pose } from './fighters'
@@ -94,7 +96,8 @@ export function Arena(props: {
   names: Record<Side, string>
   styleNames: Record<Side, string>
   /** full Style text, shown when a player taps the Style name */
-  styleTexts?: Record<Side, string>
+  /** body = the Style in a few lines; more = its full rules, folded */
+  styleTexts?: Record<Side, { body: string; more?: string }>
   /** extra controls in the in-match Settings sheet (e.g. the turn timer switch) */
   settingsExtra?: React.ReactNode
   onAction: (a: Action) => void
@@ -799,9 +802,18 @@ export function Arena(props: {
               ) : typeof sheet === 'object' && 'tip' in sheet ? (
                 <div className="info">
                   <b>{sheet.tip.title}</b>
-                  {sheet.tip.body.split('\n').map((l, i) => (
+                  {bullets(sheet.tip.body).map((l, i) => (
                     <p key={i}>{l}</p>
                   ))}
+                  {sheet.tip.more && (
+                    <details onClick={(e) => e.stopPropagation()}>
+                      <summary>{t('Full rules')}</summary>
+                      {bullets(sheet.tip.more).map((l, i) => (
+                        <p key={i}>{l}</p>
+                      ))}
+                    </details>
+                  )}
+                  <Keywords text={`${sheet.tip.body}\n${sheet.tip.more ?? ''}`} />
                   <p>{t('Tap anywhere to close.')}</p>
                 </div>
               ) : sheet === 'log' ? (
@@ -857,7 +869,7 @@ function TokenView({ side, tok, playing, locked, foe }: { side: Side; tok: Token
   )
 }
 
-type Tip = { title: string; body: string }
+type Tip = { title: string; body: string; more?: string }
 /** Tank Lifeline Endurance numbers (Ascendancy keys live in the Style's group, untyped) */
 const enduranceNum = (game: GameState, side: Side) => tuningOf(game, side)['TK:1'] as unknown as Record<string, number>
 type Chip = { label: string; tone: 'buff' | 'debuff'; tip: string }
@@ -919,7 +931,7 @@ const RESOURCE_TIP: Record<string, string> = {
   AS: 'Energy refills by 1 every turn. S cards cost Energy; without enough, the effect is off.',
 }
 
-function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: GameState; side: Side; hp: number; name: string; style: string; styleText?: string; foe: string; onTip: (t: Tip) => void }) {
+function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: GameState; side: Side; hp: number; name: string; style: string; styleText?: { body: string; more?: string }; foe: string; onTip: (t: Tip) => void }) {
   const p = game.players[side]
   const pct = Math.max(0, Math.min(100, (hp / p.maxHp) * 100))
   const res = game.rules.resources ? resourceOf(p.championId, tuningOf(game, side)) : undefined
@@ -984,7 +996,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
         <span>
           {side === 'p1' ? t('You') : foe} ·{' '}
           {style && styleText ? (
-            <button type="button" className="style-link" onClick={tap({ title: style, body: styleText })}>
+            <button type="button" className="style-link" onClick={tap({ title: style, ...styleText })}>
               {style} ⓘ
             </button>
           ) : (
@@ -1132,6 +1144,21 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
   )
 }
 
+/** What each keyword in a rules text means, one short line each (the text itself never explains them). */
+function Keywords({ text }: { text: string }) {
+  const ks = keywordsIn(text)
+  if (!ks.length) return null
+  return (
+    <ul className="keywords">
+      {ks.map(([k, d]) => (
+        <li key={k}>
+          <b>{t(k)}</b> {t(d)}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function CardSheet({ game, side, card }: { game: GameState; side: Side; card: CardInst }) {
   const f = cardFacts(game, side, card)
   return (
@@ -1144,7 +1171,8 @@ function CardSheet({ game, side, card }: { game: GameState; side: Side; card: Ca
         <span>
           {t({ P: 'Punch', K: 'Kick', S: 'Skill' }[f.type])} · {f.total} dmg{f.cost > 0 ? ` · ${t('costs {n} {res}', { n: f.cost, res: f.costName })}` : ''}
         </span>
-        <p>{f.text || t('No effect. Plain damage.')}</p>
+        {f.text ? f.text.split(' / ').map((l, i) => <p key={i}>{l}</p>) : <p>{t('No effect. Plain damage.')}</p>}
+        {f.text && <Keywords text={card.def.effectSpec?.length ? describeSpec(card.def.effectSpec, EN) : f.text} />}
         {f.short != null && <p>{t('Not enough {res}: hits for {pct}% dmg, effect off, drawbacks still fire.', { res: f.costName, pct: f.short })}</p>}
         {f.off && f.short == null && <p>{t('Effect off right now ({why}). The card still deals its damage.', { why: f.off })}</p>}
         {f.missing && <p>⚠ {t('This effect has no code yet; it plays as plain damage.')}</p>}
