@@ -141,6 +141,19 @@ export const TUNING_FIELDS = {
     { key: 'tombHealPerMana', label: 'Frozen Tomb heal per Mana', def: 5, min: 0 },
     { key: 'tombMeltPct', label: 'Shield left → HP %', def: 50, min: 0, max: 100 },
   ],
+  // ---- Arcade final boss (Chimera, engine/boss.ts; Q 2026-10-30). Stored as game_config boss_* keys (Admin → Config) ----
+  BOSS: [
+    { key: 'hp', label: 'HP', def: 111, min: 1, help: 'Start and Max HP' },
+    { key: 'classes', label: 'Classes it plays', def: 4, min: 1, max: 4, help: 'The class it looks like first, then the others' },
+    { key: 'perClass', label: 'Cards per class', def: 10, min: 1, max: 25 },
+    { key: 'capstones', label: 'Capstones (1 = on, 0 = off)', def: 1, min: 0, max: 1, help: 'One Ascendancy capstone per class' },
+    { key: 'resStart', label: 'Resource at start + (every bar)', def: 0, min: 0, help: 'Capped at each bar\'s cap; Tank pays HP so gets none' },
+    { key: 'dmgPct', label: 'Dmg dealt %', def: 100, min: 0, help: 'Its chain hits and other dmg it deals (Burn, bursts), before Block / Shield' },
+    { key: 'takenPct', label: 'Dmg taken %', def: 100, min: 0, help: 'Chain hits and other dmg it takes from the player; not its own costs' },
+    { key: 'healPct', label: 'Heals %', def: 100, min: 0 },
+    { key: 'aiDepth', label: 'AI turns looked ahead', def: 2, min: 1, max: 3 },
+    { key: 'aiNoise', label: 'AI random picks (0–1)', def: 0.02, min: 0, max: 1, decimal: true },
+  ],
 } as const satisfies Record<string, readonly TuneField[]>
 
 type Fields = typeof TUNING_FIELDS
@@ -177,6 +190,9 @@ export function resolveTuning(overrides: TuningOverrides = {}): Tuning {
 
 export const DEFAULT_TUNING: Tuning = resolveTuning()
 
+/** game_config key of an Arcade boss number: boss_per_class */
+export const bossConfigKey = (key: string) => `boss_${key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`)}`
+
 /** champions.params + champion_styles.params rows → overrides keyed by group. */
 export function tuningFromRows(
   champions: { id: string; params?: Record<string, unknown> | null }[] = [],
@@ -193,6 +209,13 @@ export function tuningFromRows(
     if (row) minor[f.key] = row.value
   }
   if (Object.keys(minor).length) out.MINOR = minor
+  // Arcade boss numbers: game_config boss_* keys (Admin → Config → Final boss)
+  const boss: Record<string, unknown> = {}
+  for (const f of TUNING_FIELDS.BOSS) {
+    const row = config.find((r) => r.key === bossConfigKey(f.key))
+    if (row) boss[f.key] = row.value
+  }
+  if (Object.keys(boss).length) out.BOSS = boss
   return out
 }
 

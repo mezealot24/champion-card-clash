@@ -1,6 +1,7 @@
 // Arcade final boss (engine/boss.ts): every class at once (Styles, capstones, cards, resource bars).
 import { describe, expect, it } from 'vitest'
-import { bossSetup, capstonesOf, costNow, createGame, pickCards, resolveTurn } from '../index'
+import { bossConfigKey, bossSetup, capstonesOf, costNow, createGame, DEFAULT_TUNING, pickCards, resolveTuning, resolveTurn, tuneBossKit, tuningFromRows } from '../index'
+import { heal, loseHp } from '../state'
 import type { BossClass, CardDef, CardInst, GameState } from '../index'
 
 let uid = 0
@@ -75,5 +76,75 @@ describe('Arcade boss', () => {
     g.players.p2.hp = 10
     const s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
     expect(s.winner).toBe('p1')
+  })
+})
+
+// Boss stat adjustment (Q 2026-10-30): tuning group BOSS, Admin → Config → Final boss (game_config boss_*)
+describe('Arcade boss stats (tuning BOSS)', () => {
+  const tuned = (b: Record<string, number>) =>
+    createGame({ championId: 'XX', hpStart: 100, hpMax: 100, deck: pool('XX') }, bossSetup('Chimera', 240, KIT, POOLS, 10, () => 0.5), { seed: 1, tuning: { BOSS: b } })
+
+  it('defaults keep the boss as it was', () => {
+    expect(DEFAULT_TUNING.BOSS).toMatchObject({ hp: 111, perClass: 10, classes: 4, capstones: 1, dmgPct: 100, takenPct: 100, healPct: 100, resStart: 0 })
+  })
+
+  it('takenPct scales the hits it takes', () => {
+    const run = (b: Record<string, number>) => {
+      const g = tuned(b)
+      g.players.p1.hand = [hit(40)]
+      return 240 - resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp
+    }
+    expect(run({})).toBe(20) // Shroud halves 40
+    expect(run({ takenPct: 50 })).toBe(10)
+  })
+
+  it('dmgPct scales its hits, takenPct leaves the player alone', () => {
+    const run = (b: Record<string, number>) => {
+      const g = tuned(b)
+      g.players.p2.hand = [hit(20)]
+      return 100 - resolveTurn(g, { p1: 'charge', p2: 'strike' }).players.p1.hp
+    }
+    const base = run({})
+    expect(base).toBeGreaterThan(0)
+    expect(run({ dmgPct: 200 })).toBe(base * 2)
+    expect(run({ takenPct: 10 })).toBe(base)
+  })
+
+  it('dmgPct also scales other dmg it deals; Sudden death is not scaled', () => {
+    const g = tuned({ dmgPct: 50, takenPct: 50 })
+    loseHp(g, 'p1', 10)
+    loseHp(g, 'p2', 10)
+    expect(g.players.p1.hp).toBe(95)
+    expect(g.players.p2.hp).toBe(235)
+    loseHp(g, 'p2', 10, 'foe', false)
+    expect(g.players.p2.hp).toBe(225)
+  })
+
+  it('healPct scales its heals only', () => {
+    const g = tuned({ healPct: 50 })
+    g.players.p1.hp = 50
+    g.players.p2.hp = 100
+    expect(heal(g, 'p2', 20)).toBe(10)
+    expect(heal(g, 'p1', 20)).toBe(20)
+  })
+
+  it('resStart fills every bar at the start, up to its cap (Tank pays HP: none)', () => {
+    const b = tuned({ resStart: 2 }).players.p2
+    const base = tuned({}).players.p2
+    expect(b.boss!.res.MG).toBe(Math.min(DEFAULT_TUNING.MG.cap, base.boss!.res.MG + 2))
+    expect(b.boss!.res.TK).toBe(0)
+  })
+
+  it('tuneBossKit: fewer classes (the shadow stays first), capstones off', () => {
+    const k = tuneBossKit(KIT, { ...DEFAULT_TUNING.BOSS, classes: 2, capstones: 0 })
+    expect(k.map((c) => c.champ)).toEqual(['BR', 'TK'])
+    expect(k.every((c) => !c.capstone)).toBe(true)
+    expect(tuneBossKit(KIT, DEFAULT_TUNING.BOSS)).toEqual(KIT)
+  })
+
+  it('reads game_config boss_* rows', () => {
+    const t = resolveTuning(tuningFromRows([], [], [{ key: 'boss_hp', value: 150 }, { key: 'boss_per_class', value: 8 }, { key: 'boss_ai_noise', value: 0.1 }]))
+    expect(t.BOSS).toMatchObject({ hp: 150, perClass: 8, aiNoise: 0.1, dmgPct: 100 })
+    expect(bossConfigKey('takenPct')).toBe('boss_taken_pct')
   })
 })

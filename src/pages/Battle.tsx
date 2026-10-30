@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
-import { bossSetup, type BossClass, buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
+import { bossSetup, tuneBossKit, type BossClass, buildDeck, createGame, randomLoadout, fillText, isEffectMissing, legalActions, MINORS, OATHS, ENDURANCE_TEXT, resolveTuning, pickSmartAction, rulesFromConfig, STYLES, resolveTurn, TREES, tuningFromRows, type Action, type CardRowLike, type GameState, type Loadout, type Side } from '../engine'
 import { t, useLang } from '../i18n'
 import { capability, type Sample } from '../online/claude'
 import type { Seat } from '../online/match'
 import { askTuktah } from '../online/tuktah'
 import { Arena, type Turn } from './Arena'
-import { addClear, BOSS, cleared, isBoss, loadRun, newRun, randomFoe, rollBossKit, saveRun, tierOf, type ArcadeRun, type Foe as FoePick, type Tier } from './arcade/arcade'
+import { addClear, BOSS, bossTier, cleared, isBoss, loadRun, newRun, randomFoe, rollBossKit, saveRun, tierOf, type ArcadeRun, type Foe as FoePick, type Tier } from './arcade/arcade'
 import { ArcadeContinue } from './arcade/ArcadeContinue'
 import { ArcadeLadder } from './arcade/ArcadeLadder'
 import { TitleMenu, type Mode } from './menu/TitleMenu'
@@ -169,8 +169,10 @@ export function Battle({ data }: { data: BattleData }) {
     setTier(aiTier)
     const foeL = bossKit ? undefined : randomLoadout(them, theirStyle, ascPoints)
     setFoeLoadout(foeL)
-    const foeSeat = bossKit
-      ? bossSetup(t(BOSS.name), BOSS.hp, bossKit, Object.fromEntries(bossKit.map((c) => [c.champ, deckOf(c.champ)])), BOSS.perClass)
+    // boss numbers from Admin → Config (tuning group BOSS)
+    const bossClasses = bossKit && tuneBossKit(bossKit, tuning.BOSS)
+    const foeSeat = bossClasses
+      ? bossSetup(t(BOSS.name), tuning.BOSS.hp, bossClasses, Object.fromEntries(bossClasses.map((c) => [c.champ, deckOf(c.champ)])), tuning.BOSS.perClass)
       : { ...setup(them), style: theirStyle, loadout: foeL }
     setGame(createGame({ ...setup(me), deck: buildDeck(myDeck(me, myStyle).rows), style: myStyle, loadout: loadoutFor(me, myStyle, ascPoints) }, foeSeat, gameOpts))
   }
@@ -187,7 +189,7 @@ export function Battle({ data }: { data: BattleData }) {
       setGame(null)
       return setStep(open)
     }
-    const aiTier = tierOf(r.at, r)
+    const aiTier = isBoss(foeAt) ? bossTier(tuning.BOSS) : tierOf(r.at, r)
     const banner = t('Stage {n}/{total} · {tier}', { n: r.at + 1, total: r.stages.length, tier: t(aiTier.name) })
     if (isBoss(foeAt)) {
       // a new kit every try; the Versus picks never hold the boss id

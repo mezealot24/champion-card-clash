@@ -1488,7 +1488,8 @@ export function applyBoss(p: PlayerState, perks: string[], gameTuning: Tuning) {
   const t = p.tuning ?? gameTuning
   for (const cls of p.boss?.classes ?? []) {
     const res = resourceOf(cls, t)
-    p.boss!.res[cls] = res && !res.payWithHp ? Math.min(res.cap, res.start) : 0
+    // BOSS.resStart: Admin's head start on every bar (Q 2026-10-30)
+    p.boss!.res[cls] = res && !res.payWithHp ? Math.min(res.cap, res.start + gameTuning.BOSS.resStart) : 0
   }
   p.res = p.boss?.res[p.championId] ?? p.res
 }
