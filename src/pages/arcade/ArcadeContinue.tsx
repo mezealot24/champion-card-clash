@@ -1,5 +1,6 @@
 // Arcade Continue screen (Q 2026-10-29): after a loss the player may rework the run's build before the retry.
 // The Champion and Style stay fixed for the run; the Ascendancy tree and the Oath can change (saved like the pre-match steps).
+import { useState } from 'react'
 import { t, useLang } from '../../i18n'
 import { champColor } from '../fighters'
 import { firstOpenStep, type SavedLoadout } from '../loadout/loadout'
@@ -25,7 +26,8 @@ export function ArcadeContinue(props: {
   useLang()
   const { run, saved } = props
   const foe = run.stages[run.at]
-  const ready = firstOpenStep(run.champ, run.style, props.points, saved) === 'fight'
+  const [ascDirty, setAscDirty] = useState(false)
+  const ready = !ascDirty && firstOpenStep(run.champ, run.style, props.points, saved) === 'fight'
 
   return (
     <div className="select" style={{ '--tint': champColor(run.champ) } as React.CSSProperties}>
@@ -42,7 +44,7 @@ export function ArcadeContinue(props: {
         {t('Rework your Ascendancy and Oath, then retry against {foe}.', { foe: props.foeName })}
       </p>
 
-      <AscTree champ={run.champ} style={run.style} points={props.points} saved={saved} onChange={props.setSaved} fill={props.fill} />
+      <AscTree champ={run.champ} style={run.style} points={props.points} saved={saved} onChange={props.setSaved} fill={props.fill} onDirty={setAscDirty} />
       <OathPicker champ={run.champ} champName={props.champName} saved={saved} onChange={props.setSaved} fill={props.fill} />
 
       <footer className="sel-foot">
@@ -50,7 +52,7 @@ export function ArcadeContinue(props: {
           {t('Give up')}
         </button>
         <button type="button" className="start" disabled={!ready} onClick={props.onFight}>
-          {ready ? t('Fight!') : t('Spend every point and pick an Oath')}
+          {ready ? t('Fight!') : ascDirty ? t('Save your Ascendancy first') : t('Spend every point and pick an Oath')}
         </button>
       </footer>
     </div>

@@ -107,3 +107,19 @@
 .lo-ghost { align-self: flex-start; background: none; border: 2px solid var(--s-line); color: var(--s-text); border-radius: 12px; padding: 8px 12px; font-weight: 800; }
 .lo-ghost:disabled { opacity: .4; cursor: default; }
 .lo-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Q 2026-10-30: nodes switch on/off in a draft; one Save keeps a full tree */
+.at-switch { display: inline-flex; align-items: center; gap: 10px; background: none; border: 0; padding: 4px 0; color: var(--s-muted); font-weight: 800; font-size: 14px; text-align: left; }
+.at-knob { flex: none; position: relative; width: 44px; height: 24px; border-radius: 999px; background: rgba(12,7,24,.6); border: 2px solid var(--s-line); transition: background-color .18s, border-color .18s; }
+.at-knob::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--s-muted); transition: transform .18s cubic-bezier(.22,1,.36,1), background-color .18s; }
+.at-switch.on { color: var(--s-text); }
+.at-switch.on .at-knob { background: var(--tint); border-color: var(--tint); }
+.at-switch.on .at-knob::after { transform: translateX(20px); background: #150f29; }
+.at-switch:focus-visible .at-knob { outline: 2px solid var(--s-text); outline-offset: 2px; }
+.at-save { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 -14px -12px; padding: 10px 14px;
+  border-top: 1px solid var(--s-line); border-radius: 0 0 14px 14px; background: var(--s-panel); }
+.at-save > span { flex: 1; min-width: 140px; font-size: 13px; font-weight: 800; color: var(--s-muted); }
+.at-save.dirty > span { color: var(--s-gold); }
+.at-save .lo-ghost { align-self: auto; }
+.at-save .at-learn:disabled { background: var(--s-panel-2); color: var(--s-muted); border-color: var(--s-line); box-shadow: none; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .at-knob, .at-knob::after { transition: none; } }

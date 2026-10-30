@@ -3,7 +3,7 @@
 // offers them); a Style and a full tree are required. Mockup: Game Designer thread (claude.ai/artifact/QWLfQ4bSXFxz6BMXUwQAB6).
 // All open in Beta, saved per Champion on every change.
 import { fillAsc, OATHS, TREES, treePoints, treeShape, validAsc } from '../../engine'
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { t, useLang } from '../../i18n'
 import { Portrait } from '../select/Portrait'
 import { RichList } from './RichText'
@@ -19,32 +19,39 @@ type Props = {
 }
 
 /** The picked Style's tree, drawn as a skill tree (Q 2026-10-29): the Style crest on top, one column per branch, passives
- * (round) then the keystone (◆, the capstone with a Cost) at the bottom. Tap a node to read it in the panel below, tap it
- * again (or press Learn) to take it. Every point must be spent before the next step. */
-export function AscTree({ champ, style, points: base, saved, onChange, fill }: Props & { style: string; points: number }) {
+ * (round) then the keystone (◆, the capstone with a Cost) at the bottom. Q 2026-10-30: tapping a node switches it on or
+ * off in a draft (switching on also takes the nodes above it); Save keeps the draft, and only a full tree can be saved. */
+export function AscTree({ champ, style, points: base, saved, onChange, fill, onDirty }: Props & { style: string; points: number; onDirty?: (dirty: boolean) => void }) {
   useLang()
   const uid = useId().replace(/:/g, '')
   const points = treePoints(style, base)
   const { letters, depth, maxCapstones } = treeShape(style)
   const tree = TREES[style]
-  const taken = saved.asc?.[style] ?? []
-  const setAsc = (ids: string[]) => onChange({ ...saved, asc: { ...saved.asc, [style]: ids } })
-  const nodeState = (id: string) => (taken.includes(id) ? 'taken' : validAsc([...taken, id], points, style) ? 'avail' : 'locked')
+  const kept = saved.asc?.[style] ?? []
+  const [taken, setTaken] = useState<string[]>(kept)
   const [focusPick, setFocus] = useState<string>()
+  const dirty = taken.length !== kept.length || taken.some((x) => !kept.includes(x))
+  useEffect(() => onDirty?.(dirty), [dirty, onDirty])
+  useEffect(() => () => onDirty?.(false), [onDirty])
   if (!tree) return <p className="lo-note">{t('This Style has no Ascendancy tree yet.')}</p>
-  const focus = tree.nodes.find((n) => n.id === focusPick) ?? tree.nodes.find((n) => nodeState(n.id) === 'avail') ?? tree.nodes[0]
-  const left = points - taken.length
 
-  function take(id: string) {
-    const next = [...taken, id]
-    if (validAsc(next, points, style)) setAsc(next)
+  // the node plus any untaken nodes above it in its branch
+  const withPath = (id: string) => [...taken, ...Array.from({ length: Number(id[1]) }, (_, i) => `${id[0]}${i + 1}`).filter((x) => !taken.includes(x))]
+  const nodeState = (id: string) => (taken.includes(id) ? 'taken' : validAsc(withPath(id), points, style) ? 'avail' : 'locked')
+  const focus = tree.nodes.find((n) => n.id === focusPick) ?? tree.nodes[0]
+  const left = points - taken.length
+  const full = left === 0
+
+  // switching a node off also drops the ones below it in that branch
+  const toggle = (id: string) => {
+    if (taken.includes(id)) setTaken(taken.filter((x) => !(x[0] === id[0] && Number(x[1]) >= Number(id[1]))))
+    else if (validAsc(withPath(id), points, style)) setTaken(withPath(id))
   }
-  // refunding a node also drops the ones below it in that branch
-  const refund = (id: string) => setAsc(taken.filter((x) => !(x[0] === id[0] && Number(x[1]) >= Number(id[1]))))
   function tap(id: string) {
-    if (id === focus.id && nodeState(id) === 'avail') take(id)
+    toggle(id)
     setFocus(id)
   }
+  const save = () => onChange({ ...saved, asc: { ...saved.asc, [style]: taken } })
 
   // layout in a 400-wide viewBox: crest, a spine, then one column per branch
   const W = 400
@@ -57,18 +64,14 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
   const SPINE = 74
 
   const focusState = nodeState(focus.id)
-  const prev = tree.nodes.find((n) => n.id === `${focus.id[0]}${Number(focus.id[1]) - 1}`)
   const keysTaken = taken.filter(isKey).length
+  const cost = withPath(focus.id).length - taken.length
   const why =
     focusState !== 'locked'
       ? ''
-      : prev && !taken.includes(prev.id)
-        ? t('Learn {name} first.', { name: prev.name })
-        : left <= 0
-          ? t('No points left. Refund a node first.')
-          : isKey(focus.id) && keysTaken >= maxCapstones
-            ? t('One keystone per tree. Refund the other first.')
-            : ''
+      : isKey(focus.id) && keysTaken >= maxCapstones
+        ? t('One keystone per tree. Switch the other one off first.')
+        : t(cost > 1 ? 'Needs {n} points with the nodes above it. Switch something off first.' : 'No points left. Switch something off first.', { n: cost })
   const below = taken.filter((x) => x[0] === focus.id[0] && Number(x[1]) > Number(focus.id[1])).length
 
   return (
@@ -84,8 +87,8 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
       <p className="lo-note">
         {t(
           maxCapstones === 1
-            ? 'Tap a node to read it, tap again to learn it. Learn each branch from the top down. The ◆ keystone at the end is optional, has a Cost, and only one fits per tree. Respec is free.'
-            : 'Tap a node to read it, tap again to learn it. Learn each branch from the top down. The ◆ keystone at the end is optional and has a Cost. Respec is free.',
+            ? 'Tap a node to switch it on or off (the nodes above it come along). The ◆ keystone at the end is optional, has a Cost, and only one fits per tree. Spend every point, then Save.'
+            : 'Tap a node to switch it on or off (the nodes above it come along). The ◆ keystone at the end is optional and has a Cost. Spend every point, then Save.',
         )}
       </p>
 
@@ -150,7 +153,7 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
                 role="button"
                 tabIndex={0}
                 aria-pressed={st === 'taken'}
-                aria-label={`${n.name}, ${key ? t('Keystone') : t('Passive · Tier {n}', { n: n.id[1] })}, ${t(st === 'taken' ? 'learned' : st === 'avail' ? 'can learn' : 'locked')}`}
+                aria-label={`${n.name}, ${key ? t('Keystone') : t('Passive · Tier {n}', { n: n.id[1] })}, ${t(st === 'taken' ? 'on' : st === 'avail' ? 'off' : 'locked')}`}
                 onClick={() => tap(n.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -203,29 +206,35 @@ export function AscTree({ champ, style, points: base, saved, onChange, fill }: P
           </div>
         )}
         <div className="at-foot">
-          {focusState === 'taken' ? (
-            <>
-              <span className="at-tag ok">✓ {t('Learned')}</span>
-              <button type="button" className="lo-ghost" onClick={() => refund(focus.id)}>
-                {below ? t('Refund (and {n} below)', { n: below }) : t('Refund')}
-              </button>
-            </>
-          ) : focusState === 'avail' ? (
-            <button type="button" className="at-learn" onClick={() => take(focus.id)}>
-              {t('Learn · 1 point')}
-            </button>
+          {focusState === 'locked' ? (
+            <span className="at-tag">🔒 {why}</span>
           ) : (
-            <span className="at-tag">🔒 {why || t('Locked')}</span>
+            <button type="button" role="switch" aria-checked={focusState === 'taken'} className={`at-switch${focusState === 'taken' ? ' on' : ''}`} onClick={() => toggle(focus.id)}>
+              <span className="at-knob" aria-hidden="true" />
+              {focusState === 'taken' ? (below ? t('On · off also turns off {n} below', { n: below }) : t('On')) : cost > 1 ? t('Off · on takes {n} points', { n: cost }) : t('Off')}
+            </button>
           )}
         </div>
       </div>
 
       <div className="lo-row">
-        <button type="button" className="lo-ghost" onClick={() => setAsc(fillAsc(style, points, taken))} disabled={!left}>
+        <button type="button" className="lo-ghost" onClick={() => setTaken(fillAsc(style, points, taken))} disabled={full}>
           {taken.length ? t('Fill the rest') : t('Quick build')}
         </button>
-        <button type="button" className="lo-ghost" onClick={() => setAsc([])} disabled={!taken.length}>
-          {t('Respec (free)')}
+        <button type="button" className="lo-ghost" onClick={() => setTaken([])} disabled={!taken.length}>
+          {t('Clear all')}
+        </button>
+      </div>
+
+      <div className={`at-save${dirty ? ' dirty' : ''}`}>
+        <span>{!dirty ? t('Saved') : full ? t('Ready to save') : t(left > 1 ? 'Switch on {n} more nodes to save' : 'Switch on {n} more node to save', { n: left })}</span>
+        {dirty && kept.length > 0 && (
+          <button type="button" className="lo-ghost" onClick={() => setTaken(kept)}>
+            {t('Undo changes')}
+          </button>
+        )}
+        <button type="button" className="at-learn" disabled={!dirty || !full} onClick={save}>
+          {t('Save Ascendancy')}
         </button>
       </div>
     </section>
