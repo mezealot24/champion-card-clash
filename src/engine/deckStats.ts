@@ -158,6 +158,8 @@ export const OVERRIDES: Record<string, Partial<DeckStats>> = {
   'BR:1:B1': { atk: 1 },
   'BR:1:B3': { atk: 1 },
   'BR:2:B2': { tech: 1 },
+  // Assassin Ghost Veil: Veil cuts hit dmg (its short text says −dmg)
+  'AS:1:C2': { def: 1 },
   // Cryomancer: Chill cuts dmg, Freeze locks
   'MG:2:A1': { atk: 1 },
   'MG:2:A3': { tech: 1 },
