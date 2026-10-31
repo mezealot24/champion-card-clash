@@ -459,12 +459,13 @@ export const TREES: Record<string, TreeData> = {
       capstone(
         'C3',
         'Avalanche',
-        'When you Strike, your Shield breaks into the chain: every card +1 dmg per {ascAvalanche} Shield spent, and the enemy gets 1 Chill per {ascAvalancheChill} Shield spent. {ascAvalancheKeep}% of your Shield stays.',
+        'When you Strike, your Shield breaks into the chain: every card +1 dmg per {ascAvalanche} Shield spent, and the enemy gets 1 Chill per {ascAvalancheChill} Shield spent. {ascAvalancheKeep}% of your Shield stays. When enemy hits break your Shield to 0, the attacker is Frozen.',
         'The Shield spent is gone before that turn\'s hits.',
         [
           ['ascAvalanche', 'Shield per +1 dmg', 15, 1],
           ['ascAvalancheChill', 'Shield per 1 Chill', 10, 1],
           ['ascAvalancheKeep', 'Shield kept %', 50, 0, 100],
+          ['ascAvalancheFreeze', 'Shield broken → Frozen (1 = on)', 1, 0, 1],
         ],
       ),
       node('D1', 'Cold Hands', 'When you Freeze the enemy, their {ascColdHands} oldest Field cards go to the bottom of their deck.', 'ascColdHands', 'cards', 1),

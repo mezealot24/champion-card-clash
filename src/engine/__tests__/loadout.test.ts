@@ -161,6 +161,20 @@ describe('randomLoadout', () => {
       expect(n.players.p1.statuses.filter((x) => x.kind === 'shield').reduce((t, x) => t + (x.n ?? 0), 0)).toBe(20)
       expect(n.players.p2.statuses.find((x) => x.kind === 'chill')?.n).toBe(2)
     })
+    it('Avalanche: enemy hits that break your Shield to 0 Freeze the attacker', () => {
+      const s = game('MG', { asc: ['C1', 'C2', 'C3'], points: 6 }, 'MG:2')
+      s.players.p1.statuses = s.players.p1.statuses.filter((x) => x.kind !== 'shield')
+      s.players.p1.statuses.push({ kind: 'shield', turns: 9999, n: 5 })
+      s.players.p1.hand = []
+      s.players.p2.hand = [hit(10)]
+      const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(n.players.p2.statuses.some((x) => x.kind === 'frozen')).toBe(true)
+      expect(n.log.some((l) => l.includes('Avalanche: the enemy broke your Shield'))).toBe(true)
+      const kept = game('MG', { asc: ['C1', 'C2', 'C3'], points: 6 }, 'MG:2') // Shield 40 soaks a 10 hit: not broken
+      kept.players.p1.hand = []
+      kept.players.p2.hand = [hit(10)]
+      expect(resolveTurn(kept, { p1: 'charge', p2: 'strike' }).players.p2.statuses.some((x) => x.kind === 'frozen')).toBe(false)
+    })
   })
 
   describe('Tank v3 Ascendancy', () => {
