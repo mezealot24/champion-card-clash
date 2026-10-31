@@ -917,4 +917,5 @@ export const TH: Record<string, string> = {
   'Tank canisters: fill when hurt, cash in when you Strike.': 'ถังพลังของ Tank: เติมเมื่อเจ็บ เก็บเมื่อ Strike',
   'Juggernaut stacks: each one adds dmg to every card.': 'stack ของ Juggernaut: ทุก stack เพิ่ม dmg ให้ทุกใบ',
   'Fatal Rhythm: every few attacks hits for extra dmg.': 'Fatal Rhythm: ทุกๆ กี่ครั้งจะตีแรงพิเศษ',
+  'Printed {base} dmg, {now} if you Strike now (all bonuses and cuts counted, foe not Blocking).': 'บนการ์ด {base} dmg ถ้า Strike ตอนนี้จะได้ {now} (นับบัฟ/ดีบัฟทั้งหมดแล้ว กรณีศัตรูไม่ Block)',
 }

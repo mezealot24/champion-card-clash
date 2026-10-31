@@ -7,6 +7,7 @@ import {
   isEffectMissing,
   legalActions,
   overdriveAdd,
+  resolveTurn,
   allRes,
   classOf,
   resourceOf,
@@ -1074,6 +1075,32 @@ function cardRule(rule: string): { timing: string; cond: string; act: string } {
   return { timing, cond: shorten(cond).replace(/ and /g, ' + '), act: shorten(act.charAt(0).toUpperCase() + act.slice(1)) }
 }
 
+/**
+ * What each Field card would hit for if its side Struck now and the foe didn't Block (Q 2026-10-31: show the real number,
+ * every + and − counted: chain buffs, Style, Oath, Ascendancy, unpaid S cards, Chill, Vulnerable). A dry run of the turn
+ * on a copy of the state; the foe Charges (or the first thing it may do). Cached per state.
+ */
+const previewCache = new WeakMap<GameState, Partial<Record<Side, Map<string, number>>>>()
+function previewDmg(game: GameState, side: Side): Map<string, number> | undefined {
+  let byGame = previewCache.get(game)
+  if (!byGame) previewCache.set(game, (byGame = {}))
+  if (side in byGame) return byGame[side]
+  let out: Map<string, number> | undefined
+  try {
+    const foe = side === 'p1' ? 'p2' : 'p1'
+    const foeActs = legalActions(game, foe)
+    const foeAct = (['charge', 'strike', 'block'] as Action[]).find((a) => foeActs.includes(a))
+    if (!game.winner && foeAct && legalActions(game, side).includes('strike')) {
+      const next = resolveTurn(game, { [side]: 'strike', [foe]: foeAct } as Record<Side, Action>)
+      out = new Map((next.events ?? []).filter((e) => e.k === 'hit' && e.side === side).map((e) => [(e as Extract<TurnEvent, { k: 'hit' }>).uid, (e as Extract<TurnEvent, { k: 'hit' }>).dmg]))
+    }
+  } catch {
+    out = undefined
+  }
+  byGame[side] = out
+  return out
+}
+
 function cardFacts(game: GameState, side: Side, card: CardInst) {
   const p = game.players[side]
   const { id, type, dmg, effectText, effectSpec } = card.def
@@ -1097,7 +1124,8 @@ function cardFacts(game: GameState, side: Side, card: CardInst) {
         : short != null
           ? t('No {res}', { res: costName })
           : undefined
-  return { id, type, dmg, total: base + grow, grow, short, cost, costName, text, missing, off }
+  const now = previewDmg(game, side)?.get(card.uid)
+  return { id, type, dmg, total: now ?? base + grow, grow, short, cost, costName, text, missing, off, delta: now != null ? now - dmg : undefined }
 }
 
 function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: GameState; side: Side; glow?: string; unpaid?: boolean; onOpen: () => void }) {
@@ -1116,7 +1144,13 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
         )}
       </div>
       <span className="dmg">{f.total}</span>
-      {f.short != null ? <span className="mod down">{f.short}%</span> : f.grow ? <span className={`mod${f.grow < 0 ? ' down' : ''}`}>{f.grow > 0 ? `+${f.grow}` : f.grow}</span> : null}
+      {f.delta != null ? (
+        f.delta ? <span className={`mod${f.delta < 0 ? ' down' : ''}`}>{f.delta > 0 ? `+${f.delta}` : `−${-f.delta}`}</span> : null
+      ) : f.short != null ? (
+        <span className="mod down">{f.short}%</span>
+      ) : f.grow ? (
+        <span className={`mod${f.grow < 0 ? ' down' : ''}`}>{f.grow > 0 ? `+${f.grow}` : f.grow}</span>
+      ) : null}
       {vc.card.owner && <span className="mod down" style={{ bottom: 17 }}>{t('stolen')}</span>}
       <div className="fx">
         {f.missing && <span className="rule">⚠ {t('no code yet')}</span>}
@@ -1173,6 +1207,7 @@ function CardSheet({ game, side, card }: { game: GameState; side: Side; card: Ca
         </span>
         {f.text ? f.text.split(' / ').map((l, i) => <p key={i}>{l}</p>) : <p>{t('No effect. Plain damage.')}</p>}
         {f.text && <Keywords text={card.def.effectSpec?.length ? describeSpec(card.def.effectSpec, EN) : f.text} />}
+        {f.delta ? <p>{t('Printed {base} dmg, {now} if you Strike now (all bonuses and cuts counted, foe not Blocking).', { base: f.dmg, now: f.total })}</p> : null}
         {f.short != null && <p>{t('Not enough {res}: hits for {pct}% dmg, effect off, drawbacks still fire.', { res: f.costName, pct: f.short })}</p>}
         {f.off && f.short == null && <p>{t('Effect off right now ({why}). The card still deals its damage.', { why: f.off })}</p>}
         {f.missing && <p>⚠ {t('This effect has no code yet; it plays as plain damage.')}</p>}
