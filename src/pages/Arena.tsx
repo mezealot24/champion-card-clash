@@ -1143,10 +1143,8 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
           </span>
         )}
       </div>
-      <span className="dmg">{f.total}</span>
-      {f.delta != null ? (
-        f.delta ? <span className={`mod${f.delta < 0 ? ' down' : ''}`}>{f.delta > 0 ? `+${f.delta}` : `−${-f.delta}`}</span> : null
-      ) : f.short != null ? (
+      <span className={`dmg${f.delta ? (f.delta > 0 ? ' up' : ' down') : ''}`}>{f.total}</span>
+      {f.delta != null ? null : f.short != null ? (
         <span className="mod down">{f.short}%</span>
       ) : f.grow ? (
         <span className={`mod${f.grow < 0 ? ' down' : ''}`}>{f.grow > 0 ? `+${f.grow}` : f.grow}</span>
