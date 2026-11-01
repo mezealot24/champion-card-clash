@@ -440,7 +440,8 @@ export const TREES: Record<string, TreeData> = {
     maxCapstones: 1,
     nodes: [
       node('A1', 'Brittle', 'Your cards deal +{ascBrittle}% dmg for each Chill stack on the enemy.', 'ascBrittle', 'dmg % per enemy Chill', 10),
-      node('A2', 'Cold Snap', 'While the enemy is Frozen, your cards deal +{ascColdSnap} dmg.', 'ascColdSnap', 'dmg +', 4),
+      // Black Ice replaces Cold Snap (Q 2026-10-31 playtest): Shatter through Block, base half → full
+      node('A2', 'Black Ice', 'Shatter through a Block is stronger: +{ascBlackIce}% of the full Shatter (up to 100%).', 'ascBlackIce', 'Shatter through Block % +', 50, 0, 100),
       capstone('A3', 'Shatterpoint', 'Freeze at {ascShatterpoint} fewer Chill, and Shatter takes +{ascShatterpointPct}% Max HP.', 'Frost Armor (and Frozen Tomb) Shield −{ascShatterpointCost}.', [
         ['ascShatterpoint', 'stacks to freeze −', 1],
         ['ascShatterpointPct', 'Shatter % +', 5],
@@ -451,18 +452,22 @@ export const TREES: Record<string, TreeData> = {
       capstone('B3', 'Eternal Winter', 'Chill never freezes and never runs out: it stacks up to {ascEternalWinter}.', 'No Freeze and no Shatter from Chill (Absolute Zero still freezes).', [
         ['ascEternalWinter', 'max Chill', 6, 1],
       ]),
-      // Frost Armor regrows on Block in the base Style now (Q 2026-10-25); Hoarfrost makes it grow faster and higher
-      // Glacier nerf (Q 2026-10-26): Hoarfrost 4/16 → 2/10, Ice Lance 6 → 4, Avalanche 10 → 15 Shield per +1
-      {
-        id: 'C1',
-        name: 'Hoarfrost',
-        text: 'Frost Armor regrows {ascHoarfrost} more Shield per Block vs a Strike, and its cap is {ascHoarfrostCap} higher.',
-        fields: [f('ascHoarfrost', 'Asc C1 Hoarfrost: regrow per Block +', 2), f('ascHoarfrostCap', 'Asc C1 Hoarfrost: Shield cap +', 10)],
-      },
+      // Glacier rework (Q 2026-10-31 playtest): Shield feeds Freeze. Rime Armor replaces Hoarfrost; Avalanche spends
+      // only part of the Shield and turns it into Chill too
+      node('C1', 'Rime Armor', 'Every hit your Shield soaks gives the attacker {ascRimeArmor} more Chill.', 'ascRimeArmor', 'Chill + per soaked hit', 1),
       node('C2', 'Ice Lance', 'While you have Shield, chain slot 1 deals +{ascIceLance} dmg.', 'ascIceLance', 'slot 1 dmg +', 4),
-      capstone('C3', 'Avalanche', 'When you Strike, all your Shield breaks into the chain: every card +1 dmg per {ascAvalanche} Shield.', 'Your Shield is gone for that turn\'s hits.', [
-        ['ascAvalanche', 'Shield per +1 dmg', 15, 1],
-      ]),
+      capstone(
+        'C3',
+        'Avalanche',
+        'Strike: spend your Shield (keep {ascAvalancheKeep}%). Every card +1 dmg per {ascAvalanche} spent, enemy gets 1 Chill per {ascAvalancheChill} spent. Enemy hits that break your Shield Freeze the attacker.',
+        'The Shield spent is gone before that turn\'s hits.',
+        [
+          ['ascAvalanche', 'Shield per +1 dmg', 15, 1],
+          ['ascAvalancheChill', 'Shield per 1 Chill', 10, 1],
+          ['ascAvalancheKeep', 'Shield kept %', 50, 0, 100],
+          ['ascAvalancheFreeze', 'Shield broken → Frozen (1 = on)', 1, 0, 1],
+        ],
+      ),
       node('D1', 'Cold Hands', 'When you Freeze the enemy, their {ascColdHands} oldest Field cards go to the bottom of their deck.', 'ascColdHands', 'cards', 1),
       node('D2', 'Frost Lock', 'When the enemy has {ascFrostLock}+ Chill after your chain, they can\'t Charge next turn.', 'ascFrostLock', 'Chill needed', 3, 1),
       capstone('D3', 'Glacial Prison', 'Frozen (and Thaw after it) lasts {ascGlacialPrison} more turn: the enemy can\'t Strike for longer.', 'Freeze needs {ascGlacialPrisonCost} more Chill.', [

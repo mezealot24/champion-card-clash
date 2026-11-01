@@ -5,7 +5,7 @@
 import { MINORS, OATHS, TREES } from './loadoutData'
 import { addRes, resourceOf } from './resources'
 import { inClass } from './classes'
-import { addIgnite, bloom, chillStacks, counterSpin, debuffStacks, endurance, gainEndurance, hooksOf, igniteStacks, isDebuff, noHealing, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
+import { addChill, addIgnite, bloom, freeze, chillStacks, counterSpin, debuffStacks, endurance, gainEndurance, hooksOf, igniteStacks, isDebuff, noHealing, PERK_HOOKS, styleHeal, type StyleDef } from './styles'
 import { fieldsOf, tuningOf, type Tuning, type TuningGroup } from './tuning'
 import type { GameState, PlayerState, Side } from './types'
 import { CUT_CAP, cutGuarded, guardAfterCut, other } from './types'
@@ -1304,15 +1304,7 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  'MG:2:A2': (amt) => ({
-    hooks: {
-      beforeHits: (state, side, bonus) => {
-        if (!state.players[other(side)].statuses.some((s) => s.kind === 'frozen') || amt(state, side) <= 0) return
-        for (let i = 0; i < bonus.length; i++) bonus[i] += amt(state, side)
-        say(state, side, `Cold Snap: enemy Frozen → every chain card +${amt(state, side)} dmg`)
-      },
-    },
-  }),
+  'MG:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'shatterBlockPct', v(k)) }),
   'MG:2:A3': (_, k) => ({
     tune: (t, v) => {
       add(t, 'MG:2', 'chillMax', -v(k))
@@ -1345,13 +1337,8 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  // Cryomancer · Glacier (Shield as ammo)
-  'MG:2:C1': (_, k) => ({
-    tune: (t, v) => {
-      add(t, 'MG:2', 'frostArmorRegen', v(k))
-      add(t, 'MG:2', 'frostArmorCap', v('ascHoarfrostCap'))
-    },
-  }),
+  // Cryomancer · Glacier (Shield feeds Freeze; Q 2026-10-31 rework)
+  'MG:2:C1': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'frostArmorChill', v(k)) }),
   'MG:2:C2': (amt) => ({
     hooks: {
       beforeHits: (state, side, bonus) => {
@@ -1363,14 +1350,43 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
   'MG:2:C3': (amt) => ({
     hooks: {
+      // Shield before this turn's hits, for "Shield broken → attacker Frozen" (Q 2026-10-31 picked both in C3)
+      actionStart: (state, side) => {
+        const p = state.players[side]
+        p.perkData = { ...p.perkData, avalancheShield: shieldOf(p) }
+      },
       beforeHits: (state, side, bonus) => {
         const p = state.players[side]
         const total = shieldOf(p)
-        const n = Math.floor(total / Math.max(1, amt(state, side)))
-        if (!bonus.length || !n) return
+        if (!bonus.length || total <= 0) return
+        const keepPct = Math.min(100, Math.max(0, num(state, side, 'MG:2', 'ascAvalancheKeep')))
+        const kept = Math.floor((total * keepPct) / 100)
+        const spent = total - kept
+        if (spent <= 0) return
+        const n = Math.floor(spent / Math.max(1, amt(state, side)))
+        const chill = Math.floor(spent / Math.max(1, num(state, side, 'MG:2', 'ascAvalancheChill')))
         p.statuses = p.statuses.filter((s) => s.kind !== 'shield')
+        if (kept > 0) p.statuses.push({ kind: 'shield', turns: 9999, n: kept })
         for (let i = 0; i < bonus.length; i++) bonus[i] += n
-        say(state, side, `🏔 Avalanche: ${total} Shield breaks → every chain card +${n} dmg`)
+        // Chill lands after the chain (so a Freeze from it waits for the next Strike, like Infuse)
+        p.perkData = { ...p.perkData, avalancheChill: chill, avalancheShield: kept }
+        say(state, side, `🏔 Avalanche: ${spent} Shield breaks (${kept} kept) → every chain card +${n} dmg`)
+      },
+      afterHits: (state, side, r) => {
+        const p = state.players[side]
+        const before = p.perkData?.avalancheShield ?? 0
+        p.perkData = { ...p.perkData, avalancheShield: 0 }
+        if (!r.attacked || !r.shieldHits || before <= 0 || shieldOf(p) > 0 || num(state, side, 'MG:2', 'ascAvalancheFreeze') <= 0) return
+        if (freeze(state, other(side), 'Avalanche: broke your Shield')) say(state, side, '🏔 Avalanche: the enemy broke your Shield → enemy Frozen')
+      },
+      afterChain: (state, side) => {
+        const p = state.players[side]
+        const chill = p.perkData?.avalancheChill ?? 0
+        if (!chill) return 0
+        p.perkData = { ...p.perkData, avalancheChill: 0 }
+        const got = addChill(state, other(side), chill)
+        say(state, side, `🏔 Avalanche: enemy gets ❄ ${chill} Chill${got ? ` (${got} stacks)` : ''}`)
+        return 0
       },
     },
   }),

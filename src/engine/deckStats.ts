@@ -162,6 +162,7 @@ export const OVERRIDES: Record<string, Partial<DeckStats>> = {
   'AS:1:C2': { def: 1 },
   // Cryomancer: Chill cuts dmg, Freeze locks
   'MG:2:A1': { atk: 1 },
+  'MG:2:A2': { atk: 1 },
   'MG:2:A3': { tech: 1 },
   'MG:2:B1': { def: 1 },
   'MG:2:B2': { tech: 1 },
