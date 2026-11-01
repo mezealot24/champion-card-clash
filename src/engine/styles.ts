@@ -163,6 +163,8 @@ export type StyleDef = {
   blockLeakPct?: (state: GameState, side: Side) => number
   /** Cost: every hit this side's Block stops deals this % of its dmg */
   blockDmgPct?: (state: GameState, side: Side) => number
+  /** the most hits this side's Shield soaks a turn; later hits skip the Shield (Cryomancer Frost Armor) */
+  shieldSoakMax?: (state: GameState, side: Side) => number
   /** cards drawn at the end of the turn, after Dual Strike draws (Cryomancer Flash Freeze) */
   endDraw?: (state: GameState, side: Side) => number
   /** extra cards a Charge that isn't broken draws, decided per turn */
@@ -630,6 +632,8 @@ Object.assign(STYLES, {
   'MG:2': {
     name: 'Cryomancer',
     infuse: addChill,
+    // Frost Armor cracks (Q 2026-11-01: pure Shield felt too safe): only the first frostArmorSoak hits a turn hit the Shield (0 = no limit)
+    shieldSoakMax: (state, side) => tuningOf(state, side)['MG:2'].frostArmorSoak || Infinity,
     setup: (p, t) => {
       if (t['MG:2'].frostArmorShield > 0) p.statuses.push({ kind: 'shield', turns: 9999, n: t['MG:2'].frostArmorShield })
     },

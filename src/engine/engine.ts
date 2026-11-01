@@ -425,6 +425,9 @@ function resolveStrikes(
   for (const side of SIDES) for (const h of hooksOf(state.players[side])) if (h.hitCutHits) cutLeft[side] = Math.min(cutLeft[side], h.hitCutHits(state, side))
   const cutSkip = { p1: 0, p2: 0 }
   for (const side of SIDES) cutSkip[side] = hooksOf(state.players[side]).reduce((t, h) => Math.max(t, h.hitCutSkip?.(state, side) ?? 0), 0)
+  // Shield soaks at most this many hits a turn (Cryomancer Frost Armor cracks: the rest go through; Q 2026-11-01)
+  const soakLeft = { p1: Infinity, p2: Infinity }
+  for (const side of SIDES) for (const h of hooksOf(state.players[side])) if (h.shieldSoakMax) soakLeft[side] = Math.min(soakLeft[side], h.shieldSoakMax(state, side))
   const critCut = { p1: 0, p2: 0 }
   for (const side of SIDES) critCut[side] = Math.min(100, hooksOf(state.players[side]).reduce((t, h) => t + (h.critCutPct?.(state, side) ?? 0), 0))
 
@@ -455,13 +458,16 @@ function resolveStrikes(
         env.hitsParried[enemy]++
       }
       let absorbed = 0
-      if (!parry) {
+      if (!parry && soakLeft[enemy] > 0) {
         for (const sh of sized(enemy, 'shield')) {
           const take = Math.min(sh.n ?? 0, dealt - absorbed)
           sh.n = (sh.n ?? 0) - take
           absorbed += take
         }
-        if (absorbed) env.shieldHits[enemy]++
+        if (absorbed) {
+          env.shieldHits[enemy]++
+          soakLeft[enemy]--
+        }
       }
       if (parry) dealt = 0
       else dealt -= absorbed

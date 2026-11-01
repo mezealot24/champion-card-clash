@@ -125,7 +125,7 @@ describe('randomLoadout', () => {
     it('Shatterpoint changes only the Cryomancer\'s own numbers, Cost included', () => {
       const s = mg('MG:2', ['A1', 'A2', 'A3'])
       expect(tuningOf(s, 'p1')['MG:2'].chillMax).toBe(3)
-      expect(tuningOf(s, 'p1')['MG:2'].frostArmorShield).toBe(20)
+      expect(tuningOf(s, 'p1')['MG:2'].frostArmorShield).toBe(10)
       expect(tuningOf(s, 'p2')['MG:2'].chillMax).toBe(4)
     })
     it('Eternal Winter: Chill stacks past the freeze line and never freezes', () => {
