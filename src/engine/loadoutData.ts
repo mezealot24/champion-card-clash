@@ -36,7 +36,7 @@ export const OATHS: Record<string, PieceData[]> = {
   AS: [
     { id: 'o1', name: 'Shadow Edge', text: 'Chain slot 1 deals +{shadowEdgeDmg} dmg.', fields: [f('shadowEdgeDmg', 'Oath Shadow Edge: slot 1 dmg +', 6)] },
     { id: 'o2', name: 'Quickdraw', text: 'Start the match with {quickdrawCards} more cards on your Field.', fields: [f('quickdrawCards', 'Oath Quickdraw: cards at start +', 2, 0, 5)] },
-    { id: 'o3', name: 'Vanish', text: 'Start the match with Parry {vanishParry}: the first hits that get past your Block deal 0.', fields: [f('vanishParry', 'Oath Vanish: Parry at start', 2)] },
+    { id: 'o3', name: 'Vanish', text: 'Start the match with Parry {vanishParry}.', fields: [f('vanishParry', 'Oath Vanish: Parry at start', 2)] },
   ],
   MG: [
     { id: 'o1', name: 'Overcharge', text: 'Mana cap +{overchargeCap}.', fields: [f('overchargeCap', 'Oath Overcharge: Mana cap +', 2)] },
@@ -90,7 +90,7 @@ const capstone = (id: string, name: string, text: string, cost: string, fields: 
  * Numbers live in the Style's group (champion_styles.params) as asc<ID> (Mage / Tank / Assassin v2: named asc keys).
  */
 /** Shown under the Lifeline Style text: how ⛨ Endurance works (Tank v3, Q 2026-10-28); numbers filled from TK:1 */
-export const ENDURANCE_TEXT = '⛨ Endurance: canisters, max {endMax}. Gain 1 (once a turn each) when you pay an S card\'s HP cost, when one hit deals you {endHeavyPct}%+ of your Max HP, or when 2+ hits reach you in a turn. When you Strike, collect them all: heal {endHealPct}% of your missing HP each (×2 below {hpPct}% HP) and slot 1 +{endSlotDmg} dmg each. Reaching the cap on a turn you don\'t Strike: counter-spin, {spinDmg} dmg each to the opponent (ignores Block and Shield). Below {hpPct}% HP, S cards cost 1 Endurance instead of HP.'
+export const ENDURANCE_TEXT = "⛨ Endurance: canisters, max {endMax}. Gain 1 when you pay an S card's HP, take one hit of {endHeavyPct}%+ Max HP, or take 2+ hits in a turn (each once a turn). Strike to collect all: each heals {endHealPct}% missing HP (×2 below {hpPct}% HP) and gives slot 1 +{endSlotDmg} dmg. Full on a turn you don't Strike: counter-spin, {spinDmg} dmg each (ignores Block and Shield). Below {hpPct}% HP, S cards cost 1 Endurance instead of HP."
 
 export const TREES: Record<string, TreeData> = {
   /**
@@ -107,11 +107,11 @@ export const TREES: Record<string, TreeData> = {
     bonusPoints: 1,
     rev: 3,
     nodes: [
-      multi('A1', 'Unflinching', 'Gain 1 Endurance when your Strike hits clean (after the collect, so it carries to your next turn). Endurance cap +{ascUnflinchingMax}.', [
+      multi('A1', 'Unflinching', 'Your Strike hits clean: gain 1 Endurance (kept for next turn). Endurance cap +{ascUnflinchingMax}.', [
         ['ascUnflinchingMax', 'Endurance cap +', 1],
       ]),
       node('A2', 'Pressure', 'When you collect, every chain card +{ascPressure} dmg per Endurance collected (not only slot 1).', 'ascPressure', 'dmg per card per Endurance', 1),
-      capstone('A3', 'Whirl', 'A counter-spin also undoes half the hit dmg you took that turn and heals {ascWhirl}% of your missing HP per Endurance spent.', 'Your Field holds at most {ascWhirlField} cards.', [
+      capstone('A3', 'Whirl', 'Counter-spin also gives back half the hit dmg you took that turn and heals {ascWhirl}% missing HP per Endurance spent.', 'Your Field holds at most {ascWhirlField} cards.', [
         ['ascWhirl', 'heal % missing HP per Endurance', 2, 0, 100],
         ['ascWhirlField', 'Cost: Field max cards', 4, 1, 5],
       ]),
@@ -119,32 +119,32 @@ export const TREES: Record<string, TreeData> = {
         ['ascThickSkull', 'red line % +', 5],
         ['ascThickSkullLoss', '% Max HP lost per Endurance', 15, 1],
       ]),
-      node('B2', 'Shrug Off', 'The first lock each turn (Charge break, can\'t Charge / Block / Strike, Frozen) doesn\'t happen to you: lose {ascShrugOff}% of your current HP and gain 1 Endurance instead.', 'ascShrugOff', '% current HP paid', 7, 0, 100),
-      capstone('B3', 'Bloodied', 'The first time you drop into the red: for {ascBloodied} turns gain 1 Endurance at the end of every turn, and chain slot 1 +1 dmg per 10% of your missing HP.', 'You can\'t gain Shield.', [
+      node('B2', 'Shrug Off', "Once a turn, shrug off a lock (Charge break, can't Charge / Block / Strike, Frozen): lose {ascShrugOff}% current HP and gain 1 Endurance instead.", 'ascShrugOff', '% current HP paid', 7, 0, 100),
+      capstone('B3', 'Bloodied', 'First drop into the red: for {ascBloodied} turns, +1 Endurance every turn end and slot 1 +1 dmg per 10% missing HP.', 'You can\'t gain Shield.', [
         ['ascBloodied', 'turns', 3, 1],
       ]),
-      multi('C1', 'Steady', 'Each turn, the {ascSteadyHits} hits after the first that reach you deal {ascSteady} less. A Charge break can\'t throw away your first {ascSteadySafe} Field cards.', [
+      multi('C1', 'Steady', 'Each turn, the {ascSteadyHits} hits after your first deal {ascSteady} less. Charge break spares your first {ascSteadySafe} Field cards.', [
         ['ascSteady', 'dmg cut per hit', 3],
         ['ascSteadyHits', 'hits cut', 2, 0],
         ['ascSteadySafe', 'safe slots', 2, 0, 5],
       ]),
-      multi('C2', 'Overflow', 'Healing past your Max HP becomes Shield (up to {ascOverflow}). When you Strike with Shield, slot 1 +dmg equal to half your Shield.', [
+      multi('C2', 'Overflow', 'Overheal becomes Shield (max {ascOverflow}). Strike with Shield: slot 1 +half your Shield as dmg.', [
         ['ascOverflow', 'Shield cap', 20],
       ]),
-      capstone('C3', 'Duel', 'After 2 turns in a row where both sides Strike, your next Strike that hits clean also deals {ascDuel}% of your Max HP, heals you {ascDuelHeal}% of your Max HP and steals {ascDuelSteal} Max HP from the opponent (up to {ascDuelCap} a match).', 'Your S cards cost {ascDuelCost}% of your current HP more.', [
+      capstone('C3', 'Duel', 'After 2 turns in a row of Strike vs Strike, your next clean hit Strike also deals {ascDuel}% of your Max HP, heals {ascDuelHeal}% Max HP and steals {ascDuelSteal} Max HP (max {ascDuelCap} a match).', 'Your S cards cost {ascDuelCost}% of your current HP more.', [
         ['ascDuel', 'dmg % of your Max HP', 4, 0, 100],
         ['ascDuelHeal', 'heal % of your Max HP', 2, 0, 100],
         ['ascDuelSteal', 'Max HP stolen', 6],
         ['ascDuelCap', 'Max HP stolen cap', 30],
         ['ascDuelCost', 'Cost: S cost + % current HP', 5, 0, 100],
       ]),
-      multi('D1', 'Momentum', 'Each Strike in a row (no other action between) gives every chain card +{ascMomentum} dmg, up to +{ascMomentumCap}. At the end of a turn the opponent didn\'t Strike, they lose {ascMomentumChip} HP.', [
+      multi('D1', 'Momentum', "Each Strike in a row: every chain card +{ascMomentum} dmg (max +{ascMomentumCap}). A turn the opponent doesn't Strike, they lose {ascMomentumChip} HP at its end.", [
         ['ascMomentum', 'dmg per Strike in a row', 1],
         ['ascMomentumCap', 'max dmg', 3],
         ['ascMomentumChip', 'HP lost when they don\'t Strike', 4],
       ]),
       node('D2', 'Spin to Win', 'Counter-spin deals +{ascSpin} more per Endurance, and also fires when your Block stops 2+ hits.', 'ascSpin', 'spin dmg + per Endurance', 3),
-      capstone('D3', 'Culling Blade', 'When you collect, every chain card +{ascCulling} dmg per Endurance. After one of your S cards resolves, if the opponent\'s HP is below {ascCullingPct}% of your Max HP, they are knocked out (ignores Block and Shield).', 'After a collect, next turn you are Vulnerable (+{ascCullingVuln}% dmg taken) and can\'t Block.', [
+      capstone('D3', 'Culling Blade', 'Collect: every chain card +{ascCulling} dmg per Endurance. After your S card, an opponent below {ascCullingPct}% of your Max HP is knocked out (ignores Block and Shield).', 'After a collect, next turn: Vulnerable +{ascCullingVuln}% and no Block.', [
         ['ascCulling', 'dmg per card per Endurance', 2],
         ['ascCullingPct', 'knock-out line, % of your Max HP', 15, 0, 100],
         ['ascCullingVuln', 'Cost: Vulnerable %', 35, 0, 100],
@@ -166,8 +166,8 @@ export const TREES: Record<string, TreeData> = {
         ['ascAncientCost', 'Cost: Colossus line +', 30],
       ]),
       node('B1', 'Fresh Vigor', 'Clean hits you land give +{ascFreshMeat}% of your Max HP more Vigor each.', 'ascFreshMeat', 'Vigor % Max HP per clean hit +', 1, 0, 100),
-      node('B2', 'Butcher\'s Brand', 'Your first clean hit in a Strike brands the opponent. On your next Strike, each clean hit on them heals you {ascBrand}% of your grown Max HP.', 'ascBrand', 'heal % of grown Max HP per clean hit', 1, 0, 100),
-      capstone('B3', 'Carve', 'Each clean hit steals {ascCarve} Max HP from the opponent (up to {ascCarveCap} a match) and adds it to your grown Max HP.', 'You get no healing from cards at all.', [
+      node('B2', 'Butcher\'s Brand', 'Your first clean hit brands the opponent. Next Strike, each clean hit on them heals {ascBrand}% of your grown Max HP.', 'ascBrand', 'heal % of grown Max HP per clean hit', 1, 0, 100),
+      capstone('B3', 'Carve', 'Each clean hit steals {ascCarve} Max HP into your grown Max HP (max {ascCarveCap} a match).', 'You get no healing from cards at all.', [
         ['ascCarve', 'Max HP stolen per clean hit', 2],
         ['ascCarveCap', 'cap a match', 40],
       ]),
@@ -184,7 +184,7 @@ export const TREES: Record<string, TreeData> = {
       ]),
       // Time of Need branch (Q 2026-10-29): Living Bark + Rooted are one node, Time of Need moves up to T2 (no Cost),
       // the new keystone is Grasp of the Undying
-      multi('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} more Max HP per debuff stack (end of turn). While you have 3+ debuff stacks, hits that reach you deal {ascRooted} less dmg.', [
+      multi('D1', 'Living Bark', 'Titan Bloom: +{ascLivingBark} more Max HP per debuff stack (turn end). With 3+ debuff stacks, hits on you deal {ascRooted} less.', [
         ['ascLivingBark', 'per debuff stack +', 3],
         ['ascRooted', 'dmg cut per hit at 3+ debuff stacks', 2],
       ]),
@@ -192,7 +192,7 @@ export const TREES: Record<string, TreeData> = {
         ['ascTimeOfNeed', 'every N turns', 5, 1],
         ['ascTimeOfNeedPct', 'heal % of missing HP', 3, 0, 100],
       ]),
-      capstone('D3', 'Grasp of the Undying', 'Once per match, when your HP would drop below 1: you are Undying for {ascUndyingTurns} turns and draw {ascUndyingDraw}. While Undying you can\'t die and can\'t be healed by anything, and every chain card deals +{ascUndyingPct}% of your Max HP dmg ({ascUndyingBlockedPct}% of that when Blocked).', 'Titan Bloom cap −{ascUndyingCost}.', [
+      capstone('D3', 'Grasp of the Undying', "Once a match, when you would drop below 1 HP: Undying for {ascUndyingTurns} turns and draw {ascUndyingDraw}. Undying: can't die, can't heal, every chain card +{ascUndyingPct}% of your Max HP dmg ({ascUndyingBlockedPct}% of that if Blocked).", 'Titan Bloom cap −{ascUndyingCost}.', [
         ['ascUndyingTurns', 'Undying turns', 3, 1],
         ['ascUndyingDraw', 'cards drawn', 2, 0, 5],
         ['ascUndyingPct', 'dmg per card, % of your Max HP', 10, 0, 100],
@@ -234,7 +234,7 @@ export const TREES: Record<string, TreeData> = {
         ['ascBloodRiteCost', 'Cost: Block stops − hits', 1],
       ]),
       node('C1', 'One-Two', 'Every 2nd P card in your chain deals +{ascOneTwo} dmg.', 'ascOneTwo', 'dmg + on every 2nd P', 3),
-      multi('C2', 'Wind Up', 'Charge while you have Rage: you are Wound Up. Your next Strike is a Payback: after your S cards pay, chain slot 1 spends all Rage left, +{ascPayback} dmg per Rage. If a hit reaches you the turn you wind up, Wound Up is lost and you gain {ascFlinchRage} Rage.', [
+      multi('C2', 'Wind Up', 'Charge with Rage: Wound Up. Next Strike is a Payback: after S cards pay, slot 1 spends all Rage left for +{ascPayback} dmg each. Hit while winding up: lose Wound Up, gain {ascFlinchRage} Rage.', [
         ['ascPayback', 'dmg per Rage', 1],
         ['ascFlinchRage', 'Rage when interrupted', 10],
       ]),
@@ -258,12 +258,12 @@ export const TREES: Record<string, TreeData> = {
     bonusPoints: 1,
     rev: 3,
     nodes: [
-      node('A1', 'Take the Hit', "After a turn the enemy Strikes you (into your Block or not), your next Strike's slot 1 deals +{ascTakeHit} dmg (doesn't stack).", 'ascTakeHit', 'slot 1 dmg +', 4),
+      node('A1', 'Take the Hit', "After the enemy Strikes you (Blocked or not), your next Strike's slot 1 +{ascTakeHit} dmg (doesn't stack).", 'ascTakeHit', 'slot 1 dmg +', 4),
       multi('A2', 'Riposte', 'A Block costs {ascUnshaken} fewer Momentum. When your Block stops every hit, your next Strike: every card +{ascRiposte} dmg (doesn\'t stack).', [
         ['ascRiposte', 'dmg + every card', 2],
         ['ascUnshaken', 'Block Momentum loss −', 1],
       ]),
-      capstone('A3', 'Retaliation', 'Each hit your Block stops gives +1 Momentum (max {ascRetaliation} a turn). When you Strike, take up to {ascSunder} enemy Shield per Momentum and keep it as your Shield (max {ascSunderCap}).', 'Lifesteal at max Momentum −{ascRetaliationCost}%.', [
+      capstone('A3', 'Retaliation', 'Each hit your Block stops: +1 Momentum (max {ascRetaliation} a turn). Strike: steal up to {ascSunder} enemy Shield per Momentum (max {ascSunderCap}).', 'Lifesteal at max Momentum −{ascRetaliationCost}%.', [
         ['ascRetaliation', 'Momentum per turn (cap)', 2],
         ['ascSunder', 'Shield taken per Momentum', 2],
         ['ascSunderCap', 'Shield taken cap', 8],
@@ -306,7 +306,7 @@ export const TREES: Record<string, TreeData> = {
     nodes: [
       node('A1', 'Redline', 'Overdrive +{ascRedline} dmg per Energy.', 'ascRedline', 'dmg per Energy +', 1),
       node('A2', 'Hair Trigger', 'Overdrive needs {ascHairTrigger} fewer chain card.', 'ascHairTrigger', 'min chain −', 1),
-      capstone('A3', 'Echo', "An Overdrive Strike replays its strongest chain card once at {ascEcho}% dmg (no effects). The enemy's Block stops it.", 'Lose {ascEchoCost} Energy at the end of that turn.', [
+      capstone('A3', 'Echo', 'Overdrive replays your strongest chain card at {ascEcho}% dmg (no effects, Block stops it).', 'Lose {ascEchoCost} Energy at the end of that turn.', [
         ['ascEcho', 'replay dmg %', 50, 0, 100],
         ['ascEchoCost', 'Cost: Energy lost', 1],
       ]),
@@ -317,11 +317,11 @@ export const TREES: Record<string, TreeData> = {
         ['ascMachDraw', 'draw on Strike into Charge', 1, 0, 5],
       ]),
       node('C1', 'Escape Artist', 'When the enemy Strikes and your Block stops every hit, gain {ascEscapeArtist} Energy.', 'ascEscapeArtist', 'Energy', 1),
-      multi('C2', 'Ghost Veil', 'Each turn no hit reaches you, gain 1 Veil (max {ascVeilMax}). Each Veil: hits that reach you deal {ascVeil} less dmg. A turn hits reach you, all Veil is gone after it.', [
+      multi('C2', 'Ghost Veil', 'Each turn no hit reaches you: +1 Veil (max {ascVeilMax}). Each Veil: hits on you −{ascVeil} dmg. Get hit: all Veil is gone at turn end.', [
         ['ascVeil', 'dmg cut per Veil', 1],
         ['ascVeilMax', 'max Veil', 3, 1],
       ]),
-      capstone('C3', 'Phantom', "After the enemy Strikes and no hit reaches you, your next Strike's first {ascPhantom} card can't be Blocked.", '−{ascPhantomCost} Max HP.', [
+      capstone('C3', 'Phantom', "Enemy Strikes and no hit reaches you: your next Strike's first {ascPhantom} card can't be Blocked.", '−{ascPhantomCost} Max HP.', [
         ['ascPhantom', 'cards that ignore Block', 1, 0, 3],
         ['ascPhantomCost', 'Cost: Max HP −', 20],
       ]),
@@ -329,11 +329,11 @@ export const TREES: Record<string, TreeData> = {
         ['ascSnare', 'cards Cut', 1, 0, 2],
         ['ascSnareField', 'enemy Field cards needed', 4, 1, 5],
       ]),
-      multi('D2', 'Tripwire', 'When you Block and the enemy Charges, Cut their {ascTripwire} newest Field card after they draw, if they then have {ascTripwireField}+.', [
+      multi('D2', 'Tripwire', 'You Block, enemy Charges: after they draw, Cut their {ascTripwire} newest Field card if they have {ascTripwireField}+.', [
         ['ascTripwire', 'cards Cut', 1, 0, 2],
         ['ascTripwireField', 'enemy Field cards needed', 5, 1, 5],
       ]),
-      capstone('D3', 'Demolition', 'Your Cut cards Cut {ascDemolition} more card while the enemy has {ascDemolitionField}+ Field cards (still max 2 Cuts a turn).', 'Your Cut cards deal {ascDemolitionCost} less dmg.', [
+      capstone('D3', 'Demolition', 'Your Cut cards Cut {ascDemolition} more while the enemy has {ascDemolitionField}+ Field cards (max 2 Cuts a turn).', 'Your Cut cards deal {ascDemolitionCost} less dmg.', [
         ['ascDemolition', 'Cut +', 1, 0, 2],
         ['ascDemolitionField', 'enemy Field cards needed', 4, 1, 5],
         ['ascDemolitionCost', 'Cost: Cut card dmg −', 2],
@@ -362,11 +362,11 @@ export const TREES: Record<string, TreeData> = {
         ['ascPrimed', 'counter at start', 2],
         ['ascPrimedCharge', 'counter + per Charge', 1, 0, 5],
       ]),
-      multi('B2', 'Off-Beat', 'Each hit your Block or Parry stops adds 1 to the Critical counter, up to {ascOffBeat} a turn. After a Critical, the next cycle starts at {ascOffBeatReset}.', [
+      multi('B2', 'Off-Beat', 'Each hit your Block or Parry stops: Critical counter +1 (max {ascOffBeat} a turn). After a Critical, the count restarts at {ascOffBeatReset}.', [
         ['ascOffBeat', 'counter + per turn (cap)', 2, 0, 5],
         ['ascOffBeatReset', 'counter after Critical', 1, 0, 5],
       ]),
-      capstone('B3', 'Build-up', 'Each successful Critical gives your next Critical ×{ascBuildUp} more (max ×{ascBuildUpMax} more). A clean hit that reaches you resets it.', 'A Critical into a Block loses {ascBuildUpBlockedLoss} Build-up step and skips the next Critical counter.', [
+      capstone('B3', 'Build-up', 'Each Critical that lands: next Critical ×{ascBuildUp} more (max ×{ascBuildUpMax}). A clean hit on you resets it.', 'A Blocked Critical loses {ascBuildUpBlockedLoss} Build-up step and skips the next count.', [
         ['ascBuildUp', 'multiplier + per Critical', 1],
         ['ascBuildUpMax', 'max multiplier +', 3, 1],
         ['ascBuildUpBlockedLoss', 'Cost: Build-up lost per Blocked Critical', 1, 0],
@@ -375,7 +375,7 @@ export const TREES: Record<string, TreeData> = {
         ['ascRunDownCounter', 'counter +', 1, 0, 5],
         ['ascRunDownDmg', 'first card dmg +', 3],
       ]),
-      multi('C2', 'Chase', 'A Strike with a Critical into their Charge, or into an enemy with {ascChaseField}+ Field cards, Cuts {ascChase} newest Field card.', [
+      multi('C2', 'Chase', 'A Strike with a Critical into a Charge, or into {ascChaseField}+ enemy Field cards, Cuts {ascChase} newest card.', [
         ['ascChase', 'cards Cut', 1, 0, 2],
         ['ascChaseField', 'enemy Field cards needed', 3, 1, 5],
       ]),
@@ -387,11 +387,11 @@ export const TREES: Record<string, TreeData> = {
         ['ascFeint', 'blocked dmg % +', 25],
         ['ascFeintPierce', 'Pierce % of total dmg', 15, 0, 100],
       ]),
-      multi('D2', 'Ghost Dance', "After a Strike with a Critical, gain Parry {ascGhostDance} for the next turn (doesn't stack). Each successful Parry adds {ascGhostDanceCounter} to the Critical counter.", [
+      multi('D2', 'Ghost Dance', "After a Strike with a Critical: Parry {ascGhostDance} next turn (doesn't stack). Each Parry that lands: Critical counter +{ascGhostDanceCounter}.", [
         ['ascGhostDance', 'Parry', 1],
         ['ascGhostDanceCounter', 'counter + per Parry', 1, 0, 5],
       ]),
-      capstone('D3', 'Shadow Mark', "A Critical Marks the enemy until the end of your next Strike. Your Strike into a Marked enemy: its first {ascShadowMark} card can't be Blocked, and their Parry and Shield break first.", 'Your Block effectiveness is −{ascShadowMarkBlockCut}%.', [
+      capstone('D3', 'Shadow Mark', "A Critical Marks the enemy until your next Strike ends. Strike into a Marked enemy: first {ascShadowMark} card can't be Blocked; their Parry and Shield break first.", 'Your Block effectiveness is −{ascShadowMarkBlockCut}%.', [
         ['ascShadowMark', 'cards that ignore Block', 1, 0, 3],
         ['ascShadowMarkBlockCut', 'Cost: Block effectiveness −%', 25, 0, 100],
       ]),
@@ -427,7 +427,7 @@ export const TREES: Record<string, TreeData> = {
       ]),
       node('D1', 'Ember Heart', 'While your HP is in the red (30%), each paid Skill card gives the enemy {ascEmberHeart} more Ignite.', 'ascEmberHeart', 'Ignite +', 1),
       node('D2', 'Cauterize', 'At the end of every turn, heal {ascCauterize} for each Ignite stack on the enemy.', 'ascCauterize', 'heal per stack', 4),
-      capstone('D3', 'Rebirth', 'Once per match, a hit that would knock you out leaves you on 1 HP: heal {ascRebirth}% Max HP and the enemy gets max Ignite.', '−{ascRebirthCost} Max HP.', [
+      capstone('D3', 'Rebirth', 'Once a match, a knockout hit leaves you on 1 HP: heal {ascRebirth}% Max HP and the enemy gets max Ignite.', '−{ascRebirthCost} Max HP.', [
         ['ascRebirth', 'heal % Max HP', 30, 0, 100],
         ['ascRebirthCost', 'Cost: Max HP −', 20],
       ]),
@@ -448,7 +448,7 @@ export const TREES: Record<string, TreeData> = {
         ['ascShatterpointCost', 'Cost: Shield −', 20],
       ]),
       node('B1', 'Numbing Cold', 'Each Chill cuts +{ascNumbingCold}% more dmg.', 'ascNumbingCold', 'dmg cut % +', 5),
-      node('B2', 'Bitter Wind', 'When the enemy has {ascBitterWind}+ Chill after your chain, their Skill card effects are off next turn.', 'ascBitterWind', 'Chill needed', 3, 1),
+      node('B2', 'Bitter Wind', 'Enemy has {ascBitterWind}+ Chill after your chain: their Skill effects are off next turn.', 'ascBitterWind', 'Chill needed', 3, 1),
       capstone('B3', 'Eternal Winter', 'Chill never freezes and never runs out: it stacks up to {ascEternalWinter}.', 'No Freeze and no Shatter from Chill (Absolute Zero still freezes).', [
         ['ascEternalWinter', 'max Chill', 6, 1],
       ]),

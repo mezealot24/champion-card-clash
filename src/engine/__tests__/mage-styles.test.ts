@@ -282,7 +282,7 @@ describe('⟡ Infuse action and new conditions (2026-10-19)', () => {
   })
   it('infuse is not a drawback, and reads as ⟡ Infuse', () => {
     expect(isDrawback({ a: 'infuse', who: 'self', n: 1 })).toBe(false)
-    expect(describeAct({ a: 'infuse', who: 'enemy', n: 1 })).toBe('⟡ Infuse 1 (Pyromancer: 1 Ignite · Cryomancer: 1 Chill)')
+    expect(describeAct({ a: 'infuse', who: 'enemy', n: 1 })).toBe('⟡ Infuse 1')
   })
 
   const healIf = (c: CondSpec, type: CardInst['def']['type'] = 'P') => card([{ hook: 'onResolve', if: [c], do: [{ a: 'heal', who: 'self', n: 10 }] }], type)
