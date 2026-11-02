@@ -30,8 +30,9 @@ export type CardDef = {
  */
 /** owner = the side whose deck this copy goes back to, when it was stolen onto the other Field. */
 /** paidHp = HP this copy's cost took this turn (Tank Blood Price cards read it). */
-export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number; owner?: Side; paidHp?: number }
+export type CardInst = { uid: string; def: CardDef; grow?: number; growNext?: number; usedOnce?: number[]; enteredWith?: number; owner?: Side; paidHp?: number; iced?: boolean }
 
+/** iced = Frost Breath (Cryomancer Rime Hex): this Field card sits out its side's next Strike chain, then thaws */
 /** trueDmg = your hits ignore dmg cuts (only Block stops them) */
 /** deathMark = on the side that carries it: every Strike against it bursts for 50% of that chain's total dmg (Assassin combo, rest of game) */
 /** woundUp = Bruiser Payback (Fury Ascendancy): the next Strike's slot 1 spends all Rage left; a buff the enemy can see */

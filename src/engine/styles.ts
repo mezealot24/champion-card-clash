@@ -659,10 +659,14 @@ Object.assign(STYLES, {
         const pct = r.cleanHits ? t2.shatterPct : (t2.shatterPct * through) / 100
         const lost = Math.floor((foe.maxHp * pct) / 100)
         foe.hp = Math.max(0, foe.hp - lost)
+        // Shatterpoint (Q 2026-11-02, Dota Ice Blast): at or below the line after the Shatter = knocked out
+        const exec = t2.shatterExecPct > 0 && foe.hp > 0 && (100 * foe.hp) / foe.maxHp <= t2.shatterExecPct
+        if (exec) foe.hp = 0
         if (foe.hp < before) {
           for (const h of hooksOf(foe)) h.onHpLoss?.(state, other(side))
           ;(state.events ??= []).push({ k: 'hp', side: other(side), delta: foe.hp - before })
         }
+        if (exec) say(state, side, `💥 Shatterpoint: Frozen enemy at ${t2.shatterExecPct}% HP or less → shattered`)
         say(state, side, r.cleanHits ? `💥 Shatter: clean hit on a Frozen enemy → ${lost} HP` : `💥 Shatter through Block (${through}%) → ${lost} HP`)
       }
       if (p.styleData?.subZero && r.cleanHits) {

@@ -1305,10 +1305,10 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
   'MG:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'shatterBlockPct', v(k)) }),
+  // Shatterpoint (Q 2026-11-02, Dota Ice Blast): Shatter executes at or below a HP line
   'MG:2:A3': (_, k) => ({
     tune: (t, v) => {
-      add(t, 'MG:2', 'chillMax', -v(k))
-      add(t, 'MG:2', 'shatterPct', v('ascShatterpointPct'))
+      add(t, 'MG:2', 'shatterExecPct', v(k))
       add(t, 'MG:2', 'frostArmorShield', -v('ascShatterpointCost'))
     },
   }),
@@ -1391,26 +1391,26 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
     },
   }),
   // Cryomancer · Rime Hex (lockdown)
+  // Rime Hex rework (Q 2026-11-02, refs: MTG Frost Breath, LoR Frostbite)
   'MG:2:D1': (amt) => ({
     hooks: {
       endTurn: (state, side) => {
         if (!freshFreeze(state, side, 1)) return
         const foe = state.players[other(side)]
-        const lost = foe.hand.splice(0, Math.max(0, amt(state, side)))
-        if (!lost.length) return
-        foe.deck.push(...lost)
-        say(state, side, `Cold Hands: enemy's ${lost.length} oldest Field card${lost.length === 1 ? '' : 's'} → deck bottom`)
+        const iced = foe.hand.filter((c) => !c.iced).slice(0, Math.max(0, amt(state, side)))
+        if (!iced.length) return
+        for (const c of iced) c.iced = true
+        say(state, side, `❄ Frost Breath: enemy's ${iced.length} oldest Field card${iced.length === 1 ? '' : 's'} iced (sit out their next chain)`)
       },
     },
   }),
   'MG:2:D2': (amt) => ({
     hooks: {
-      afterChain: (state, side) => {
-        const foe = state.players[other(side)]
-        if (chillStacks(foe) < amt(state, side) || foe.statuses.some((s) => s.kind === 'noCharge')) return 0
-        foe.statuses.push({ kind: 'noCharge', turns: 1 })
-        say(state, side, 'Frost Lock: enemy can\'t Charge next turn')
-        return 0
+      endTurn: (state, side) => {
+        if (!freshFreeze(state, side, 8) || amt(state, side) <= 0) return
+        // lasts as long as the Frozen turn (statuses tick at the start of a turn)
+        state.players[other(side)].statuses.push({ kind: 'blockPlus', turns: 2, n: -amt(state, side) })
+        say(state, side, `❄ Frostbite: Frozen enemy's Block stops ${amt(state, side)} fewer hit${amt(state, side) === 1 ? '' : 's'}`)
       },
     },
   }),

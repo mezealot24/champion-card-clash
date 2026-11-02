@@ -296,8 +296,12 @@ function resolveStrikes(
   const pierce: Partial<Record<Side, number[]>> = {}
   const piercePct: Partial<Record<Side, number[]>> = {}
   for (const side of strikers) {
-    chains[side] = state.players[side].hand
-    state.players[side].hand = [] // Strike uses the whole hand
+    // Strike uses the whole hand, except iced cards (Frost Breath): they sit this chain out, stay, and thaw
+    const p = state.players[side]
+    chains[side] = p.hand.filter((c) => !c.iced)
+    p.hand = p.hand.filter((c) => c.iced)
+    for (const c of [...p.hand, ...p.deck]) delete c.iced
+    if (p.hand.length) log(state, `${side} ❄ Frost Breath: ${p.hand.length} iced Field card${p.hand.length === 1 ? '' : 's'} sit out the chain`)
     // resource costs, in chain order: an unpaid card still hits but only its drawbacks fire this turn
     // (Bruiser: base dmg also drops to 50%)
     payChain(state, side, chains[side])
