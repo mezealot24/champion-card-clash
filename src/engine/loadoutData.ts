@@ -442,15 +442,15 @@ export const TREES: Record<string, TreeData> = {
       node('A1', 'Brittle', 'Your cards deal +{ascBrittle}% dmg for each Chill stack on the enemy.', 'ascBrittle', 'dmg % per enemy Chill', 10),
       // Black Ice replaces Cold Snap (Q 2026-10-31 playtest): Shatter through Block, base half → full
       node('A2', 'Black Ice', 'Shatter through a Block is stronger: +{ascBlackIce}% of the full Shatter (up to 100%).', 'ascBlackIce', 'Shatter through Block % +', 50, 0, 100),
-      capstone('A3', 'Shatterpoint', 'Freeze at {ascShatterpoint} fewer Chill, and Shatter takes +{ascShatterpointPct}% Max HP.', 'Frost Armor (and Frozen Tomb) Shield −{ascShatterpointCost}.', [
-        ['ascShatterpoint', 'stacks to freeze −', 1],
-        ['ascShatterpointPct', 'Shatter % +', 5],
+      // Shatterpoint rework (Q 2026-11-02, Dota Ice Blast): an execute line instead of +numbers
+      capstone('A3', 'Shatterpoint', 'Shatter knocks out a Frozen enemy left at {ascShatterExec}% Max HP or less.', 'Frost Armor (and Frozen Tomb) Shield −{ascShatterpointCost}.', [
+        ['ascShatterExec', 'execute line % Max HP', 12, 0, 100],
         ['ascShatterpointCost', 'Cost: Shield −', 20],
       ]),
       node('B1', 'Numbing Cold', 'Each Chill cuts +{ascNumbingCold}% more dmg.', 'ascNumbingCold', 'dmg cut % +', 5),
       node('B2', 'Bitter Wind', 'Enemy has {ascBitterWind}+ Chill after your chain: their Skill effects are off next turn.', 'ascBitterWind', 'Chill needed', 3, 1),
       capstone('B3', 'Eternal Winter', 'Chill never freezes and never runs out: it stacks up to {ascEternalWinter}.', 'No Freeze and no Shatter from Chill (Absolute Zero still freezes).', [
-        ['ascEternalWinter', 'max Chill', 6, 1],
+        ['ascEternalWinter', 'max Chill', 5, 1],
       ]),
       // Glacier rework (Q 2026-10-31 playtest): Shield feeds Freeze. Rime Armor replaces Hoarfrost; Avalanche spends
       // only part of the Shield and turns it into Chill too
@@ -468,8 +468,9 @@ export const TREES: Record<string, TreeData> = {
           ['ascAvalancheFreeze', 'Shield broken → Frozen (1 = on)', 1, 0, 1],
         ],
       ),
-      node('D1', 'Cold Hands', 'When you Freeze the enemy, their {ascColdHands} oldest Field cards go to the bottom of their deck.', 'ascColdHands', 'cards', 1),
-      node('D2', 'Frost Lock', 'When the enemy has {ascFrostLock}+ Chill after your chain, they can\'t Charge next turn.', 'ascFrostLock', 'Chill needed', 3, 1),
+      // Rime Hex rework (Q 2026-11-02): Frost Breath (MTG) replaces Cold Hands, Frostbite (LoR) replaces Frost Lock
+      node('D1', 'Frost Breath', "When you Freeze the enemy, their {ascFrostBreath} oldest Field cards are iced: they sit out the enemy's next chain.", 'ascFrostBreath', 'cards iced', 2),
+      node('D2', 'Frostbite', "When you Freeze the enemy, their Block stops {ascFrostbite} fewer hit while they're Frozen.", 'ascFrostbite', 'Block hits −', 1),
       capstone('D3', 'Glacial Prison', 'Frozen (and Thaw after it) lasts {ascGlacialPrison} more turn: the enemy can\'t Strike for longer.', 'Freeze needs {ascGlacialPrisonCost} more Chill.', [
         ['ascGlacialPrison', 'turns +', 1],
         ['ascGlacialPrisonCost', 'Cost: stacks to freeze +', 1],

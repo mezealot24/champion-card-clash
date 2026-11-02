@@ -168,6 +168,7 @@ export const OVERRIDES: Record<string, Partial<DeckStats>> = {
   'MG:2:B2': { tech: 1 },
   'MG:2:B3': { def: 1 },
   'MG:2:D1': { tech: 1 },
+  'MG:2:D2': { tech: 1 },
 }
 
 export function pieceTags(text: string): Partial<DeckStats> {

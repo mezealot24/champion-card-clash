@@ -1150,6 +1150,7 @@ function CardView({ vc, game, side, glow, unpaid, onOpen }: { vc: VCard; game: G
         <span className={`mod${f.grow < 0 ? ' down' : ''}`}>{f.grow > 0 ? `+${f.grow}` : f.grow}</span>
       ) : null}
       {vc.card.owner && <span className="mod down" style={{ bottom: 17 }}>{t('stolen')}</span>}
+      {vc.card.iced && <span className="mod down" style={{ bottom: vc.card.owner ? 31 : 17 }}>❄ {t('iced')}</span>}
       <div className="fx">
         {f.missing && <span className="rule">⚠ {t('no code yet')}</span>}
         {vc.card.def.effectSpec?.length ? (

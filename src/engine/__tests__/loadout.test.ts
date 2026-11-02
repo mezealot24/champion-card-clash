@@ -124,18 +124,64 @@ describe('randomLoadout', () => {
     const mg = (style: string, asc: string[]) => game('MG', { asc, points: 6 }, style, 'MG')
     it('Shatterpoint changes only the Cryomancer\'s own numbers, Cost included', () => {
       const s = mg('MG:2', ['A1', 'A2', 'A3'])
-      expect(tuningOf(s, 'p1')['MG:2'].chillMax).toBe(3)
+      expect(tuningOf(s, 'p1')['MG:2'].shatterExecPct).toBe(12)
       expect(tuningOf(s, 'p1')['MG:2'].frostArmorShield).toBe(10)
-      expect(tuningOf(s, 'p2')['MG:2'].chillMax).toBe(4)
+      expect(tuningOf(s, 'p2')['MG:2'].shatterExecPct).toBe(0)
     })
     it('Eternal Winter: Chill stacks past the freeze line and never freezes', () => {
       const s = mg('MG:2', ['B1', 'B2', 'B3'])
       expect(tuningOf(s, 'p1')['MG:2'].chillNoFreeze).toBe(1)
-      expect(tuningOf(s, 'p1')['MG:2'].chillMax).toBe(6)
+      expect(tuningOf(s, 'p1')['MG:2'].chillMax).toBe(5)
     })
     it('Eruption takes away Molten Shield Ignite; Rebirth costs Max HP', () => {
       expect(tuningOf(mg('MG:1', ['C1', 'C2', 'C3']), 'p1')['MG:1'].moltenIgnite).toBe(0)
       expect(mg('MG:1', ['D1', 'D2', 'D3']).players.p1.maxHp).toBe(110)
+    })
+    // p1 Cryo with the nodes, p2 plain; a 1-Mana paid S Infuses the 4th Chill → Frozen
+    const freezeFoe = (asc: string[], foeHp?: number) => {
+      const s = game('MG', { asc, points: 6 }, 'MG:2')
+      if (foeHp) s.players.p2.hp = foeHp
+      s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 3 })
+      s.players.p1.res = 3
+      s.players.p1.hand = [{ uid: 'fz', def: { id: 'MG-900', type: 'S', dmg: 1, effectText: '', cost: 1 } }]
+      return s
+    }
+    it('Frost Breath: on Freeze the enemy\'s 2 oldest Field cards sit out their next chain, then thaw', () => {
+      const s = freezeFoe(['D1'])
+      s.players.p2.hand = [hit(5), hit(5), hit(5)]
+      let n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      expect(n.players.p2.hand.filter((c) => c.iced)).toHaveLength(2)
+      n.players.p1.hand = []
+      n = resolveTurn(n, { p1: 'charge', p2: 'block' }) // Frozen turn
+      n = resolveTurn(n, { p1: 'charge', p2: 'charge' }) // Thaw
+      const hp = n.players.p1.hp
+      const field = n.players.p2.hand.length
+      n.players.p1.statuses = n.players.p1.statuses.filter((x) => x.kind !== 'shield')
+      const t = resolveTurn(n, { p1: 'charge', p2: 'strike' })
+      expect(t.log.some((l) => l.includes('Frost Breath: 2 iced'))).toBe(true)
+      expect(t.players.p2.hand.some((c) => c.iced)).toBe(false)
+      expect(hp - t.players.p1.hp).toBeLessThan(field * 5) // the 2 iced cards didn't hit
+    })
+    it('Frostbite: a Frozen enemy\'s Block stops 1 fewer hit', () => {
+      const s = freezeFoe(['D1', 'D2'])
+      const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      n.players.p1.hand = [hit(4), hit(4)]
+      const hp = n.players.p2.hp
+      const t = resolveTurn(n, { p1: 'strike', p2: 'block' })
+      expect(hp - t.players.p2.hp).toBeGreaterThanOrEqual(4) // 2nd hit got past the 1-hit Block
+    })
+    it('Shatterpoint: Shatter knocks out a Frozen enemy left at 12% Max HP or less', () => {
+      const alive = freezeFoe(['A1', 'A2', 'A3'])
+      const a = resolveTurn(alive, { p1: 'strike', p2: 'charge' })
+      a.players.p1.hand = [hit(1)]
+      expect(resolveTurn(a, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBeGreaterThan(12) // full HP: just the Shatter
+      const s = freezeFoe(['A1', 'A2', 'A3'], 50) // Max HP 100
+      let n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      n.players.p1.hand = [hit(1)]
+      n.players.p2.hp = 25
+      n = resolveTurn(n, { p1: 'strike', p2: 'charge' }) // 25 − 1 − 15 (Shatter) = 9 ≤ 12 → out
+      expect(n.players.p2.hp).toBe(0)
+      expect(n.winner).toBe('p1')
     })
     it('Black Ice: Shatter through Block goes from half to full', () => {
       expect(tuningOf(mg('MG:2', []), 'p1')['MG:2'].shatterBlockPct).toBe(50)
