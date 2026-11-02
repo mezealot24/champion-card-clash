@@ -125,7 +125,7 @@ describe('randomLoadout', () => {
     it('Shatterpoint changes only the Cryomancer\'s own numbers, Cost included', () => {
       const s = mg('MG:2', ['A1', 'A2', 'A3'])
       expect(tuningOf(s, 'p1')['MG:2'].chillMax).toBe(3)
-      expect(tuningOf(s, 'p1')['MG:2'].frostArmorShield).toBe(20)
+      expect(tuningOf(s, 'p1')['MG:2'].frostArmorShield).toBe(10)
       expect(tuningOf(s, 'p2')['MG:2'].chillMax).toBe(4)
     })
     it('Eternal Winter: Chill stacks past the freeze line and never freezes', () => {
@@ -137,10 +137,43 @@ describe('randomLoadout', () => {
       expect(tuningOf(mg('MG:1', ['C1', 'C2', 'C3']), 'p1')['MG:1'].moltenIgnite).toBe(0)
       expect(mg('MG:1', ['D1', 'D2', 'D3']).players.p1.maxHp).toBe(110)
     })
-    it('Hoarfrost: Frost Armor regrows faster and to a higher cap', () => {
-      const s = mg('MG:2', ['C1'])
-      expect(tuningOf(s, 'p1')['MG:2'].frostArmorRegen).toBe(10)
-      expect(tuningOf(s, 'p1')['MG:2'].frostArmorCap).toBe(50)
+    it('Black Ice: Shatter through Block goes from half to full', () => {
+      expect(tuningOf(mg('MG:2', []), 'p1')['MG:2'].shatterBlockPct).toBe(50)
+      expect(tuningOf(mg('MG:2', ['A1', 'A2']), 'p1')['MG:2'].shatterBlockPct).toBe(100)
+    })
+    it('Rime Armor: every hit the Shield soaks gives 1 more Chill', () => {
+      const s = game('MG', { asc: ['C1'], points: 6 }, 'MG:2')
+      expect(tuningOf(s, 'p1')['MG:2'].frostArmorChill).toBe(2)
+      s.players.p2.hand = [hit(3), hit(3)]
+      s.players.p1.hand = []
+      const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(n.players.p2.statuses.some((x) => x.kind === 'noStrike')).toBe(true) // 2 hits × 2 Chill = 4 → Frozen
+    })
+    it('Avalanche: spends half the Shield for dmg, keeps the rest, Chill after the chain', () => {
+      const s = game('MG', { asc: ['C1', 'C2', 'C3'], points: 6 }, 'MG:2')
+      s.players.p1.statuses = s.players.p1.statuses.filter((x) => x.kind !== 'shield')
+      s.players.p1.statuses.push({ kind: 'shield', turns: 9999, n: 40 })
+      s.players.p1.hand = [hit(1), hit(1)]
+      const hp = s.players.p2.hp
+      const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
+      // 20 spent: +1 dmg per 15 → +1 each, Ice Lance slot 1 +4 (Shield still up), 2 Chill (1 per 10)
+      expect(hp - n.players.p2.hp).toBe(2 + 2 + 4)
+      expect(n.players.p1.statuses.filter((x) => x.kind === 'shield').reduce((t, x) => t + (x.n ?? 0), 0)).toBe(20)
+      expect(n.players.p2.statuses.find((x) => x.kind === 'chill')?.n).toBe(2)
+    })
+    it('Avalanche: enemy hits that break your Shield to 0 Freeze the attacker', () => {
+      const s = game('MG', { asc: ['C1', 'C2', 'C3'], points: 6 }, 'MG:2')
+      s.players.p1.statuses = s.players.p1.statuses.filter((x) => x.kind !== 'shield')
+      s.players.p1.statuses.push({ kind: 'shield', turns: 9999, n: 5 })
+      s.players.p1.hand = []
+      s.players.p2.hand = [hit(10)]
+      const n = resolveTurn(s, { p1: 'charge', p2: 'strike' })
+      expect(n.players.p2.statuses.some((x) => x.kind === 'frozen')).toBe(true)
+      expect(n.log.some((l) => l.includes('Avalanche: the enemy broke your Shield'))).toBe(true)
+      const kept = game('MG', { asc: ['C1', 'C2', 'C3'], points: 6 }, 'MG:2') // Shield 40 soaks a 10 hit: not broken
+      kept.players.p1.hand = []
+      kept.players.p2.hand = [hit(10)]
+      expect(resolveTurn(kept, { p1: 'charge', p2: 'strike' }).players.p2.statuses.some((x) => x.kind === 'frozen')).toBe(false)
     })
   })
 

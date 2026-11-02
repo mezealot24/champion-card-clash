@@ -38,7 +38,7 @@ describe('resolveTuning', () => {
 
 describe('tuned numbers reach the engine', () => {
   it('Cryomancer Frost Armor Shield', () => {
-    expect(game('MG', 'MG:2').players.p1.statuses.find((s) => s.kind === 'shield')?.n).toBe(40)
+    expect(game('MG', 'MG:2').players.p1.statuses.find((s) => s.kind === 'shield')?.n).toBe(30)
     expect(game('MG', 'MG:2', { 'MG:2': { frostArmorShield: 25 } }).players.p1.statuses.find((s) => s.kind === 'shield')?.n).toBe(25)
     expect(game('MG', 'MG:2', { 'MG:2': { frostArmorShield: 0 } }).players.p1.statuses.some((s) => s.kind === 'shield')).toBe(false)
   })

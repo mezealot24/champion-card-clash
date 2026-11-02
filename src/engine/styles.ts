@@ -163,6 +163,8 @@ export type StyleDef = {
   blockLeakPct?: (state: GameState, side: Side) => number
   /** Cost: every hit this side's Block stops deals this % of its dmg */
   blockDmgPct?: (state: GameState, side: Side) => number
+  /** the most hits this side's Shield soaks a turn; later hits skip the Shield (Cryomancer Frost Armor) */
+  shieldSoakMax?: (state: GameState, side: Side) => number
   /** cards drawn at the end of the turn, after Dual Strike draws (Cryomancer Flash Freeze) */
   endDraw?: (state: GameState, side: Side) => number
   /** extra cards a Charge that isn't broken draws, decided per turn */
@@ -611,7 +613,7 @@ Object.assign(STYLES, {
   },
   /**
    * Mage · Cryomancer (Q 2026-10-18, from a Gemini draft; replaces Frostbinder).
-   * Frost Armor: start the game with Shield 40; every hit a Shield soaks gives the attacker 1 Chill.
+   * Frost Armor: start the game with Shield 40; every hit a Shield soaks gives the attacker frostArmorChill (1) Chill.
    * ⟡ Infuse (Q 2026-10-19, replaces Deep Freeze): every Skill card you paid for, hit clean or Blocked,
    * gives the opponent 1 Chill (MG.infusePerS) after your chain. No extra Mana.
    * Frozen Tomb (Q 2026-10-18, replaces Frost Barrier), once a game: HP loss that leaves you below 30% Max HP (the red bar), or would
@@ -622,6 +624,7 @@ Object.assign(STYLES, {
    * Chill clears and it can't Strike next turn, then Thaw keeps it from being Frozen again for a while (combos.ts freeze).
    * Shatter (Q 2026-10-25, Ice Lance pattern): your first clean hit on a Frozen enemy takes shatterPct of its Max HP,
    * so the Frozen side guesses Block (stops the hits) or Charge. Flash Freeze draws you cards for that Strike.
+   * Shatter through Block (Q 2026-10-31 playtest): a Strike the Frozen side Blocks still Shatters, at shatterBlockPct (50) of the full %.
    * Frost Armor regrows (Q 2026-10-25, StS Frost orb): every turn you Block an enemy Strike, Shield +frostArmorRegen up to frostArmorCap.
    * Block vs Charge regrows nothing (Q 2026-10-26: no free Shield from Block spam).
    * Arcane Sub-Zero (card) leaves a subZero status: the next Strike's clean hits each give 1 Chill.
@@ -629,6 +632,8 @@ Object.assign(STYLES, {
   'MG:2': {
     name: 'Cryomancer',
     infuse: addChill,
+    // Frost Armor cracks (Q 2026-11-01: pure Shield felt too safe): only the first frostArmorSoak hits a turn hit the Shield (0 = no limit)
+    shieldSoakMax: (state, side) => tuningOf(state, side)['MG:2'].frostArmorSoak || Infinity,
     setup: (p, t) => {
       if (t['MG:2'].frostArmorShield > 0) p.statuses.push({ kind: 'shield', turns: 9999, n: t['MG:2'].frostArmorShield })
     },
@@ -644,17 +649,21 @@ Object.assign(STYLES, {
       const p = state.players[side]
       // Shatter before Infuse, so a Freeze from this very chain waits for the next Strike
       const ice = state.players[other(side)].statuses.find((s) => s.kind === 'frozen')
-      if (p.styleData?.foeFrozen && r.cleanHits && ice && !((ice.n ?? 0) & 4)) {
+      // Shatter through Block (Q 2026-10-31): a Blocked chain still Shatters, at shatterBlockPct of the full %
+      const t2 = tuningOf(state, side)['MG:2']
+      const through = !r.cleanHits && r.blocked > 0 ? Math.min(100, Math.max(0, t2.shatterBlockPct)) : 0
+      if (p.styleData?.foeFrozen && (r.cleanHits || through) && ice && !((ice.n ?? 0) & 4)) {
         ice.n = (ice.n ?? 0) | 4 // once per Freeze
         const foe = state.players[other(side)]
         const before = foe.hp
-        const lost = Math.floor((foe.maxHp * tuningOf(state, side)['MG:2'].shatterPct) / 100)
+        const pct = r.cleanHits ? t2.shatterPct : (t2.shatterPct * through) / 100
+        const lost = Math.floor((foe.maxHp * pct) / 100)
         foe.hp = Math.max(0, foe.hp - lost)
         if (foe.hp < before) {
           for (const h of hooksOf(foe)) h.onHpLoss?.(state, other(side))
           ;(state.events ??= []).push({ k: 'hp', side: other(side), delta: foe.hp - before })
         }
-        say(state, side, `💥 Shatter: clean hit on a Frozen enemy → ${lost} HP`)
+        say(state, side, r.cleanHits ? `💥 Shatter: clean hit on a Frozen enemy → ${lost} HP` : `💥 Shatter through Block (${through}%) → ${lost} HP`)
       }
       if (p.styleData?.subZero && r.cleanHits) {
         const n = addChill(state, other(side), r.cleanHits)
@@ -664,8 +673,9 @@ Object.assign(STYLES, {
       return 0
     },
     afterHits: (state, side, r) => {
-      if (!r.shieldHits) return
-      const n = addChill(state, other(side), r.shieldHits)
+      const per = tuningOf(state, side)['MG:2'].frostArmorChill
+      if (!r.shieldHits || per <= 0) return
+      const n = addChill(state, other(side), r.shieldHits * per)
       say(state, side, `Frost Armor: Shield took ${r.shieldHits} hits → enemy gets ❄ Chill${n ? ` (${n} stacks)` : ''}`)
     },
     onHpLoss: (state, side) => {

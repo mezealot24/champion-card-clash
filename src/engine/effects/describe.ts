@@ -21,7 +21,7 @@ export const HOOK_LABEL: Record<Hook, string> = {
 export const WHO: Record<Who, string> = { self: 'you', enemy: 'opponent', both: 'both players' }
 const ACTION = { strike: 'Strike', block: 'Block', charge: 'Charge' }
 export const TYPE = { P: 'Punch', K: 'Kick', S: 'Skill' }
-export const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced (card effects off)', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero (each clean hit next Strike gives 1 Chill)', frozenTomb: 'Frozen Tomb', thaw: 'Thaw (can\'t be Frozen)', venom: 'Venom', woundUp: 'Wound Up', cutGuard: "Cut guard (can't be Cut)", regen: 'Regen', empower: 'Empower', holdMomentum: 'Momentum hold' }
+export const STATUS = { noStrike: "can't Strike", noBlock: "can't Block", noCharge: "can't Charge", blockPlus: 'Block stops ± hits', trueDmg: 'True Damage', guardBreak: 'Guard Crush', silence: 'Silenced', shield: 'Shield', parry: 'Parry', vulnerable: 'Vulnerable', deathMark: 'Mark of Assassin', ignite: 'Ignite', chill: 'Chill', frozen: 'Frozen', skillSilence: 'Skill effects off', subZero: 'Sub-Zero', frozenTomb: 'Frozen Tomb', thaw: 'Thaw', venom: 'Venom', woundUp: 'Wound Up', cutGuard: "Cut guard (can't be Cut)", regen: 'Regen', empower: 'Empower', holdMomentum: 'Momentum hold' }
 export const PER_LABEL: Record<Per, string> = {
   hitBlocked: 'hit you blocked this turn',
   chainCard: 'card in your chain',
@@ -133,10 +133,10 @@ export function describeAct(a: ActSpec, now = false, tr: Tr = EN, res = 'resourc
       if (a.kind === 'shield') {
         // a Shield gained now lasts this turn; one gained after the attack lasts through next turn
         const lasts = turnsEn === 'next turn' ? tr('through next turn') : turns
-        return tr(self ? 'gain Shield {n}{per} (absorbs hit dmg, lasts {lasts})' : '{who} gains Shield {n}{per} (absorbs hit dmg, lasts {lasts})', { n, per: per(tr, a.per), lasts, who })
+        return tr(self ? 'gain Shield {n}{per} ({lasts})' : '{who} gains Shield {n}{per} ({lasts})', { n, per: per(tr, a.per), lasts, who })
       }
-      if (a.kind === 'parry') return tr(self ? 'gain Parry {n} {turns} (the first {n} {hits} past Block are parried: 0 dmg)' : '{who} gains Parry {n} {turns} (the first {n} {hits} past Block are parried: 0 dmg)', { n, turns, hits: tr(n === 1 ? 'hit' : 'hits'), who })
-      if (a.kind === 'regen') return tr(self ? 'you regain {n}% of missing HP at the end of every turn, {t} {turnWord}' : '{who} regains {n}% of missing HP at the end of every turn, {t} {turnWord}', { n, t: a.turns, turnWord: tr(a.turns === 1 ? 'turn' : 'turns'), who })
+      if (a.kind === 'parry') return tr(self ? 'gain Parry {n} {turns}' : '{who} gains Parry {n} {turns}', { n, turns, who })
+      if (a.kind === 'regen') return tr(self ? 'gain Regen {n}% missing HP for {t} {turnWord}' : '{who} gains Regen {n}% missing HP for {t} {turnWord}', { n, t: a.turns, turnWord: tr(a.turns === 1 ? 'turn' : 'turns'), who })
       if (a.kind === 'holdMomentum') return tr(self ? "your Block doesn't cost Momentum {turns}" : "{who}'s Block doesn't cost Momentum {turns}", { turns, who })
       if (a.kind === 'empower') return tr(self ? 'your next Strike: every chain card +{n} dmg' : "{who}'s next Strike: every chain card +{n} dmg", { n, who })
       if (a.kind === 'vulnerable') return tr(self ? 'you take {n}% more dmg from hits {turns}' : '{who} takes {n}% more dmg from hits {turns}', { n, turns, who })
@@ -156,21 +156,21 @@ export function describeAct(a: ActSpec, now = false, tr: Tr = EN, res = 'resourc
       if (a.parry) return tr(one ? '{what} ignores Block and Parry' : '{what} ignore Block and Parry', { what })
       return tr(one ? '{what} ignores Block' : '{what} ignore Block', { what })
     }
-    case 'shatter': return tr("remove the opponent's Shield and Parry first, this card +{n} dmg per one removed", { n: a.n })
+    case 'shatter': return tr("break opponent's Shield and Parry first: this card +{n} dmg per one broken", { n: a.n })
     case 'steal': return tr("steal the opponent's card in this slot onto your Field")
     case 'cut': {
-      if (a.which === 'facing') return tr('opponent discards their card in this slot from the Field to the bottom of their deck (Cut)')
+      if (a.which === 'facing') return tr("Cut opponent's card in this slot")
       const which = tr(a.which)
-      return tr(a.n === 1 ? 'opponent discards their {which} card from the Field to the bottom of their deck (Cut)' : 'opponent discards their {n} {which} cards from the Field to the bottom of their deck (Cut)', { n: a.n, which })
+      return tr(a.n === 1 ? "Cut opponent's {which} Field card" : "Cut opponent's {n} {which} Field cards", { n: a.n, which })
     }
     case 'critCounter': return tr('Critical counter {n} (Fatal Rhythm)', { n: signed(a.n) })
     // a negative gain is a payment (BR-029 "Pay 5 Rage" read "Gain -5 resource")
     case 'gainRes': return (a.n < 0 ? tr(self ? 'lose {n} {res}' : '{who} lose {n} {res}', { n: -a.n, who, res: tr(res) }) : tr(self ? 'gain {n} {res}' : '{who} gain {n} {res}', { n: a.n, who, res: tr(res) })) + per(tr, a.per)
     case 'ignite':
       if (a.n === 0) return tr("{who}'s Ignite starts its 3 turns again", { who })
-      return tr(self ? '{who} gain {n} Ignite{per} (each stack burns 2 HP + 0.5% Max HP every turn and cuts heals 10%, 3 turns, max 4)' : '{who} gains {n} Ignite{per} (each stack burns 2 HP + 0.5% Max HP every turn and cuts heals 10%, 3 turns, max 4)', { n: a.n, who, per: per(tr, a.per) })
-    case 'chill': return tr(self ? "{who} gain {n} Chill{per} (each stack: hits deal 10% less, 3 turns; at 4 stacks Frozen: loses 15% Max HP and can't Strike next turn)" : "{who} gains {n} Chill{per} (each stack: hits deal 10% less, 3 turns; at 4 stacks Frozen: loses 15% Max HP and can't Strike next turn)", { n: a.n, who, per: per(tr, a.per) })
-    case 'infuse': return a.who === 'enemy' ? tr('⟡ Infuse {n} (Pyromancer: {n} Ignite · Cryomancer: {n} Chill)', { n: a.n }) : tr('⟡ Infuse {n} on {who} (Pyromancer: {n} Ignite · Cryomancer: {n} Chill)', { n: a.n, who })
+      return tr(self ? '{who} gain {n} Ignite{per}' : '{who} gains {n} Ignite{per}', { n: a.n, who, per: per(tr, a.per) })
+    case 'chill': return tr(self ? '{who} gain {n} Chill{per}' : '{who} gains {n} Chill{per}', { n: a.n, who, per: per(tr, a.per) })
+    case 'infuse': return a.who === 'enemy' ? tr('⟡ Infuse {n}', { n: a.n }) : tr('⟡ Infuse {n} on {who}', { n: a.n, who })
     case 'consumeIgnite': return a.burn ? tr("{who}'s Ignite explodes: all its remaining burn dmg at once", { who }) : tr("clear {who}'s Ignite", { who })
     case 'mulDmg': {
       const what = dmgWhat(a, tr)
