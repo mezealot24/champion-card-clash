@@ -426,7 +426,7 @@ export const TREES: Record<string, TreeData> = {
         ['ascEruption', 'dmg per Mana', 2],
       ]),
       node('D1', 'Ember Heart', 'While your HP is in the red (30%), each paid Skill card gives the enemy {ascEmberHeart} more Ignite.', 'ascEmberHeart', 'Ignite +', 1),
-      node('D2', 'Cauterize', 'At the end of every turn, heal {ascCauterize} for each Ignite stack on the enemy.', 'ascCauterize', 'heal per stack', 4),
+      node('D2', 'Cauterize', 'At the end of every turn, heal {ascCauterize} for each Ignite stack on the enemy.', 'ascCauterize', 'heal per stack', 1),
       capstone('D3', 'Rebirth', 'Once a match, a knockout hit leaves you on 1 HP: heal {ascRebirth}% Max HP and the enemy gets max Ignite.', '−{ascRebirthCost} Max HP.', [
         ['ascRebirth', 'heal % Max HP', 30, 0, 100],
         ['ascRebirthCost', 'Cost: Max HP −', 20],
