@@ -156,6 +156,7 @@ export function describeAct(a: ActSpec, now = false, tr: Tr = EN, res = 'resourc
       if (a.parry) return tr(one ? '{what} ignores Block and Parry' : '{what} ignore Block and Parry', { what })
       return tr(one ? '{what} ignores Block' : '{what} ignore Block', { what })
     }
+    case 'flurry': return a.target === 'this' ? tr('Flurry') : tr('{what} gain Flurry', { what: tr(PIERCE_TARGET[a.target]) })
     case 'shatter': return tr("break opponent's Shield and Parry first: this card +{n} dmg per one broken", { n: a.n })
     case 'steal': return tr("steal the opponent's card in this slot onto your Field")
     case 'cut': {

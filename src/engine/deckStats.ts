@@ -70,6 +70,7 @@ function actPoints(a: ActSpec): Partial<DeckStats> {
     case 'blockNow':
       return self && a.n > 0 ? { def: 1 } : enemy && a.n < 0 ? { atk: 1 } : {}
     case 'pierce':
+    case 'flurry':
     case 'shatter':
     case 'ignite':
     case 'consumeIgnite':
@@ -131,7 +132,7 @@ const TAG_RULES: [RegExp, StatKey][] = [
   [/heal|Lifesteal|Max HP and start HP|Max HP grown|\+\d*\{?\w*\}? Max HP/i, 'hp'],
   [/Shield|Parry|less dmg|deal \{\w+\} less|Block stops every|stops every hit|dmg cut/i, 'def'],
   [/Cut |can't be Blocked|Silenc|can't (Strike|Block|Charge)|finishes them|knocked out|Mark/i, 'tech'],
-  [/\+\{?\w*\}? dmg|dmg \+|Critical|Ignite|burn|ignores Block|loses \{\w+\} HP|×\{\w+\}|Overdrive/i, 'atk'],
+  [/\+\{?\w*\}? dmg|dmg \+|Critical|Ignite|burn|ignores Block|loses \{\w+\} HP|×\{\w+\}|Overdrive|Flurry/i, 'atk'],
 ]
 
 /** Hand tags where the words mislead or say nothing (key = "CHAMP:oath" or "STYLE:NODE", e.g. "TK:1:A1"). */
@@ -160,6 +161,8 @@ export const OVERRIDES: Record<string, Partial<DeckStats>> = {
   'BR:2:B2': { tech: 1 },
   // Assassin Ghost Veil: Veil cuts hit dmg (its short text says −dmg)
   'AS:1:C2': { def: 1 },
+  // Assassin Storm: more Flurry hits = dmg
+  'AS:1:A3': { atk: 1 },
   // Cryomancer: Chill cuts dmg, Freeze locks
   'MG:2:A1': { atk: 1 },
   'MG:2:A2': { atk: 1 },

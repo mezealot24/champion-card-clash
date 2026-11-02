@@ -53,6 +53,15 @@ const surgeOf = (g: GameState, side: Side, action: Action) => {
   if (!s || !res || p.championId !== SURGE_CHAMPION || !SURGE_MODES.includes(s.mode) || (p.res ?? 0) < res.cap) return undefined
   return s.name
 }
+/** What the Surge does, for the button tooltip. Shroud's payoff depends on the Style (engine.ts). */
+const surgeRule = (g: GameState, side: Side, name: string) => {
+  if (name !== 'Shroud') return t('hits that get past your Block deal 1 each')
+  const p = g.players[side]
+  const tune = tuningOf(g, side)
+  if (p.style === 'AS:1' && tune['AS:1'].shroudDraw > 0) return t('no Charge break, draw {n} more', { n: tune['AS:1'].shroudDraw })
+  if (p.style === 'AS:2' && tune['AS:2'].shroudCounter > 0) return t('no Charge break, Critical counter +{n}', { n: tune['AS:2'].shroudCounter })
+  return t('no Charge break')
+}
 const SPEEDS = [1, 1.5, 2]
 /** Signature combo banner time at 1x speed (was 1.3 s, players couldn't read it) */
 const BANNER_MS = 3200
@@ -480,6 +489,8 @@ export function Arena(props: {
       count[ev.side]++
       spark(b.x, b.y, ev.crit ? '#ffc84a' : '#fff2b8')
       if (ev.crit) pop(b.x, b.y - 40, t('CRITICAL'), 'crit')
+      // Flurry: the same card comes back for its next hit
+      else if (ev.flurry) pop(b.x, b.y - 40, `${t('FLURRY')} ${ev.flurry}`, 'soft')
       if (ev.absorbed) pop(b.x - 20, b.y - 34, `${t('SHIELD')} −${ev.absorbed}`, 'soft')
       if (ev.dealt > 0) charHit(foe, ev.dealt)
       shake(q(`.hud.${foe} .portrait`))
@@ -734,7 +745,7 @@ export function Arena(props: {
                   key={action}
                   type="button"
                   className={`act ${action}${locked === action ? ' locked' : ''}${surge ? ' surge' : ''}`}
-                  title={surge ? t('{name}: spends all your Energy this turn ({rule})', { name: surge, rule: t(surge === 'Shroud' ? 'no Charge break, hits on you deal half' : 'hits that get past your Block deal 1 each') }) : undefined}
+                  title={surge ? t('{name}: spends all your Energy this turn ({rule})', { name: surge, rule: surgeRule(game, 'p1', surge) }) : undefined}
                   disabled={playing || !!turn || !!game.winner || !!props.busy || !legal.includes(action)}
                   onClick={(e) => {
                     e.stopPropagation()
@@ -984,7 +995,7 @@ function Hud({ game, side, hp, name, style, styleText, foe, onTip }: { game: Gam
       ? [{ label: '💀 Undying', tone: 'buff' as const, tip: t("Undying until turn {turn}: your HP can't drop below 1 and nothing can heal you. Every chain card deals +{n} dmg (half when Blocked).", { turn: p.perkData!.undyingUntil!, n: Math.floor((p.maxHp * ((tuningOf(game, side)['TK:2'] as Record<string, number>).ascUndyingPct ?? 0)) / 100) }) }]
       : []),
     // Sonic Bliz: what Overdrive adds to every card if this side Strikes now, so both players can see it coming
-    ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: t('If this side Strikes now with no S card, every chain card gets +{n} dmg and all Energy is spent.', { n: overdriveAdd(game, side) }) }] : []),
+    ...(overdriveAdd(game, side) ? [{ label: `⚡ Overdrive +${overdriveAdd(game, side)}`, tone: 'buff' as const, tip: t('If this side Strikes now, Overdrive spends all Energy left after Skills: Punch / Kick cards get Flurry, about +{n} dmg in all.', { n: overdriveAdd(game, side) }) }] : []),
   ]
   const who = (
     <div className="who" key="who">
@@ -1092,7 +1103,9 @@ function previewDmg(game: GameState, side: Side): Map<string, number> | undefine
     const foeAct = (['charge', 'strike', 'block'] as Action[]).find((a) => foeActs.includes(a))
     if (!game.winner && foeAct && legalActions(game, side).includes('strike')) {
       const next = resolveTurn(game, { [side]: 'strike', [foe]: foeAct } as Record<Side, Action>)
-      out = new Map((next.events ?? []).filter((e) => e.k === 'hit' && e.side === side).map((e) => [(e as Extract<TurnEvent, { k: 'hit' }>).uid, (e as Extract<TurnEvent, { k: 'hit' }>).dmg]))
+      out = new Map()
+      // a Flurry card hits more than once: show what all its hits add up to
+      for (const e of next.events ?? []) if (e.k === 'hit' && e.side === side) out.set(e.uid, (out.get(e.uid) ?? 0) + e.dmg)
     }
   } catch {
     out = undefined

@@ -53,46 +53,73 @@ describe('Cut', () => {
   })
 })
 
+// Overdrive v2 (Sonic Bliz Flurry rework, Q 2026-11-02): Energy left after Skills → that many P/K cards get Flurry,
+// +2 dmg on each of their hits. A 1-dmg card with Flurry hits 1 + 0, so 3 + 2 = 5 with the per-hit dmg.
 describe('Sonic Bliz Overdrive', () => {
   const five = () => Array.from({ length: 5 }, () => card(1, 'K'))
-  it('full Field, no S: spends all Energy, +2 dmg per Energy on every card', () => {
+  it('3 Energy: the first 3 cards hit twice, +2 dmg per hit; all Energy spent', () => {
     const g = game(five(), [], 'AS:1')
     g.players.p1.res = 3
     const s = resolveTurn(g, { p1: 'strike', p2: 'charge' })
-    expect(s.players.p2.hp).toBe(100 - 5 * (1 + 6))
+    expect(s.players.p2.hp).toBe(100 - 3 * 5 - 2)
     expect(s.players.p1.res).toBe(1) // 0 after the spend, +1 at end of turn
+    expect(s.events!.filter((e) => e.k === 'hit')).toHaveLength(8)
   })
 
   it('works while Silenced (it is a Style)', () => {
     const g = game(five(), [], 'AS:1')
     g.players.p1.res = 2
     g.players.p1.statuses.push({ kind: 'silence', turns: 1 })
-    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 5 * 5)
+    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 2 * 5 - 3)
   })
 
-  it('from 3 cards (Q 2026-10-16): 3 cards with 3 Energy → +6 each', () => {
-    const g = game(five().slice(0, 3), [], 'AS:1')
-    g.players.p1.res = 3
-    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 3 * 7)
+  it('Skills are allowed: their cost comes first, the rest makes Flurry; Skills never get it', () => {
+    const g = game([...five().slice(0, 4), card(1, 'S')], [], 'AS:1') // 3 Energy, the S pays 1
+    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 2 * 5 - 2 - 1)
   })
 
-  it('not with an S card in the chain, not with fewer than 3 cards, not for Fatal Rhythm', () => {
-    const withS = [...five().slice(0, 4), card(1, 'S')]
-    let g = game(withS, [], 'AS:1')
-    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(95)
-    g = game(five().slice(0, 2), [], 'AS:1')
+  it('not with fewer than 3 cards, not for Fatal Rhythm', () => {
+    let g = game(five().slice(0, 2), [], 'AS:1')
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(98)
     g = game(five(), [], 'AS:2')
     expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(100 - 4 - 3)
   })
 
-  it('overdriveAdd previews the bonus for the HUD chip and the AI (Q 2026-10-17)', () => {
+  it('overdriveAdd previews the extra dmg for the HUD chip and the AI', () => {
     const g = game(five(), [], 'AS:1')
     g.players.p1.res = 3
-    expect(overdriveAdd(g, 'p1')).toBe(6)
+    expect(overdriveAdd(g, 'p1')).toBe(12) // 3 cards × 2 hits × 2
     g.players.p1.res = 0
     expect(overdriveAdd(g, 'p1')).toBe(0)
-    expect(overdriveAdd(game([...five().slice(0, 4), card(1, 'S')], [], 'AS:1'), 'p1')).toBe(0)
+    expect(overdriveAdd(game([...five().slice(0, 4), card(1, 'S')], [], 'AS:1'), 'p1')).toBe(8)
     expect(overdriveAdd(game(five(), [], 'AS:2'), 'p1')).toBe(0)
+  })
+})
+
+describe('Flurry', () => {
+  const flurry: EffectSpec = [{ hook: 'modify', do: [{ a: 'flurry', target: 'this' }] }]
+  const noOd = (g: GameState) => ((g.players.p1.res = 0), g)
+
+  it('a Flurry card hits twice, its dmg split between the hits (first one gets the odd point)', () => {
+    const s = resolveTurn(noOd(game([card(11, 'P', flurry)], [])), { p1: 'strike', p2: 'charge' })
+    expect(s.events!.filter((e) => e.k === 'hit').map((e) => (e.k === 'hit' ? e.dealt : 0))).toEqual([6, 5])
+    expect(s.players.p2.hp).toBe(89)
+  })
+
+  it('Block counts hits: a Flurry card in slot 1 uses up both, the next card gets through', () => {
+    const s = resolveTurn(noOd(game([card(10, 'P', flurry), card(10, 'K')], [])), { p1: 'strike', p2: 'block' })
+    expect(s.players.p2.hp).toBe(90)
+  })
+
+  it('Parry stops one hit, the second still lands', () => {
+    const g = noOd(game([card(10, 'P', flurry)], []))
+    g.players.p2.statuses.push({ kind: 'parry', turns: 2, n: 1 })
+    expect(resolveTurn(g, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(95)
+  })
+
+  it('card effects fire once, however many hits', () => {
+    const draws: EffectSpec = [...flurry, { hook: 'onHit', do: [{ a: 'draw', who: 'self', n: 1 }] }]
+    const s = resolveTurn(noOd(game([card(4, 'P', draws)], [])), { p1: 'strike', p2: 'charge' })
+    expect(s.players.p1.hand).toHaveLength(1)
   })
 })

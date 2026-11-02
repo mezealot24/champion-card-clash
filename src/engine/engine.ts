@@ -1,5 +1,5 @@
 // Turn resolver. resolveTurn never mutates its input: it clones, resolves, returns the new state.
-import { classesOf, inClass } from './classes'
+import { classesOf, inClass, styleOn } from './classes'
 import { applyConqueror, checkCombos, lifestealPct } from './combos'
 import { cardHeal, chillCut, getStyle, hooksOf, igniteBurn, igniteStacks } from './styles'
 import { addRes, baseDmgOf, gainRes, payChain, resourceOf, SURGE_CHAMPION, SURGE_MODES } from './resources'
@@ -84,7 +84,20 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
       if (!SURGE_MODES.includes(mode)) return
       surge[side] = p.res ?? 0
       p.res = 0
-      const what = mode === 'A' ? 'Wraith Step (hits through Block deal only 1)' : mode === 'B' ? 'Shroud (no charge break, half dmg)' : 'Elusive (enemy Block stops 1 less)'
+      // Shroud is the greedy pick (Q 2026-10-30): no Charge break and a Style payoff, but hits land in full.
+      // Sonic Bliz draws more (speed), Fatal Rhythm moves the Critical counter (rhythm). Wraith Step stays the safe pick.
+      const t = tuningOf(state, side)
+      let shroud = 'Shroud (no Charge break'
+      if (mode === 'B' && styleOn(p, 'AS:1') && t['AS:1'].shroudDraw > 0) shroud += `, draws ${t['AS:1'].shroudDraw} more`
+      if (mode === 'B' && styleOn(p, 'AS:2') && t['AS:2'].shroudCounter > 0) {
+        // never past the next Critical: the attack that would crit stays a Critical
+        const at = p.styleData?.attacks ?? 0
+        const every = Math.max(1, t['AS:2'].every)
+        const next = Math.min(at + t['AS:2'].shroudCounter, Math.ceil((at + 1) / every) * every - 1)
+        p.styleData = { ...p.styleData, attacks: Math.max(at, next) }
+        shroud += `, Critical counter +${Math.max(0, next - at)}`
+      }
+      const what = mode === 'A' ? 'Wraith Step (hits through Block deal only 1)' : mode === 'B' ? `${shroud})` : 'Elusive (enemy Block stops 1 less)'
       log(state, `${side} Energy Surge: spends all ${surge[side]} Energy → ${what}`)
     })
   }
@@ -160,6 +173,11 @@ export function resolveTurn(prev: GameState, actions: Record<Side, Action>): Gam
     } else {
       const extra = hooksOf(p).reduce((t, h) => t + (h.chargeDraw ?? 0) + (h.extraChargeDraw?.(state, side) ?? 0), 0)
       drawCards(state, side, state.rules.chargeDraw + extra)
+    }
+    // Sonic Bliz Shroud: draws more on top, broken Charge or not (a Shroud is never broken)
+    if (env.shroud[side] && styleOn(p, 'AS:1')) {
+      const n = tuningOf(state, side)['AS:1'].shroudDraw
+      if (n > 0) log(state, `${side} Shroud: draws ${drawCards(state, side, n)} more`)
     }
   }
 
@@ -295,6 +313,9 @@ function resolveStrikes(
   const mult: Partial<Record<Side, number[]>> = {}
   const pierce: Partial<Record<Side, number[]>> = {}
   const piercePct: Partial<Record<Side, number[]>> = {}
+  // Flurry (Sonic Bliz rework, Q 2026-11-02): hits per card (dmg split between them) and dmg added to every one of its hits
+  const hits: Partial<Record<Side, number[]>> = {}
+  const perHit: Partial<Record<Side, number[]>> = {}
   for (const side of strikers) {
     // Strike uses the whole hand, except iced cards (Frost Breath): they sit this chain out, stay, and thaw
     const p = state.players[side]
@@ -309,6 +330,8 @@ function resolveStrikes(
     mult[side] = chains[side].map(() => 1)
     pierce[side] = chains[side].map(() => 0)
     piercePct[side] = chains[side].map(() => 0)
+    hits[side] = chains[side].map(() => 1)
+    perHit[side] = chains[side].map(() => 0)
   }
 
   // held = a card in the hand of a side that didn't Strike (it has no chain of its own)
@@ -337,6 +360,7 @@ function resolveStrikes(
       mult: held ? [] : mult[side]!,
       enemyMult: mult[enemy] ?? null,
       pierce: held ? [] : pierce[side]!,
+      hits: held ? [] : hits[side]!,
       blocked,
       clean,
     }
@@ -360,8 +384,11 @@ function resolveStrikes(
   }
 
   const stops = (side: Side) => Math.max(0, blockStops[side] + env.blockNow[side])
-  // Pierce: a hit marked by an effect ignores Block
-  const isBlocked = (side: Side, i: number) => actions[other(side)] === 'block' && i < stops(other(side)) - (env.elusive[side] ? 1 : 0) && !pierce[side]![i]
+  // hits of the chain before card i (a Flurry card counts each of its hits): Block stops the first hits of the chain
+  const hitStart = (side: Side, i: number) => hits[side]!.slice(0, i).reduce((t, n) => t + n, 0)
+  // Pierce: a hit marked by an effect ignores Block. h = which hit of the card (Flurry)
+  const isBlocked = (side: Side, i: number, h = 0) =>
+    actions[other(side)] === 'block' && hitStart(side, i) + h < stops(other(side)) - (env.elusive[side] ? 1 : 0) && !pierce[side]![i]
   const dmgOf = (side: Side, i: number) => {
     const card = chains[side]![i]
     // True Damage: dmg cuts (negative bonus, multiplier below 1) don't apply; only Block stops the hit
@@ -395,16 +422,23 @@ function resolveStrikes(
   // loadout Costs that make a side's Block leak: every blocked hit after its first still deals N% (Unrelenting)
   const blockLeak = { p1: 0, p2: 0 }
   for (const side of SIDES) blockLeak[side] = hooksOf(state.players[side]).reduce((t, h) => Math.max(t, h.blockLeakPct?.(state, side) ?? 0), 0)
-  const leakPct = (side: Side, i: number) => {
+  const leakPct = (side: Side, i: number, h: number) => {
     if (!blockLeak[other(side)]) return 0
     let earlier = 0
-    for (let j = 0; j < i; j++) if (isBlocked(side, j)) earlier++
+    for (let j = 0; j < i; j++) for (let k = 0; k < hits[side]![j]; k++) if (isBlocked(side, j, k)) earlier++
+    for (let k = 0; k < h; k++) if (isBlocked(side, i, k)) earlier++
     return earlier >= 1 ? blockLeak[other(side)] : 0
   }
-  const dealtOf = (side: Side, i: number) => {
-    const dmg = dmgOf(side, i)
-    if (!isBlocked(side, i)) return dmg
-    const stoppedThrough = Math.min(100, Math.max(throughPct(side, i), leakPct(side, i)))
+  // one hit of card i: its dmg split evenly between its hits (the first ones get the rest), then the per-hit dmg on top
+  const hitDmg = (side: Side, i: number, h: number) => {
+    const total = dmgOf(side, i)
+    const n = hits[side]![i]
+    return Math.floor(total / n) + (h < total % n ? 1 : 0) + perHit[side]![i]
+  }
+  const dealtOf = (side: Side, i: number, h: number) => {
+    const dmg = hitDmg(side, i, h)
+    if (!isBlocked(side, i, h)) return dmg
+    const stoppedThrough = Math.min(100, Math.max(throughPct(side, i), leakPct(side, i, h)))
     const pierced = Math.min(100, Math.max(0, piercePct[side]![i] ?? 0))
     return Math.min(dmg, Math.floor((dmg * stoppedThrough) / 100) + Math.floor((dmg * pierced) / 100))
   }
@@ -421,6 +455,7 @@ function resolveStrikes(
     pierce[side]!,
     piercePct[side]!,
     chains[other(side)] ?? handAtStart[other(side)],
+    { hits: hits[side]!, perHit: perHit[side]! },
   )
   // loadout pieces that soften every hit getting past a side's Block (Iron Hide)
   const hitCut = { p1: 0, p2: 0 }
@@ -438,46 +473,52 @@ function resolveStrikes(
   // Every hit's outcome is worked out now, in hit order: Block, then Parry, then Shield, then HP.
   // So dmg each side will take from hits this turn is known before any hit lands.
   const longest = Math.max(...strikers.map((s) => chains[s]!.length))
-  const outcome = new Map<string, { dealt: number; parried: boolean; absorbed: number }>()
+  type HitOut = { dealt: number; parried: boolean; absorbed: number }
+  // per card: one entry per hit (Flurry cards have more)
+  const outcome = new Map<string, HitOut[]>()
   const sized = (side: Side, kind: 'shield' | 'parry') => state.players[side].statuses.filter((s) => s.kind === kind && (s.n ?? 0) > 0)
   for (let i = 0; i < longest; i++) {
     for (const side of strikers) {
       const card = chains[side]![i]
       if (!card) continue
       const enemy = other(side)
-      let dealt = dealtOf(side, i)
-      // Energy Surge: Wraith Step caps hits past Block at 1, Shroud halves them
-      if (env.wraith[enemy] && !isBlocked(side, i)) dealt = Math.min(dealt, 1)
-      if (env.shroud[enemy]) dealt = Math.floor(dealt / 2)
-      if (critCut[enemy] && crit[side].has(i)) dealt = Math.floor((dealt * (100 - critCut[enemy])) / 100)
-      if (hitCut[enemy] && !isBlocked(side, i) && dealt > 0 && cutSkip[enemy] > 0) cutSkip[enemy]--
-      else if (hitCut[enemy] && !isBlocked(side, i) && dealt > 0 && cutLeft[enemy] > 0) {
-        dealt = Math.max(0, dealt - hitCut[enemy])
-        cutLeft[enemy]--
-      }
-      // pierce 2 (Crushing Weight) ignores Parry too
-      const parry = !isBlocked(side, i) && dealt > 0 && pierce[side]![i] !== 2 ? sized(enemy, 'parry')[0] : undefined
-      if (parry) {
-        parry.n = (parry.n ?? 1) - 1
-        env.hitsParried[enemy]++
-      }
-      let absorbed = 0
-      if (!parry && soakLeft[enemy] > 0) {
-        for (const sh of sized(enemy, 'shield')) {
-          const take = Math.min(sh.n ?? 0, dealt - absorbed)
-          sh.n = (sh.n ?? 0) - take
-          absorbed += take
+      const outs: HitOut[] = []
+      for (let h = 0; h < hits[side]![i]; h++) {
+        const blocked = isBlocked(side, i, h)
+        let dealt = dealtOf(side, i, h)
+        // Energy Surge: Wraith Step caps hits past Block at 1 (Shroud no longer cuts dmg, Q 2026-10-30)
+        if (env.wraith[enemy] && !blocked) dealt = Math.min(dealt, 1)
+        if (critCut[enemy] && crit[side].has(i)) dealt = Math.floor((dealt * (100 - critCut[enemy])) / 100)
+        if (hitCut[enemy] && !blocked && dealt > 0 && cutSkip[enemy] > 0) cutSkip[enemy]--
+        else if (hitCut[enemy] && !blocked && dealt > 0 && cutLeft[enemy] > 0) {
+          dealt = Math.max(0, dealt - hitCut[enemy])
+          cutLeft[enemy]--
         }
-        if (absorbed) {
-          env.shieldHits[enemy]++
-          soakLeft[enemy]--
+        // pierce 2 (Crushing Weight) ignores Parry too
+        const parry = !blocked && dealt > 0 && pierce[side]![i] !== 2 ? sized(enemy, 'parry')[0] : undefined
+        if (parry) {
+          parry.n = (parry.n ?? 1) - 1
+          env.hitsParried[enemy]++
         }
+        let absorbed = 0
+        if (!parry && soakLeft[enemy] > 0) {
+          for (const sh of sized(enemy, 'shield')) {
+            const take = Math.min(sh.n ?? 0, dealt - absorbed)
+            sh.n = (sh.n ?? 0) - take
+            absorbed += take
+          }
+          if (absorbed) {
+            env.shieldHits[enemy]++
+            soakLeft[enemy]--
+          }
+        }
+        if (parry) dealt = 0
+        else dealt -= absorbed
+        outs.push({ dealt, parried: !!parry, absorbed })
+        env.hitsIn[enemy].push({ slot: i, type: card.def.type, blocked, landed: !blocked && !parry })
+        hitDmgTaken[enemy] += dealt
       }
-      if (parry) dealt = 0
-      else dealt -= absorbed
-      outcome.set(card.uid, { dealt, parried: !!parry, absorbed })
-      env.hitsIn[enemy].push({ slot: i, type: card.def.type, blocked: isBlocked(side, i), landed: !isBlocked(side, i) && !parry })
-      hitDmgTaken[enemy] += dealt
+      outcome.set(card.uid, outs)
     }
   }
   for (const side of SIDES) state.players[side].statuses = state.players[side].statuses.filter((s) => s.kind !== 'parry' || (s.n ?? 0) > 0)
@@ -490,28 +531,38 @@ function resolveStrikes(
       const card = chains[side]![i]
       if (!card) continue
       const enemy = other(side)
-      const blocked = isBlocked(side, i)
-      if (blocked) hitsBlocked[enemy]++
       const usedNext = card.growNext ?? 0
-      const dmg = dmgOf(side, i)
-      const { dealt, parried, absorbed } = outcome.get(card.uid)!
-      if (!blocked && !parried) env.hitsTaken[enemy]++
-      emit(state, { k: 'hit', side, slot: i, uid: card.uid, type: card.def.type, dmg, dealt, blocked, parried, absorbed, crit: crit[side].has(i) })
-      if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
-      const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
-      const guard = parried ? ` (${enemy} Parries ${dmg})` : absorbed ? ` (Shield absorbs ${absorbed})` : ''
-      log(state, `${side} slot ${i + 1} ${card.def.id} ${blocked ? `Blocked${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} through ${dealt})` : ''}${critTag}` : `hits ${dmg}${critTag}${guard}`}`)
-      const ls = Math.floor((dealt * (lifestealPct(state, side) + hooksOf(state.players[side]).reduce((t, h) => t + (h.lifesteal?.(state, side) ?? 0), 0))) / 100)
-      if (ls > 0 && heal(state, side, ls) > 0) {
-        log(state, `${side} Lifesteal heals ${ls}`)
-      }
-      // clean = some dmg got through Block, Parry and Shield (GDD)
-      const clean = !blocked && dealt > 0
-      if (clean) cleanHits[side]++
-      if (clean && card.def.type !== 'S') env.cleanPK[side]++
-      hitResults.set(card.uid, { blocked, clean })
-      // On hit: fires right here, between hits, so e.g. a heal lands before the next enemy hit (Q 2026-10-17)
-      effectOf(state, side, card)?.onHit?.(ctxFor(side, i, blocked, clean, false, i))
+      const n = hits[side]![i]
+      // the card counts as Blocked when Block stopped every one of its hits, clean when any of them got through
+      let allBlocked = true
+      let anyClean = false
+      outcome.get(card.uid)!.forEach(({ dealt, parried, absorbed }, h) => {
+        const blocked = isBlocked(side, i, h)
+        if (blocked) hitsBlocked[enemy]++
+        else allBlocked = false
+        const dmg = hitDmg(side, i, h)
+        if (!blocked && !parried) env.hitsTaken[enemy]++
+        emit(state, { k: 'hit', side, slot: i, uid: card.uid, type: card.def.type, dmg, dealt, blocked, parried, absorbed, crit: crit[side].has(i), ...(n > 1 ? { flurry: h + 1 } : {}) })
+        if (dealt > 0) loseHp(state, enemy, dealt, 'hit')
+        const critTag = crit[side].has(i) ? ' 💥 Critical' : ''
+        const flurryTag = n > 1 ? ` (Flurry ${h + 1}/${n})` : ''
+        const guard = parried ? ` (${enemy} Parries ${dmg})` : absorbed ? ` (Shield absorbs ${absorbed})` : ''
+        log(state, `${side} slot ${i + 1} ${card.def.id}${flurryTag} ${blocked ? `Blocked${dealt ? ` (${crit[side].has(i) ? 'Critical' : 'Guard Crush'} through ${dealt})` : ''}${critTag}` : `hits ${dmg}${critTag}${guard}`}`)
+        const ls = Math.floor((dealt * (lifestealPct(state, side) + hooksOf(state.players[side]).reduce((t, hk) => t + (hk.lifesteal?.(state, side) ?? 0), 0))) / 100)
+        if (ls > 0 && heal(state, side, ls) > 0) {
+          log(state, `${side} Lifesteal heals ${ls}`)
+        }
+        // clean = some dmg got through Block, Parry and Shield (GDD)
+        const clean = !blocked && dealt > 0
+        if (clean) {
+          anyClean = true
+          cleanHits[side]++
+          if (card.def.type !== 'S') env.cleanPK[side]++
+        }
+      })
+      hitResults.set(card.uid, { blocked: allBlocked, clean: anyClean })
+      // On hit: fires right here, between hits, so e.g. a heal lands before the next enemy hit (Q 2026-10-17); once per card
+      effectOf(state, side, card)?.onHit?.(ctxFor(side, i, allBlocked, anyClean, false, i))
       if (usedNext) card.growNext = (card.growNext ?? 0) - usedNext || undefined
     }
   }
@@ -560,7 +611,7 @@ function resolveStrikes(
       blocked: chains[side]!.reduce((n, c) => n + (hitResults.get(c.uid)?.blocked ? 1 : 0), 0),
       criticalBlocked: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && hitResults.get(c.uid)?.blocked ? 1 : 0), 0),
       criticalClean: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && hitResults.get(c.uid)?.clean ? 1 : 0), 0),
-      criticalParried: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && outcome.get(c.uid)?.parried ? 1 : 0), 0),
+      criticalParried: chains[side]!.reduce((n, c, i) => n + (crit[side].has(i) && outcome.get(c.uid)?.some((o) => o.parried) ? 1 : 0), 0),
     }
     const extra = hooksOf(state.players[side]).reduce((t, h) => t + (h.afterChain?.(state, side, report) ?? 0), 0)
     if (extra) env.hitsTaken[other(side)] += extra
@@ -627,6 +678,7 @@ function resolveHeld(
         mult: [],
         enemyMult: null,
         pierce: [],
+        hits: [],
         blocked: false,
         clean: false,
       })

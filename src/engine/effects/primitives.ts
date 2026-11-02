@@ -196,6 +196,17 @@ export const pierce =
     if (ctx.chain.length) log(ctx.state, `${ctx.card.def.id}: Pierce (through Block${parry ? ' and Parry' : ''})`)
   }
 
+/** Before action only: the target cards in your chain get Flurry (hit {AS:1.flurryHits} times, dmg split between the hits). */
+export const flurry =
+  (target: 'this' | 'next' | 'following' | 'chain'): Act =>
+  (ctx) => {
+    if (!ctx.hits.length) return
+    const n = Math.max(2, tuningOf(ctx.state, ctx.self)['AS:1'].flurryHits)
+    const slots = target === 'chain' ? ctx.chain.map((_, i) => i) : targetSlots(ctx, target)
+    for (const i of slots) if (i < ctx.hits.length) ctx.hits[i] = Math.max(ctx.hits[i], n)
+    log(ctx.state, `${ctx.card.def.id}: Flurry (hits ${n} times)`)
+  }
+
 /** Before action only (Tank Shatter Guard): remove every Shield and Parry on the opponent, this card +n dmg per one removed. */
 export const shatter =
   (n: number): Act =>

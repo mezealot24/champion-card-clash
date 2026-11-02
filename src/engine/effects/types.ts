@@ -45,6 +45,8 @@ export type ChainCtx = BaseCtx & {
   enemyMult: number[] | null
   /** 1 = that slot of my chain ignores Block (Pierce). */
   pierce: number[]
+  /** Hits per slot of my chain (1 = normal, 2+ = Flurry, Sonic Bliz rework 2026-11-02). Empty for held cards. */
+  hits: number[]
   /** Hit phase only: was this hit stopped by Block? */
   blocked: boolean
   /** Hit phase only: did this hit land clean (not blocked, dmg > 0)? */

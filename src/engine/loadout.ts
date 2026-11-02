@@ -856,36 +856,11 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   // Sonic Bliz · Overdrive
   'AS:1:A1': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'dmgPerEnergy', v(k)) }),
   'AS:1:A2': (_, k) => ({ tune: (t, v) => add(t, 'AS:1', 'minChain', -v(k)) }),
-  'AS:1:A3': (amt) => ({
-    hooks: {
-      actionStart: foeActSeen,
-      beforeHits: (state, side, bonus, mult, _c, chain) => {
-        const p = state.players[side]
-        if (p.styleData?.odTurn !== state.turn || !chain?.length) return
-        // strongest chain card after Overdrive and every other boost so far
-        const best = Math.max(...chain.map((c, i) => Math.max(0, (c.def.dmg ?? 0) + (bonus[i] ?? 0)) * (mult[i] ?? 1)))
-        p.perkData = { ...p.perkData, echo: Math.floor((best * amt(state, side)) / 100), echoTurn: state.turn }
-      },
-      afterChain: (state, side) => {
-        const p = state.players[side]
-        if (p.perkData?.echoTurn !== state.turn) return 0
-        const n = p.perkData?.echo ?? 0
-        if (foeDid(state, side, 'block')) {
-          say(state, side, 'Echo: Blocked')
-          return 0
-        }
-        if (n <= 0 || state.players[other(side)].hp <= 0) return 0
-        hurt(state, other(side), n)
-        say(state, side, `Echo: replays the strongest card for ${n} dmg`)
-        return 1
-      },
-      endTurn: (state, side) => {
-        const p = state.players[side]
-        const n = num(state, side, 'AS:1', 'ascEchoCost')
-        if (p.perkData?.echoTurn !== state.turn || n <= 0 || !(p.res ?? 0)) return
-        p.res = Math.max(0, (p.res ?? 0) - n)
-        say(state, side, `Echo: loses ${n} Energy`)
-      },
+  // Storm (replaced Echo, Q 2026-11-02): Flurry cards hit one more time; Cost: Overdrive dmg per hit −1
+  'AS:1:A3': () => ({
+    tune: (t, v) => {
+      add(t, 'AS:1', 'flurryHits', v('ascStorm'))
+      add(t, 'AS:1', 'dmgPerEnergy', -v('ascStormCost'))
     },
   }),
   // Sonic Bliz · Acceleration

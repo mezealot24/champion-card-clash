@@ -62,6 +62,8 @@ export type ActSpec =
   | { a: 'mulDmg'; target: P.DmgTarget; pct: number; onlyType?: CardType }
   | { a: 'blockNow'; who: P.Who; n: number }
   | { a: 'pierce'; target: 'this' | 'next' | 'following' | 'chain'; parry?: boolean }
+  // Flurry (Sonic Bliz rework, Q 2026-11-02): the target cards hit twice, their dmg split between the hits
+  | { a: 'flurry'; target: 'this' | 'next' | 'following' | 'chain' }
   // Tank v3 (2026-10-28): remove the opponent's Shield and Parry first, this card +n dmg per one removed
   | { a: 'shatter'; n: number }
   | { a: 'steal' }
@@ -136,6 +138,7 @@ function act(s: ActSpec): Act {
     case 'mulDmg': return P.mulDmg(s.target, s.pct, s.onlyType)
     case 'blockNow': return P.blockNow(s.who, s.n)
     case 'pierce': return P.pierce(s.target, s.parry)
+    case 'flurry': return P.flurry(s.target)
     case 'shatter': return P.shatter(s.n)
     case 'steal': return P.steal
     case 'cut': return P.cut(s.which, s.n)

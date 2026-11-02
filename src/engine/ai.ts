@@ -110,8 +110,8 @@ function score(state: GameState, side: Side, w: AiWeights): number {
     const hp = (100 * (p.hp + shield)) / Math.max(1, p.maxHp)
     const full = p.hand.length >= handMaxOf(state, s) ? w.fullField : 1
     // cards on the Field are loaded dmg: worth a share of their dmg as % of the opponent's life bar
-    // Sonic Bliz Overdrive: the Energy bar turns into +N dmg on every card of a no-S Field of 3+
-    const loaded = p.hand.reduce((t, c) => t + c.def.dmg, 0) + overdriveAdd(state, s) * p.hand.length
+    // Sonic Bliz Overdrive: Energy left after Skills turns Punch / Kick cards into Flurry, +N dmg on each hit
+    const loaded = p.hand.reduce((t, c) => t + c.def.dmg, 0) + overdriveAdd(state, s)
     const field = (w.fieldValue * full * 100 * loaded) / Math.max(1, victim.maxHp)
     const status = p.statuses.reduce((t, x) => t + (STATUS_VALUE[x.kind] ?? 0) * Math.max(1, x.turns), 0)
     const stacks = Object.values(p.comboData ?? {}).reduce((t, n) => t + n, 0)

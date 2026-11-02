@@ -152,7 +152,7 @@ export const DEFAULT_RULES: RulesConfig = {
  * sweep = a Strike chain going back under the deck.
  */
 export type TurnEvent =
-  | { k: 'hit'; side: Side; slot: number; uid: string; type: CardType; dmg: number; dealt: number; blocked: boolean; parried: boolean; absorbed: number; crit: boolean }
+  | { k: 'hit'; side: Side; slot: number; uid: string; type: CardType; dmg: number; dealt: number; blocked: boolean; parried: boolean; absorbed: number; crit: boolean; flurry?: number }
   | { k: 'hp'; side: Side; delta: number }
   | { k: 'draw'; side: Side; card: CardInst; slot?: number } // slot = index it went to, when not the end of the Field
   | { k: 'discard'; side: Side; uid: string; reason: string }
