@@ -7,14 +7,15 @@ export const AS_PRESETS: Preset[] = [
   {
     id: 'as-blitz',
     name: 'Blitz Tempo',
-    pitch: 'Draw fast, Strike with no Skill, and let Overdrive turn every Energy into dmg.',
+    pitch: 'Fill the Field fast, Overdrive your Punches and Kicks into Flurry, and finish with a Skill.',
     style: 'AS:1',
     oath: 'o2',
     asc: ['A1', 'A2', 'A3', 'B1', 'B2', 'B3'],
+    // v2 (Sonic Bliz Flurry rework, Q 2026-11-02): Skills are back (5); Afterimage, Fast Hands and Rooftop Drop out
     deck: {
       'AS-006': 2, 'AS-015': 2, 'AS-025': 2, 'AS-029': 2, 'AS-034': 2,
-      'AS-004': 2, 'AS-012': 2, 'AS-016': 2, 'AS-026': 2, 'AS-018': 2, 'AS-005': 2, 'AS-033': 2,
-      'AS-010': 1,
+      'AS-004': 2, 'AS-012': 2, 'AS-026': 2, 'AS-018': 2, 'AS-005': 2,
+      'AS-037': 2, 'AS-032': 2, 'AS-022': 1,
     },
   },
   {

@@ -93,7 +93,8 @@ export const TUNING_FIELDS = {
   ],
   'AS:1': [
     { key: 'startDraw', label: 'Cards on Field at start', def: 3, min: 0, max: 5 },
-    { key: 'dmgPerEnergy', label: 'Overdrive dmg per Energy', def: 2 },
+    { key: 'dmgPerEnergy', label: 'Overdrive dmg per hit', def: 2, help: 'Added to every hit of the Flurry cards Overdrive picks' },
+    { key: 'flurryHits', label: 'Flurry hits per card', def: 2, min: 2, max: 4 },
     { key: 'minChain', label: 'Overdrive min chain', def: 3, min: 1, max: 5 },
     { key: 'dualDraw', label: 'Acceleration draw', def: 2, min: 0 },
     { key: 'shroudDraw', label: 'Shroud (Energy Surge Charge) extra draw', def: 1, min: 0, max: 5 },

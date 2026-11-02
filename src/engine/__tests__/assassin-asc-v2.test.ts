@@ -25,18 +25,15 @@ describe('Assassin v2 Ascendancy', () => {
   })
 
   describe('Sonic Bliz', () => {
-    it('Echo: an Overdrive replays its strongest card at 50%, Block stops it; loses 1 Energy', () => {
+    it('Storm: Overdrive Flurry cards hit 3 times; Cost: −1 dmg per hit', () => {
       let s = as('AS:1', ['A1', 'A2', 'A3'])
-      s.players.p1.res = 2
-      s.players.p1.hand = [hit(4), hit(10)]
+      s.players.p1.res = 1
+      s.players.p1.hand = [hit(9), hit(4)]
       s = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      expect(said(s, 'Echo: replays the strongest card for')).toBe(true)
-      expect(said(s, 'Echo: loses 1 Energy')).toBe(true) // 0 after Overdrive, the turn's +1 is lost
-      expect(s.players.p1.res).toBe(0)
-      s.players.p1.res = 2
-      s.players.p1.hand = [hit(4), hit(10)]
-      s = resolveTurn(s, { p1: 'strike', p2: 'block' })
-      expect(said(s, 'Echo: Blocked')).toBe(true)
+      // Redline +1 and Storm −1 per hit: 2 per hit; Hair Trigger lets 2 cards Overdrive
+      const hits = s.events!.filter((e) => e.k === 'hit' && e.side === 'p1')
+      expect(hits).toHaveLength(4)
+      expect(hits.map((e) => (e.k === 'hit' ? e.dmg : 0))).toEqual([5, 5, 5, 4])
     })
 
     it('Mach Speed: Strike into Charge draws 1, no Energy; one fewer card at start', () => {

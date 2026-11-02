@@ -923,4 +923,16 @@ export const TH: Record<string, string> = {
   'Juggernaut stacks: each one adds dmg to every card.': 'stack ของ Juggernaut: ทุก stack เพิ่ม dmg ให้ทุกใบ',
   'Fatal Rhythm: every few attacks hits for extra dmg.': 'Fatal Rhythm: ทุกๆ กี่ครั้งจะตีแรงพิเศษ',
   'Printed {base} dmg, {now} if you Strike now (all bonuses and cuts counted, foe not Blocking).': 'บนการ์ด {base} dmg ถ้า Strike ตอนนี้จะได้ {now} (นับบัฟ/ดีบัฟทั้งหมดแล้ว กรณีศัตรูไม่ Block)',
+  // Sonic Bliz Flurry rework (Q 2026-11-02)
+  'FLURRY': 'FLURRY',
+  'If this side Strikes now, Overdrive spends all Energy left after Skills: Punch / Kick cards get Flurry, about +{n} dmg in all.': 'ถ้าฝั่งนี้ Strike ตอนนี้ Overdrive จะใช้ Energy ที่เหลือหลังจ่าย S ทั้งหมด: การ์ด Punch / Kick ได้ Flurry รวมประมาณ +{n} dmg',
+  'Flurry': 'Flurry',
+  '{what} gain Flurry': '{what} ได้ Flurry',
+  'Overdrive +{ascRedline} dmg per hit.': 'Overdrive +{ascRedline} dmg ต่อ hit',
+  'Flurry cards hit {ascStorm} more time.': 'การ์ด Flurry ตีเพิ่ม {ascStorm} ครั้ง',
+  'Overdrive −{ascStormCost} dmg per hit.': 'Overdrive −{ascStormCost} dmg ต่อ hit',
+  'Hits twice; its dmg is split between the hits.': 'ตี 2 hit โดยแบ่ง dmg ของการ์ดเป็น 2 ก้อน',
+  'Overdrive: Energy left after Skills makes your Punch / Kick cards Flurry, +{dmgPerEnergy} dmg per hit. Strike vs Strike refills Energy.': 'Overdrive: Energy ที่เหลือหลังจ่าย S ทำให้การ์ด Punch / Kick ได้ Flurry ทุก hit +{dmgPerEnergy} dmg · Strike ชน Strike เติม Energy เต็ม',
+  'Start the game with {startDraw} cards on your Field. Acceleration: when you and the opponent both Strike, your Energy refills and you draw {dualDraw} at the end of the turn. Overdrive: Strike with {minChain}+ cards → spend the Energy left after Skills: that many Punch / Kick cards get Flurry, each hit +{dmgPerEnergy} dmg. Energy Surge: with full Energy at the start of the turn, Block or Charge spends it all. Block → Wraith Step: hits that get past your Block deal 1 dmg each. Charge → Shroud: no Charge break, and you draw {shroudDraw} more.': 'เริ่มเกมด้วยการ์ด {startDraw} ใบบน Field\nAcceleration: เมื่อคุณและศัตรู Strike พร้อมกัน Energy เติมเต็ม และจั่ว {dualDraw} ใบตอนจบเทิร์น\nOverdrive: Strike ด้วยการ์ด {minChain}+ ใบ → ใช้ Energy ที่เหลือหลังจ่าย S ทั้งหมด: การ์ด Punch / Kick ใบแรกๆ ได้ Flurry ตามจำนวน Energy ทุก hit +{dmgPerEnergy} dmg\nEnergy Surge: ถ้า Energy เต็มตอนต้นเทิร์น การ Block หรือ Charge จะใช้ทั้งหมด\nBlock → Wraith Step: hit ที่ผ่าน Block มาทำแค่ 1 dmg ต่อ hit\nCharge → Shroud: ไม่โดน Charge break และจั่วเพิ่ม {shroudDraw} ใบ',
+  'Fill the Field fast, Overdrive your Punches and Kicks into Flurry, and finish with a Skill.': 'เติม Field ให้ไว ใช้ Overdrive ให้ Punch กับ Kick ได้ Flurry แล้วปิดด้วย Skill',
 }

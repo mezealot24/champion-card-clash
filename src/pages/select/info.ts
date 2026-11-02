@@ -47,7 +47,7 @@ export const STYLE_SUMMARY: Record<string, string> = {
   'TK:2': 'Hits grow your Max HP. Grow into a Colossus, then Colossus Slam.',
   'BR:1': 'Warm-up at {warmUpRage}+ Rage: first {slots} chain cards +{warmUpDmg} dmg. Below {hpPct}% HP: True Fury +{bonusDmg}; stopped hits chip {chipDmg} and give {chipRage} Rage.',
   'BR:2': 'Each chain card adds a stack (+{dmgPerStack} dmg). Full stacks: lifesteal.',
-  'AS:1': 'Start with {startDraw} cards. Strike vs Strike refills Energy and draws {dualDraw}.',
+  'AS:1': 'Overdrive: Energy left after Skills makes your Punch / Kick cards Flurry, +{dmgPerEnergy} dmg per hit. Strike vs Strike refills Energy.',
   'AS:2': 'Every {every|ord} attack is a x{critMult} Critical.',
   'MG:1': 'Each paid S card ⟡ Infuses {MG.infusePerS} Ignite, even if Blocked. Ignite burns and cuts healing.',
   'MG:2': 'Start with Shield {frostArmorShield}. Each paid S card ⟡ Infuses {MG.infusePerS} Chill; {chillMax} Chill = Frozen.',

@@ -26,6 +26,7 @@ export const KEYWORDS: [string, string][] = [
   ['Endurance', 'Tank canisters: fill when hurt, cash in when you Strike.'],
   ['Momentum', 'Juggernaut stacks: each one adds dmg to every card.'],
   ['Critical', 'Fatal Rhythm: every few attacks hits for extra dmg.'],
+  ['Flurry', 'Hits twice; its dmg is split between the hits.'],
 ]
 
 /** The keywords a rules text uses, in glossary order (whole words; "Cut" also matches "Cuts"). */

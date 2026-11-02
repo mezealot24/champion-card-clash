@@ -4,6 +4,7 @@ import { freeze } from './combos'
 import { resIn, styleOn, wrapInClass } from './classes'
 export { freeze }
 import { tuningOf, type Tuning } from './tuning'
+import { costNow } from './resources'
 import type { Action, CardInst, GameState, PlayerState, Side } from './types'
 import { other } from './types'
 
@@ -123,7 +124,7 @@ export type StyleDef = {
    * bonus = dmg added per slot of this side's chain, mult = dmg multiplier per slot (applied after bonus),
    * crit = add a slot index to show that hit as Critical in the log
    */
-  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[], pierce?: number[], piercePct?: number[], enemyChain?: CardInst[]) => void
+  beforeHits?: (state: GameState, side: Side, bonus: number[], mult: number[], crit: Set<number>, chain?: CardInst[], pierce?: number[], piercePct?: number[], enemyChain?: CardInst[], flurry?: FlurryCtx) => void
   /** Strike chains only: after this side's chain has hit. Returns extra hits it landed (they count as hits taken). */
   afterChain?: (state: GameState, side: Side, r: ChainReport) => number
   /** Strike chains only: right after Before action combos, before Momentum and any hit (e.g. Juggernaut stacks) */
@@ -179,6 +180,9 @@ export type StyleDef = {
 export const PERK_HOOKS: Record<string, StyleDef> = {}
 
 /** Everything that hooks into a side's turn: its Style, then its loadout pieces in order. */
+/** Flurry (Sonic Bliz rework, Q 2026-11-02): hits per chain slot and dmg added to each of those hits. */
+export type FlurryCtx = { hits: number[]; perHit: number[] }
+
 export function hooksOf(p: PlayerState): StyleDef[] {
   // the boss: every class's Style and capstone, each run as its class
   if (p.boss) {
@@ -526,19 +530,21 @@ Object.assign(STYLES, {
     name: 'Sonic Bliz',
     startDraw: (t) => t['AS:1'].startDraw,
     /**
-     * Overdrive (Q 2026-10-16): Strike with 3+ cards (was a full Field of 5) and no S card in the chain → all Energy
-     * left is spent, every card in the chain gets +dmgPerEnergy dmg per Energy spent (Claude default).
-     * A Style, so Silence doesn't stop it.
+     * Overdrive v2 (Sonic Bliz rework, Q 2026-11-02, design/sonic-bliz-flurry-rework-2026-10-31.md): Strike with
+     * minChain+ cards (Skills allowed) → the Energy left after paying Skills is all spent: that many Punch / Kick cards,
+     * from the front of the chain, get Flurry and +dmgPerEnergy dmg on each of their hits. A Style, so Silence doesn't stop it.
      */
-    beforeHits: (state, side, bonus, _mult, _crit, chain) => {
+    beforeHits: (state, side, _bonus, _mult, _crit, chain, _pierce, _piercePct, _enemyChain, flurry) => {
       const p = state.players[side]
-      const energy = p.res ?? 0
-      const add = overdriveAdd(state, side, chain ?? p.hand)
-      if (!add) return
-      for (let i = 0; i < bonus.length; i++) bonus[i] += add
+      const plan = overdrivePlan(state, side, chain ?? p.hand)
+      if (!plan || !flurry) return
+      for (const i of plan.slots) {
+        flurry.hits[i] = Math.max(flurry.hits[i], plan.hits)
+        flurry.perHit[i] += plan.perHit
+      }
       p.res = 0
       p.styleData = { ...p.styleData, odTurn: state.turn } // for loadout pieces that react to an Overdrive
-      say(state, side, `Sonic Bliz Overdrive: spends all ${energy} Energy → every chain card +${add} dmg`)
+      say(state, side, `Sonic Bliz Overdrive: spends all ${plan.energy} Energy → ${plan.slots.length} card${plan.slots.length === 1 ? '' : 's'} Flurry, +${plan.perHit} dmg per hit`)
     },
     // Acceleration (Q 2026-10-16, replaces Extra Hits): Strike meets Strike → Energy full + draw 2 at the end of the turn
     dualStrike: { draw: (t) => t['AS:1'].dualDraw, fillRes: true },
@@ -730,15 +736,26 @@ Object.assign(STYLES, {
 } satisfies Record<string, StyleDef>)
 
 /**
- * Sonic Bliz Overdrive dmg each card would get if `side` Struck right now with its whole Field (0 = no Overdrive).
- * Shared by the Style, the AI's look-ahead score and the "Overdrive +N" chip on the battle HUD.
+ * Sonic Bliz Overdrive v2 if `side` Struck right now with this chain (undefined = no Overdrive): the slots that get
+ * Flurry, hits each and dmg per hit. Energy is what is left after paying the chain's Skills.
  */
-export function overdriveAdd(state: GameState, side: Side, chain: CardInst[] = state.players[side].hand): number {
+export function overdrivePlan(state: GameState, side: Side, chain: CardInst[] = state.players[side].hand) {
   const p = state.players[side]
-  if (!styleOn(p, 'AS:1') || !state.rules.resources || resIn(p, 'AS') <= 0) return 0
+  if (!styleOn(p, 'AS:1') || !state.rules.resources) return undefined
   const f = tuningOf(state, side)['AS:1']
-  if (chain.length < f.minChain || chain.some((c) => c.def.type === 'S')) return 0
-  return resIn(p, 'AS') * f.dmgPerEnergy
+  if (chain.length < f.minChain) return undefined
+  // before the chain is paid (HUD, AI), count the Skills' costs as already spent
+  const paid = chain === p.hand ? chain.filter((c) => c.def.type === 'S').reduce((t, c) => t + costNow(state, side, c), 0) : 0
+  const energy = Math.max(0, resIn(p, 'AS') - paid)
+  if (energy <= 0) return undefined
+  const slots = chain.map((c, i) => (c.def.type === 'S' ? -1 : i)).filter((i) => i >= 0).slice(0, energy)
+  return { energy, slots, hits: Math.max(2, f.flurryHits), perHit: f.dmgPerEnergy }
+}
+
+/** Extra dmg Overdrive would add to this chain right now (0 = none): for the AI's look-ahead and the battle HUD chip. */
+export function overdriveAdd(state: GameState, side: Side, chain: CardInst[] = state.players[side].hand): number {
+  const plan = overdrivePlan(state, side, chain)
+  return plan ? plan.slots.length * plan.hits * plan.perHit : 0
 }
 
 export const getStyle = (key?: string | null) => (key ? STYLES[key] : undefined)

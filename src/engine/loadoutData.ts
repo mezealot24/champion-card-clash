@@ -304,11 +304,12 @@ export const TREES: Record<string, TreeData> = {
     depth: 3,
     bonusPoints: 1,
     nodes: [
-      node('A1', 'Redline', 'Overdrive +{ascRedline} dmg per Energy.', 'ascRedline', 'dmg per Energy +', 1),
+      node('A1', 'Redline', 'Overdrive +{ascRedline} dmg per hit.', 'ascRedline', 'dmg per hit +', 1),
       node('A2', 'Hair Trigger', 'Overdrive needs {ascHairTrigger} fewer chain card.', 'ascHairTrigger', 'min chain −', 1),
-      capstone('A3', 'Echo', 'Overdrive replays your strongest chain card at {ascEcho}% dmg (no effects, Block stops it).', 'Lose {ascEchoCost} Energy at the end of that turn.', [
-        ['ascEcho', 'replay dmg %', 50, 0, 100],
-        ['ascEchoCost', 'Cost: Energy lost', 1],
+      // Storm replaced Echo (Sonic Bliz Flurry rework, Q 2026-11-02)
+      capstone('A3', 'Storm', 'Flurry cards hit {ascStorm} more time.', 'Overdrive −{ascStormCost} dmg per hit.', [
+        ['ascStorm', 'Flurry hits +', 1, 0, 2],
+        ['ascStormCost', 'Cost: Overdrive dmg per hit −', 1, 0],
       ]),
       node('B1', 'Quick Hands', 'Acceleration draws {ascQuickHands} more.', 'ascQuickHands', 'draw +', 1),
       node('B2', 'Slipstream', 'When Strike meets Strike, hits that reach you deal {ascSlipstream} less dmg.', 'ascSlipstream', 'dmg cut per hit', 2),
