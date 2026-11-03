@@ -1386,11 +1386,11 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
   }),
   'MG:2:D2': (amt) => ({
     hooks: {
-      endTurn: (state, side) => {
-        if (!freshFreeze(state, side, 8) || amt(state, side) <= 0) return
-        // lasts as long as the Frozen turn (statuses tick at the start of a turn)
-        state.players[other(side)].statuses.push({ kind: 'blockPlus', turns: 2, n: -amt(state, side) })
-        say(state, side, `❄ Frostbite: Frozen enemy's Block stops ${amt(state, side)} fewer hit${amt(state, side) === 1 ? '' : 's'}`)
+      beforeHits: (state, side, _bonus, mult) => {
+        // the Frozen turn (noStrike has ticked off by now; frozen outlasts it by one turn)
+        if (amt(state, side) <= 0 || !state.players[other(side)].statuses.some((s) => s.kind === 'frozen')) return
+        for (let i = 0; i < mult.length; i++) mult[i] *= 1 + amt(state, side) / 100
+        say(state, side, `❄ Frostbite: +${amt(state, side)}% dmg on the Frozen enemy`)
       },
     },
   }),

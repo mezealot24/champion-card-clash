@@ -162,13 +162,16 @@ describe('randomLoadout', () => {
       expect(t.players.p2.hand.some((c) => c.iced)).toBe(false)
       expect(hp - t.players.p1.hp).toBeLessThan(field * 5) // the 2 iced cards didn't hit
     })
-    it('Frostbite: a Frozen enemy\'s Block stops 1 fewer hit', () => {
-      const s = freezeFoe(['D1', 'D2'])
-      const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      n.players.p1.hand = [hit(4), hit(4)]
-      const hp = n.players.p2.hp
-      const t = resolveTurn(n, { p1: 'strike', p2: 'block' })
-      expect(hp - t.players.p2.hp).toBeGreaterThanOrEqual(4) // 2nd hit got past the 1-hit Block
+    it('Frostbite: your cards deal +25% dmg to a Frozen enemy', () => {
+      const run = (asc: string[]) => {
+        const n = resolveTurn(freezeFoe(asc), { p1: 'strike', p2: 'charge' })
+        n.players.p1.hand = [hit(8), hit(8)]
+        n.players.p2.hp = 100
+        const t = resolveTurn(n, { p1: 'strike', p2: 'charge' })
+        return t.log.some((l) => l.includes('Frostbite: +25%'))
+      }
+      expect(run(['D1', 'D2'])).toBe(true)
+      expect(run(['D1'])).toBe(false)
     })
     it('Shatterpoint: Shatter knocks out a Frozen enemy left at 12% Max HP or less', () => {
       const alive = freezeFoe(['A1', 'A2', 'A3'])

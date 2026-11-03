@@ -471,7 +471,8 @@ export const TREES: Record<string, TreeData> = {
       ),
       // Rime Hex rework (Q 2026-11-02): Frost Breath (MTG) replaces Cold Hands, Frostbite (LoR) replaces Frost Lock
       node('D1', 'Frost Breath', "When you Freeze the enemy, their {ascFrostBreath} oldest Field cards are iced: they sit out the enemy's next chain.", 'ascFrostBreath', 'cards iced', 2),
-      node('D2', 'Frostbite', "When you Freeze the enemy, their Block stops {ascFrostbite} fewer hit while they're Frozen.", 'ascFrostbite', 'Block hits −', 1),
+      // Frostbite v2 (Q 2026-11-03): Deep Freeze already lets your hits through a Frozen Block, so it adds dmg instead
+      node('D2', 'Frostbite', 'Your cards deal +{ascFrostbite}% dmg to a Frozen enemy.', 'ascFrostbite', 'dmg % vs Frozen', 25),
       capstone('D3', 'Glacial Prison', 'Frozen (and Thaw after it) lasts {ascGlacialPrison} more turn: the enemy can\'t Strike for longer.', 'Freeze needs {ascGlacialPrisonCost} more Chill.', [
         ['ascGlacialPrison', 'turns +', 1],
         ['ascGlacialPrisonCost', 'Cost: stacks to freeze +', 1],
