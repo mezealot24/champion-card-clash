@@ -9,6 +9,7 @@ import { champColor } from '../fighters'
 import { Portrait } from '../select/Portrait'
 import { tutorialDone } from '../settings'
 import { TimerSetting } from '../timer/TurnTimer'
+import { buildLabel, feedbackUrl } from '../../lib/beta'
 import { ARCADE_STAGES, cleared, type ArcadeRun } from '../arcade/arcade'
 import './menu.css'
 
@@ -90,6 +91,14 @@ export function TitleMenu(props: {
             ))}
           </nav>
         )}
+        <div className="tm-foot">
+          {feedbackUrl() && (
+            <a className="tm-small alt" href={feedbackUrl()!} target="_blank" rel="noreferrer">
+              {t('Report a bug')}
+            </a>
+          )}
+          <small className="tm-build">{buildLabel()}</small>
+        </div>
       </div>
     </div>
   )
