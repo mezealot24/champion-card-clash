@@ -1,9 +1,18 @@
 import { supabase } from '../lib/supabase'
 import { must, useAsync } from '../lib/useAsync'
 import { t, useLang } from '../i18n'
+import { useState } from 'react'
+import { betaUnlocked } from '../lib/beta'
 import { Battle, type BattleData } from './Battle'
+import { BetaGate } from './menu/BetaGate'
 
+// Closed Beta: the access code comes first (no-op when VITE_BETA_CODE is unset)
 export function BattlePage() {
+  const [open, setOpen] = useState(betaUnlocked)
+  return open ? <BattleLoader /> : <BetaGate onUnlock={() => setOpen(true)} />
+}
+
+function BattleLoader() {
   useLang()
   const { data, error } = useAsync(async (): Promise<BattleData> => {
     const [champions, cards, styles, config] = await Promise.all([

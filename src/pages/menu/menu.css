@@ -1,12 +1,12 @@
 /* Title menu + Arcade ladder. Same night palette as Champion select and the arena.
    Phone landscape first (Q plays on Android): fighters left, menu right; stacked in portrait. */
-.title-menu, .ladder { --s-bg: #150f29; --s-panel: #211940; --s-panel-2: #2b2152; --s-line: #3d3270; --s-text: #f4eefe; --s-muted: #b8acd8; --s-gold: #ffc84a; --ink: #0c0718;
+.title-menu, .ladder, .beta-gate { --s-bg: #150f29; --s-panel: #211940; --s-panel-2: #2b2152; --s-line: #3d3270; --s-text: #f4eefe; --s-muted: #b8acd8; --s-gold: #ffc84a; --ink: #0c0718;
   color-scheme: dark; color: var(--s-text); font-family: 'Nunito', 'Noto Sans Thai', system-ui, sans-serif; font-weight: 600;
   min-height: min(100dvh, 640px); border-radius: 16px; max-width: 960px; margin: 0 auto; overflow: hidden; position: relative; }
-.title-menu h1, .title-menu h2, .ladder h1 { font-family: 'Lilita One', 'Kanit', 'Arial Black', sans-serif; font-weight: 400; margin: 0; letter-spacing: .3px; }
-.title-menu button, .ladder button { font: inherit; cursor: pointer; }
+.title-menu h1, .title-menu h2, .ladder h1, .beta-gate h1, .beta-gate h2 { font-family: 'Lilita One', 'Kanit', 'Arial Black', sans-serif; font-weight: 400; margin: 0; letter-spacing: .3px; }
+.title-menu button, .ladder button, .beta-gate button { font: inherit; cursor: pointer; }
 .title-menu button:focus-visible, .ladder button:focus-visible { outline: 3px solid var(--s-text); outline-offset: 2px; }
-@media (max-width: 900px) { main:has(> .title-menu), main:has(> .ladder) { padding: 0; } .title-menu, .ladder { border-radius: 0; min-height: 100dvh; } }
+@media (max-width: 900px) { main:has(> .title-menu), main:has(> .ladder), main:has(> .beta-gate) { padding: 0; } .title-menu, .ladder, .beta-gate { border-radius: 0; min-height: 100dvh; } }
 
 /* ---- title ---- */
 .title-menu { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(260px, 1fr); align-items: center; gap: 12px; padding: 16px;
@@ -103,3 +103,14 @@
 @keyframes boss-face { 0%, 22% { opacity: 1; } 28%, 100% { opacity: 0; } }
 .ld-stages li.ld-boss:not(.won):not(.next) .ld-foe .face { filter: brightness(0) drop-shadow(0 0 3px #d46bff); }
 @media (prefers-reduced-motion: reduce) { .portrait.boss .face { animation: none; } .portrait.boss .face:first-child { opacity: 1; } }
+
+/* Closed Beta: build label, bug button, access-code screen */
+.tm-foot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tm-foot a.tm-small { text-decoration: none; font-size: 14px; padding: 6px 12px; }
+.tm-build { font-size: 12px; color: var(--s-muted); letter-spacing: .3px; }
+.beta-gate { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: var(--s-bg); padding: 24px 16px; }
+.beta-gate > * { width: 100%; max-width: 360px; }
+.beta-gate .tm-logo { align-items: center; }
+.beta-gate .tm-build { text-align: center; }
+.beta-gate .tm-small { align-self: stretch; }
+.beta-gate input { font-size: 18px; padding: 8px 12px; text-transform: uppercase; letter-spacing: 2px; background: var(--s-panel-2); color: var(--s-text); border: 1px solid var(--s-line); border-radius: 10px; }
