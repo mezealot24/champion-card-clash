@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { createGame, legalActions, resolveTurn } from '../index'
 import { heal } from '../state'
-import { resolveTuning } from '../tuning'
+import { resolveTuning, tuningOf } from '../tuning'
 import type { CardDef, CardInst, GameState } from '../index'
 import { describeAct, describeCond } from '../effects/describe'
 import { isDrawback, type CondSpec, type EffectSpec } from '../effects/spec'
@@ -159,7 +159,7 @@ describe('Cryomancer', () => {
     expect(frozen(n)).toBe(true)
     expect(n.players.p1.hand.length).toBe(field + 1 + 2) // Charge 1 + Flash Freeze 2
   })
-  it('Shatter: the first clean hit on a Frozen enemy takes 15% Max HP, once; through Block only half', () => {
+  it('Shatter: the first clean hit on a Frozen enemy takes 15% Max HP, once; Deep Freeze: a Frozen Block stops nothing', () => {
     const frozenFoe = () => {
       const s = fresh()
       s.players.p2.statuses.push({ kind: 'chill', turns: 3, n: 3 })
@@ -174,10 +174,16 @@ describe('Cryomancer', () => {
     const blocked = frozenFoe()
     blocked.players.p1.hand = [hit(1), hit(1)]
     const b = resolveTurn(blocked, { p1: 'strike', p2: 'block' })
-    expect(blocked.players.p2.hp - b.players.p2.hp).toBe(7) // 50% of 15% of 100, rounded down
-    expect(b.log.some((l) => l.includes('Shatter through Block (50%)'))).toBe(true)
+    expect(blocked.players.p2.hp - b.players.p2.hp).toBe(2 + 15) // Deep Freeze: both hits clean, full Shatter
     b.players.p1.hand = [hit(1)]
     expect(resolveTurn(b, { p1: 'strike', p2: 'charge' }).players.p2.hp).toBe(b.players.p2.hp - 1) // once per Freeze
+    // Admin sets frozenBlockHits 2: the Block stops both hits, Shatter through Block at half
+    const old = frozenFoe()
+    old.players.p1.tuning = { ...tuningOf(old, 'p1'), 'MG:2': { ...tuningOf(old, 'p1')['MG:2'], frozenBlockHits: 2 } }
+    old.players.p1.hand = [hit(1), hit(1)]
+    const o = resolveTurn(old, { p1: 'strike', p2: 'block' })
+    expect(old.players.p2.hp - o.players.p2.hp).toBe(7) // 50% of 15% of 100, rounded down
+    expect(o.log.some((l) => l.includes('Shatter through Block (50%)'))).toBe(true)
   })
   it('Thaw: a side that just thawed can\'t be Frozen again yet', () => {
     const s = fresh()

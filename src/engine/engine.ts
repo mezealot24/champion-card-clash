@@ -293,7 +293,10 @@ function blockStopsFor(state: GameState, side: Side): number {
   const p = state.players[side]
   const extra = p.statuses.filter((s) => s.kind === 'blockPlus').reduce((t, s) => t + (s.n ?? 1), 0)
   const perks = hooksOf(p).reduce((t, h) => t + (h.blockBonus?.(state, side) ?? 0), 0)
-  return Math.max(0, state.rules.blockStopsHits + extra + perks)
+  const stops = Math.max(0, state.rules.blockStopsHits + extra + perks)
+  // Deep Freeze (Q 2026-11-03): on its Frozen turn a side's Block stops at most frozenBlockHits (the Cryomancer's number) of the hits
+  // (by now noStrike has ticked off; frozen outlasts it by one turn for exactly this)
+  return p.statuses.some((s) => s.kind === 'frozen') ? Math.min(stops, Math.max(0, tuningOf(state, other(side))['MG:2'].frozenBlockHits)) : stops
 }
 
 function resolveStrikes(

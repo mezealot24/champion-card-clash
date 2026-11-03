@@ -162,13 +162,16 @@ describe('randomLoadout', () => {
       expect(t.players.p2.hand.some((c) => c.iced)).toBe(false)
       expect(hp - t.players.p1.hp).toBeLessThan(field * 5) // the 2 iced cards didn't hit
     })
-    it('Frostbite: a Frozen enemy\'s Block stops 1 fewer hit', () => {
-      const s = freezeFoe(['D1', 'D2'])
-      const n = resolveTurn(s, { p1: 'strike', p2: 'charge' })
-      n.players.p1.hand = [hit(4), hit(4)]
-      const hp = n.players.p2.hp
-      const t = resolveTurn(n, { p1: 'strike', p2: 'block' })
-      expect(hp - t.players.p2.hp).toBeGreaterThanOrEqual(4) // 2nd hit got past the 1-hit Block
+    it('Frostbite: your cards deal +25% dmg to a Frozen enemy', () => {
+      const run = (asc: string[]) => {
+        const n = resolveTurn(freezeFoe(asc), { p1: 'strike', p2: 'charge' })
+        n.players.p1.hand = [hit(8), hit(8)]
+        n.players.p2.hp = 100
+        const t = resolveTurn(n, { p1: 'strike', p2: 'charge' })
+        return t.log.some((l) => l.includes('Frostbite: +25%'))
+      }
+      expect(run(['D1', 'D2'])).toBe(true)
+      expect(run(['D1'])).toBe(false)
     })
     it('Shatterpoint: Shatter knocks out a Frozen enemy left at 12% Max HP or less', () => {
       const alive = freezeFoe(['A1', 'A2', 'A3'])
@@ -183,9 +186,11 @@ describe('randomLoadout', () => {
       expect(n.players.p2.hp).toBe(0)
       expect(n.winner).toBe('p1')
     })
-    it('Black Ice: Shatter through Block goes from half to full', () => {
-      expect(tuningOf(mg('MG:2', []), 'p1')['MG:2'].shatterBlockPct).toBe(50)
-      expect(tuningOf(mg('MG:2', ['A1', 'A2']), 'p1')['MG:2'].shatterBlockPct).toBe(100)
+    it('Deep Cold: Freeze needs 1 less Chill, Eternal Winter still sets its own max', () => {
+      expect(tuningOf(mg('MG:2', []), 'p1')['MG:2'].chillMax).toBe(4)
+      expect(tuningOf(mg('MG:2', ['A1', 'A2']), 'p1')['MG:2'].chillMax).toBe(3)
+      expect(tuningOf(mg('MG:2', ['A1', 'A2', 'B1', 'B2', 'B3']), 'p1')['MG:2'].chillMax).toBe(5)
+      expect(tuningOf(mg('MG:2', ['B1', 'B2', 'B3', 'A1', 'A2']), 'p1')['MG:2'].chillMax).toBe(5)
     })
     it('Rime Armor: every hit the Shield soaks gives 1 more Chill', () => {
       const s = game('MG', { asc: ['C1'], points: 6 }, 'MG:2')

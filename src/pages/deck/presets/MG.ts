@@ -26,10 +26,11 @@ export const MG_PRESETS: Preset[] = [
   {
     id: 'mg-glacier',
     name: 'Glacier Lock',
-    pitch: 'Hide behind ice, lock what they can do, and win the long game.',
+    // Q 2026-11-03 (Arcade sim): Eternal Winter capstone; the old build took no capstone and won ~39% a stage
+    pitch: 'Pile on Chill that never melts: they hit softer every turn while your Skills hit harder.',
     style: 'MG:2',
     oath: 'o2',
-    asc: ['B1', 'B2', 'C1', 'C2', 'D1', 'D2'],
+    asc: ['B1', 'B2', 'B3', 'A1', 'C1', 'C2'],
     deck: {
       'MG-004': 2, // Frostbite
       'MG-005': 1, // Mind Boggle

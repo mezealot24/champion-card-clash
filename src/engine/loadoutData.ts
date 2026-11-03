@@ -441,8 +441,8 @@ export const TREES: Record<string, TreeData> = {
     maxCapstones: 1,
     nodes: [
       node('A1', 'Brittle', 'Your cards deal +{ascBrittle}% dmg for each Chill stack on the enemy.', 'ascBrittle', 'dmg % per enemy Chill', 10),
-      // Black Ice replaces Cold Snap (Q 2026-10-31 playtest): Shatter through Block, base half → full
-      node('A2', 'Black Ice', 'Shatter through a Block is stronger: +{ascBlackIce}% of the full Shatter (up to 100%).', 'ascBlackIce', 'Shatter through Block % +', 50, 0, 100),
+      // Deep Cold replaces Black Ice (Q 2026-11-03, Arcade: the Shatter branch had no way to Freeze sooner)
+      node('A2', 'Deep Cold', 'Freeze needs {ascDeepCold} less Chill.', 'ascDeepCold', 'stacks to freeze −', 1, 0, 3),
       // Shatterpoint rework (Q 2026-11-02, Dota Ice Blast): an execute line instead of +numbers
       capstone('A3', 'Shatterpoint', 'Shatter knocks out a Frozen enemy left at {ascShatterExec}% Max HP or less.', 'Frost Armor (and Frozen Tomb) Shield −{ascShatterpointCost}.', [
         ['ascShatterExec', 'execute line % Max HP', 12, 0, 100],
@@ -471,7 +471,8 @@ export const TREES: Record<string, TreeData> = {
       ),
       // Rime Hex rework (Q 2026-11-02): Frost Breath (MTG) replaces Cold Hands, Frostbite (LoR) replaces Frost Lock
       node('D1', 'Frost Breath', "When you Freeze the enemy, their {ascFrostBreath} oldest Field cards are iced: they sit out the enemy's next chain.", 'ascFrostBreath', 'cards iced', 2),
-      node('D2', 'Frostbite', "When you Freeze the enemy, their Block stops {ascFrostbite} fewer hit while they're Frozen.", 'ascFrostbite', 'Block hits −', 1),
+      // Frostbite v2 (Q 2026-11-03): Deep Freeze already lets your hits through a Frozen Block, so it adds dmg instead
+      node('D2', 'Frostbite', 'Your cards deal +{ascFrostbite}% dmg to a Frozen enemy.', 'ascFrostbite', 'dmg % vs Frozen', 25),
       capstone('D3', 'Glacial Prison', 'Frozen (and Thaw after it) lasts {ascGlacialPrison} more turn: the enemy can\'t Strike for longer.', 'Freeze needs {ascGlacialPrisonCost} more Chill.', [
         ['ascGlacialPrison', 'turns +', 1],
         ['ascGlacialPrisonCost', 'Cost: stacks to freeze +', 1],
