@@ -183,9 +183,11 @@ describe('randomLoadout', () => {
       expect(n.players.p2.hp).toBe(0)
       expect(n.winner).toBe('p1')
     })
-    it('Black Ice: Shatter through Block goes from half to full', () => {
-      expect(tuningOf(mg('MG:2', []), 'p1')['MG:2'].shatterBlockPct).toBe(50)
-      expect(tuningOf(mg('MG:2', ['A1', 'A2']), 'p1')['MG:2'].shatterBlockPct).toBe(100)
+    it('Deep Cold: Freeze needs 1 less Chill, Eternal Winter still sets its own max', () => {
+      expect(tuningOf(mg('MG:2', []), 'p1')['MG:2'].chillMax).toBe(4)
+      expect(tuningOf(mg('MG:2', ['A1', 'A2']), 'p1')['MG:2'].chillMax).toBe(3)
+      expect(tuningOf(mg('MG:2', ['A1', 'A2', 'B1', 'B2', 'B3']), 'p1')['MG:2'].chillMax).toBe(5)
+      expect(tuningOf(mg('MG:2', ['B1', 'B2', 'B3', 'A1', 'A2']), 'p1')['MG:2'].chillMax).toBe(5)
     })
     it('Rime Armor: every hit the Shield soaks gives 1 more Chill', () => {
       const s = game('MG', { asc: ['C1'], points: 6 }, 'MG:2')

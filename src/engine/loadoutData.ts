@@ -441,8 +441,8 @@ export const TREES: Record<string, TreeData> = {
     maxCapstones: 1,
     nodes: [
       node('A1', 'Brittle', 'Your cards deal +{ascBrittle}% dmg for each Chill stack on the enemy.', 'ascBrittle', 'dmg % per enemy Chill', 10),
-      // Black Ice replaces Cold Snap (Q 2026-10-31 playtest): Shatter through Block, base half → full
-      node('A2', 'Black Ice', 'Shatter through a Block is stronger: +{ascBlackIce}% of the full Shatter (up to 100%).', 'ascBlackIce', 'Shatter through Block % +', 50, 0, 100),
+      // Deep Cold replaces Black Ice (Q 2026-11-03, Arcade: the Shatter branch had no way to Freeze sooner)
+      node('A2', 'Deep Cold', 'Freeze needs {ascDeepCold} less Chill.', 'ascDeepCold', 'stacks to freeze −', 1, 0, 3),
       // Shatterpoint rework (Q 2026-11-02, Dota Ice Blast): an execute line instead of +numbers
       capstone('A3', 'Shatterpoint', 'Shatter knocks out a Frozen enemy left at {ascShatterExec}% Max HP or less.', 'Frost Armor (and Frozen Tomb) Shield −{ascShatterpointCost}.', [
         ['ascShatterExec', 'execute line % Max HP', 12, 0, 100],

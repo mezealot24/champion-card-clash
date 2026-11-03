@@ -1279,7 +1279,12 @@ const NODE_FX: Record<string, (amt: (state: GameState, side: Side) => number, ke
       },
     },
   }),
-  'MG:2:A2': (_, k) => ({ tune: (t, v) => add(t, 'MG:2', 'shatterBlockPct', v(k)) }),
+  // Deep Cold (Q 2026-11-03): Freeze sooner. Eternal Winter sets max Chill outright, so it wins either way round
+  'MG:2:A2': (_, k) => ({
+    tune: (t, v) => {
+      if (!t['MG:2'].chillNoFreeze) add(t, 'MG:2', 'chillMax', -v(k))
+    },
+  }),
   // Shatterpoint (Q 2026-11-02, Dota Ice Blast): Shatter executes at or below a HP line
   'MG:2:A3': (_, k) => ({
     tune: (t, v) => {

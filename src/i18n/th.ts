@@ -149,7 +149,7 @@ export const TH: Record<string, string> = {
   'Build overview': 'ภาพรวมบิลด์',
   // Mage presets
   'Pile on Ignite with every Skill, then Silence them and drop the Meteor.': 'กอง Ignite ด้วย Skill ทุกใบ แล้ว Silence ศัตรูก่อนทิ้ง Meteor ปิดเกม',
-  'Hide behind ice, lock what they can do, and win the long game.': 'หลบหลังกำแพงน้ำแข็ง ล็อกทุกการกระทำของศัตรู แล้วชนะเกมยาว',
+  'Pile on Chill that never melts: they hit softer every turn while your Skills hit harder.': 'กอง Chill ที่ไม่มีวันละลาย: ศัตรูตีเบาลงทุกเทิร์น ส่วน Skill ของเราแรงขึ้นเรื่อยๆ',
   // Tank presets
   'Outgrow them: Block to grow Max HP, heal off it, win late with a heavy Punch chain.': 'โตให้ไวกว่า: Block ให้ Max HP โต ฮีลจาก Max HP ที่โตแล้ว ปิดเกมท้ายด้วย chain Punch หนักๆ',
   'Guard and hit back: stack Shield and Parry, spin on big Blocks, cash in Endurance with Duel.': 'ตั้งการ์ดแล้วสวน: ซ้อน Shield กับ Parry, Block ได้หลายฮิตก็หมุนสวน แล้วเก็บ Endurance ปิดด้วย Duel',
@@ -837,7 +837,7 @@ export const TH: Record<string, string> = {
   'Once a match, a knockout hit leaves you on 1 HP: heal {ascRebirth}% Max HP and the enemy gets max Ignite.': 'แมตช์ละครั้ง hit ที่จะน็อกคุณเหลือ 1 HP\nฮีล {ascRebirth}% ของ Max HP\nศัตรูติด Ignite เต็ม',
   '−{ascRebirthCost} Max HP.': 'Max HP −{ascRebirthCost}',
   'Your cards deal +{ascBrittle}% dmg for each Chill stack on the enemy.': 'การ์ดของคุณ +{ascBrittle}% dmg ต่อ Chill stack บนศัตรู',
-  'Shatter through a Block is stronger: +{ascBlackIce}% of the full Shatter (up to 100%).': 'Shatter ทะลุ Block แรงขึ้น: +{ascBlackIce}% ของ Shatter เต็ม (สูงสุด 100%)',
+  'Freeze needs {ascDeepCold} less Chill.': 'Freeze ใช้ Chill น้อยลง {ascDeepCold} ชั้น',
   'Shatter knocks out a Frozen enemy left at {ascShatterExec}% Max HP or less.': 'Shatter น็อกศัตรูที่ Frozen ซึ่งเหลือ HP ไม่เกิน {ascShatterExec}% ของ Max HP',
   'Frost Armor (and Frozen Tomb) Shield −{ascShatterpointCost}.': 'Shield ของ Frost Armor (และ Frozen Tomb) −{ascShatterpointCost}',
   'Each Chill cuts +{ascNumbingCold}% more dmg.': 'Chill แต่ละ stack ลด dmg เพิ่มอีก +{ascNumbingCold}%',

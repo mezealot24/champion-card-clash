@@ -134,7 +134,7 @@ export const TUNING_FIELDS = {
     { key: 'chillDmgCut', label: 'Dmg cut % per Chill', def: 10, min: 0, max: 100 },
     { key: 'shatterPct', label: 'Shatter % Max HP', def: 15, min: 0, max: 100, help: 'Your first clean hit on a Frozen enemy' },
     { key: 'shatterExecPct', label: 'Shatter execute line % Max HP (0 = off)', def: 0, min: 0, max: 100, help: 'Shatterpoint (Ascendancy) sets it' },
-    { key: 'shatterBlockPct', label: 'Shatter through Block (% of full Shatter)', def: 50, min: 0, max: 100, help: 'When the Frozen enemy Blocks your Strike; Black Ice (Ascendancy) raises it' },
+    { key: 'shatterBlockPct', label: 'Shatter through Block (% of full Shatter)', def: 50, min: 0, max: 100, help: 'When the Frozen enemy Blocks your Strike' },
     { key: 'chillNoFreeze', label: 'Chill never freezes (1 = on)', def: 0, min: 0, max: 1, help: 'Eternal Winter (Ascendancy) turns it on' },
     { key: 'thawTurns', label: 'Thaw turns (no Freeze again)', def: 2, min: 0, help: 'After Frozen ends, this many turns the enemy can\'t be Frozen again' },
     { key: 'freezeDraw', label: 'Flash Freeze: cards drawn on a Freeze', def: 2, min: 0 },
