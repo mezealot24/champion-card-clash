@@ -1,0 +1,6 @@
+{
+    "name": "CardClash.Client",
+    "rootNamespace": "CardClash.Client",
+    "references": ["CardClash.Core"],
+    "autoReferenced": true
+}
